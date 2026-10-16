@@ -9,8 +9,14 @@ delete process.env.BOT_TOKEN;
 let api: typeof import('./api.ts').api;
 let rateLimiter: typeof import('./api.ts').rateLimiter;
 let chatLink: typeof import('./chatLink.ts');
+let db: typeof import('./db.ts');
+let botModule: typeof import('./bot.ts');
 before(async () => {
   ({ api, rateLimiter } = await import('./api.ts'));
+  botModule = await import('./bot.ts');
+  db = await import('./db.ts');
+  // Most tests act as a chat admin; the admin check itself is covered separately.
+  botModule.setBotTestHooks({ chatMember: async () => 'administrator' });
   chatLink = await import('./chatLink.ts');
 });
 
@@ -848,6 +854,74 @@ test('foreign expense: PUT can change the rate, switch to the group currency and
 let nextChat = -1001000;
 const newChat = () => nextChat--;
 const entries = async (user: number, g: Json) => (await history(user, g)).items;
+
+test('attach: only chat creator/administrator may link; others get 403', async () => {
+  const u = newUser();
+  const g = await createGroup(u);
+  for (const status of ['member', 'restricted', 'left']) {
+    botModule.setBotTestHooks({ chatMember: async () => status });
+    const token = chatLink.createChatLink(newChat(), 'Чат', u);
+    const res = await call(u, 'POST', `/chat-links/${token}/attach`, { groupId: g.id });
+    assert.equal(res.status, 403);
+    assert.equal(res.body.error, 'Привязать чат может только администратор чата');
+    assert.equal(chatLink.checkChatLink(token).problem, undefined);
+  }
+  botModule.setBotTestHooks({ chatMember: async () => 'creator' });
+  const token = chatLink.createChatLink(newChat(), 'Чат', u);
+  assert.equal((await call(u, 'POST', `/chat-links/${token}/attach`, { groupId: g.id })).status, 200);
+  botModule.setBotTestHooks({ chatMember: async () => 'administrator' });
+});
+
+test('attach: bot unavailable gives 503', async () => {
+  const u = newUser();
+  const g = await createGroup(u);
+  const token = chatLink.createChatLink(newChat(), 'Чат', u);
+  botModule.setBotTestHooks(); // no hook, no bot token: bot is not ready
+  assert.equal((await call(u, 'POST', `/chat-links/${token}/attach`, { groupId: g.id })).status, 503);
+  botModule.setBotTestHooks({
+    chatMember: async () => {
+      throw new Error('chat not found');
+    },
+  });
+  assert.equal((await call(u, 'POST', `/chat-links/${token}/attach`, { groupId: g.id })).status, 503);
+  botModule.setBotTestHooks({ chatMember: async () => 'administrator' });
+  assert.equal((await call(u, 'POST', `/chat-links/${token}/attach`, { groupId: g.id })).status, 200);
+});
+
+test('createChatLink reuses the valid unused token of the chat', () => {
+  const u = newUser();
+  const chatId = newChat();
+  const a = chatLink.createChatLink(chatId, 'Чат', u);
+  assert.equal(chatLink.createChatLink(chatId, 'Чат', u), a);
+  assert.notEqual(chatLink.createChatLink(newChat(), 'Другой', u), a);
+  // An expired token is not reused.
+  const old = chatLink.createChatLink(newChat(), 'Старый', u, new Date(Date.now() - 25 * 3600_000));
+  assert.notEqual(chatLink.createChatLink(chatLinkChatOf(old), 'Старый', u), old);
+});
+
+function chatLinkChatOf(token: string): number {
+  return chatLink.checkChatLink(token, new Date(Date.now() - 25 * 3600_000)).link!.chat_id;
+}
+
+test('cleanupChatLinks removes only used/expired tokens older than 7 days', () => {
+  const u = newUser();
+  const day = 24 * 3600_000;
+  const row = (token: string) => db.one('SELECT token FROM chat_links WHERE token = ?', token);
+  const oldExpired = chatLink.createChatLink(newChat(), 'a', u, new Date(Date.now() - 9 * day));
+  const recentExpired = chatLink.createChatLink(newChat(), 'b', u, new Date(Date.now() - 3 * day));
+  const fresh = chatLink.createChatLink(newChat(), 'c', u);
+  const oldUsed = chatLink.createChatLink(newChat(), 'd', u, new Date(Date.now() - 20 * day));
+  db.run("UPDATE chat_links SET used_at = datetime('now', '-10 days') WHERE token = ?", oldUsed);
+  const recentUsed = chatLink.createChatLink(newChat(), 'e', u);
+  db.run("UPDATE chat_links SET used_at = datetime('now', '-1 days') WHERE token = ?", recentUsed);
+  chatLink.cleanupChatLinks();
+  assert.equal(row(oldExpired), undefined);
+  assert.equal(row(oldUsed), undefined);
+  assert.ok(row(recentExpired));
+  assert.ok(row(fresh));
+  assert.ok(row(recentUsed));
+  assert.equal(chatLink.cleanupChatLinks(), 0);
+});
 
 test('chat link token: 24 URL-safe characters', () => {
   assert.match(chatLink.newChatToken(), /^[A-Za-z0-9_-]{24}$/);

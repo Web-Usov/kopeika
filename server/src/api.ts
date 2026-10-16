@@ -10,6 +10,7 @@ import { expenseSnapshot, listActivity, logActivity } from './activity.ts';
 import { type TelegramUser, validateInitData } from './auth.ts';
 import {
   appLink,
+  chatMemberStatus,
   loadExpenseSnap,
   notifyChatLinked,
   notifyExpense,
@@ -331,6 +332,15 @@ api.post('/chat-links/:token/attach', async (c) => {
   const body = z.object({ groupId: z.number().int().positive() }).parse(await c.req.json());
   const link = loadChatLink(c.req.param('token'));
   const { group, me } = loadGroupFor(String(body.groupId), user.id);
+  // Only a chat admin may link the chat: the token is visible to every member of the chat.
+  let status: string | null;
+  try {
+    status = await chatMemberStatus(link.chat_id, user.id);
+  } catch {
+    throw fail(503, 'errors.botUnavailable');
+  }
+  if (status === null) throw fail(503, 'errors.botUnavailable');
+  if (status !== 'creator' && status !== 'administrator') throw fail(403, 'errors.chatLinkNotAdmin');
   attachChat(link, group, user.id);
   const linked = one<GroupRow>('SELECT * FROM groups WHERE id = ?', group.id)!;
   notifyChatLinked(link.chat_id, linked, c.get('lang'));
