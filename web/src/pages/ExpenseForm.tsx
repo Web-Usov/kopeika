@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CATEGORIES,
   type CategoryId,
@@ -71,6 +71,28 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
   const [categoryPicked, setCategoryPicked] = useState(Boolean(expense));
   const [saving, setSaving] = useState(false);
 
+  const chipsRef = useRef<HTMLDivElement>(null);
+  // Keep the selected chip visible in the scrollable row. A new expense starts at the beginning of the row.
+  const firstRun = useRef(true);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the category changes
+  useEffect(() => {
+    const row = chipsRef.current;
+    const first = firstRun.current;
+    firstRun.current = false;
+    if (!row || (first && !expense)) return;
+    const chip = row.querySelector<HTMLElement>('.chip.active');
+    if (!chip) return;
+    const pad = 16;
+    const rowRect = row.getBoundingClientRect();
+    const chipRect = chip.getBoundingClientRect();
+    const start = chipRect.left - rowRect.left + row.scrollLeft;
+    const end = start + chipRect.width;
+    let left = row.scrollLeft;
+    if (start - pad < left) left = start - pad;
+    else if (end + pad > left + row.clientWidth) left = end + pad - row.clientWidth;
+    if (left !== row.scrollLeft) row.scrollTo({ left, behavior: first ? 'auto' : 'smooth' });
+  }, [category]);
+
   const amount = parseAmount(amountStr);
   const update = (id: number, patch: Partial<Participant>) => setParts((p) => ({ ...p, [id]: { ...p[id], ...patch } }));
 
@@ -141,7 +163,19 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
             if (!categoryPicked) setCategory(suggestCategory(e.target.value, lang) ?? DEFAULT_CATEGORY);
           }}
         />
-        <div className="chips">
+        <div className="amount-field">
+          <input
+            className="field amount"
+            inputMode="decimal"
+            placeholder="0"
+            value={amountStr}
+            onChange={(e) => setAmountStr(e.target.value)}
+          />
+          <span className="currency">{g.currency}</span>
+        </div>
+        {amountStr && amount === null && <div className="field-error">{t('expense.amountError')}</div>}
+        <div className="chips-caption">{t('expense.categorySection')}</div>
+        <div className="chips" ref={chipsRef}>
           {CATEGORIES.map((c) => (
             <button
               key={c.id}
@@ -154,21 +188,11 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
                 setCategoryPicked(true);
               }}
             >
-              <span aria-hidden="true">{c.emoji}</span> {t(categoryKey(c.id))}
+              <span aria-hidden="true">{c.emoji}</span>
+              {t(categoryKey(c.id))}
             </button>
           ))}
         </div>
-        <div className="amount-field">
-          <input
-            className="field amount"
-            inputMode="decimal"
-            placeholder="0"
-            value={amountStr}
-            onChange={(e) => setAmountStr(e.target.value)}
-          />
-          <span className="currency">{g.currency}</span>
-        </div>
-        {amountStr && amount === null && <div className="field-error">{t('expense.amountError')}</div>}
       </Section>
 
       <Section title={t('expense.whoPaid')}>
