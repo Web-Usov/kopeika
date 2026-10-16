@@ -318,6 +318,32 @@ export const en: Dict = {
     chatUnlinked: 'The chat is unlinked from the group',
     chatNotLinked: "This chat isn't linked to any group",
     chatAdminOnly: 'Only chat admins can unlink the chat',
+    balanceTitle: 'Total spent: {total}',
+    balanceMembers: 'Balances',
+    balanceSettle: 'How to settle up',
+    balanceSettleLine: '{from} → {to}: {amount}',
+    balanceSettled: 'All settled up 🎉',
+    balanceMore: 'and {count} more',
+    balanceUnlinked: "This chat isn't linked to a group. Link it and /balance will show balances here.",
+    balanceUnlinkedNoButton: "This chat isn't linked to a group, and linking is unavailable right now.",
+    balancePrivateTitle: 'Your balances by group',
+    balancePrivateEmpty: "You don't have any groups yet. Open Kopeika and create the first one.",
+    balancePrivateSettled: 'settled up',
+    helpPrivate:
+      'I am Kopeika: I help split shared expenses.\n\n' +
+      '/balance - your balances in each group\n' +
+      '/help - this message\n\n' +
+      'Groups, expenses and transfers live in the app. I will message you when someone adds an expense you take part in.',
+    helpGroup:
+      'I am Kopeika: I help split shared expenses.\n\n' +
+      '/balance - who owes whom\n' +
+      '/unlink - unlink the chat from the group (admins only)\n' +
+      '/help - this message\n\n' +
+      'To link the chat to a group, open the group in the app.',
+    commandStart: 'Start',
+    commandHelp: 'What the bot can do',
+    commandBalance: 'Who owes whom',
+    commandUnlink: 'Unlink the chat from the group',
   },
   export: {
     date: 'Date',
