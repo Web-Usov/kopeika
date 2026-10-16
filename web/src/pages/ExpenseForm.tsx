@@ -72,11 +72,26 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
   const [saving, setSaving] = useState(false);
 
   const chipsRef = useRef<HTMLDivElement>(null);
-  // Show the selected category in the scrollable row when the form opens.
+  // Keep the selected chip visible in the scrollable row. A new expense starts at the beginning of the row.
+  const firstRun = useRef(true);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the category changes
   useEffect(() => {
-    const active = chipsRef.current?.querySelector<HTMLElement>('.chip.active');
-    active?.scrollIntoView?.({ inline: 'nearest', block: 'nearest' });
-  }, []);
+    const row = chipsRef.current;
+    const first = firstRun.current;
+    firstRun.current = false;
+    if (!row || (first && !expense)) return;
+    const chip = row.querySelector<HTMLElement>('.chip.active');
+    if (!chip) return;
+    const pad = 16;
+    const rowRect = row.getBoundingClientRect();
+    const chipRect = chip.getBoundingClientRect();
+    const start = chipRect.left - rowRect.left + row.scrollLeft;
+    const end = start + chipRect.width;
+    let left = row.scrollLeft;
+    if (start - pad < left) left = start - pad;
+    else if (end + pad > left + row.clientWidth) left = end + pad - row.clientWidth;
+    if (left !== row.scrollLeft) row.scrollTo({ left, behavior: first ? 'auto' : 'smooth' });
+  }, [category]);
 
   const amount = parseAmount(amountStr);
   const update = (id: number, patch: Partial<Participant>) => setParts((p) => ({ ...p, [id]: { ...p[id], ...patch } }));
