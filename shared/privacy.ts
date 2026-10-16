@@ -63,7 +63,7 @@ const ru: Policy = {
     {
       heading: 'Где и сколько хранится',
       paragraphs: [
-        'Данные лежат в базе на сервере владельца приложения. Пока вы пользуетесь Копейкой, они хранятся. Раз в сутки сервер делает резервную копию базы и держит последние 14 копий; после удаления данных они исчезнут и из копий в течение 14 дней.',
+        'Данные лежат в базе на сервере владельца приложения. Пока вы пользуетесь Копейкой, они хранятся. Раз в сутки сервер делает резервную копию базы и держит последние 14 копий; после удаления данных они исчезнут и из копий в течение 14 дней. Отдельно владелец видит обезличенную статистику использования: дневные суммы по видам действий (сколько групп и трат создано и т. п.) и число активных пользователей — без имён, идентификаторов и содержимого.',
       ],
     },
     {
@@ -140,7 +140,7 @@ const en: Policy = {
     {
       heading: 'Where and for how long',
       paragraphs: [
-        'Data lives in a database on the app owner’s server and is kept while you use Kopeika. Once a day the server makes a database backup and keeps the last 14; after you delete your data it disappears from the backups within 14 days.',
+        'Data lives in a database on the app owner’s server and is kept while you use Kopeika. Once a day the server makes a database backup and keeps the last 14; after you delete your data it disappears from the backups within 14 days. Separately, the owner sees anonymous usage statistics: daily totals per kind of action (how many groups and expenses were created, etc.) and the number of active users, with no names, IDs or content.',
       ],
     },
     {

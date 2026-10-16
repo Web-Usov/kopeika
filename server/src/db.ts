@@ -175,6 +175,15 @@ const migrations = [
   // Placeholder "deleted user" (id 0 never collides with a Telegram id). Account deletion points expenses.created_by,
   // activity.user_id and recurring.created_by of the removed user here, so history stays but is anonymous.
   `INSERT INTO users (id, first_name) VALUES (0, '');`,
+  // Anonymous daily usage counters (server-local day). No user or group ids: only how often something happened.
+  `
+  CREATE TABLE stats_daily (
+    date   TEXT NOT NULL,      -- YYYY-MM-DD
+    event  TEXT NOT NULL,
+    count  INTEGER NOT NULL,
+    PRIMARY KEY (date, event)
+  );
+  `,
 ];
 
 const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;

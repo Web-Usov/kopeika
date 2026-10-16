@@ -2,6 +2,7 @@ import { DELETED_USER_ID, logActivity } from './activity.ts';
 import { all, one, run, tx } from './db.ts';
 import { fail } from './errors.ts';
 import type { GroupRow, MemberRow } from './repo.ts';
+import { countEvent } from './stats.ts';
 
 /** Removes a group with everything in it (expenses, shares, members; history, reminders and templates cascade). */
 export function eraseGroup(groupId: number) {
@@ -68,6 +69,7 @@ export function deleteAccount(userId: number) {
     run('UPDATE expenses SET created_by = ? WHERE created_by = ?', DELETED_USER_ID, userId);
     run('UPDATE activity SET user_id = ? WHERE user_id = ?', DELETED_USER_ID, userId);
     run('DELETE FROM users WHERE id = ?', userId);
+    countEvent('user.delete');
     return { ok: true, groupsDeleted, groupsLeft };
   });
 }

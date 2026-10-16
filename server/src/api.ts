@@ -49,6 +49,7 @@ import {
   type UserRow,
   upsertUser,
 } from './repo.ts';
+import { countEvent, countEventSafe } from './stats.ts';
 
 type Env = { Variables: { user: TelegramUser; lang: Lang } };
 
@@ -175,6 +176,7 @@ api.post('/groups', async (c) => {
     run('INSERT INTO members (group_id, user_id, name) VALUES (?, ?, ?)', id, user.id, displayName(user));
     for (const n of body.memberNames) run('INSERT INTO members (group_id, name) VALUES (?, ?)', id, n);
     logActivity(id, user.id, 'group.create', { name: body.name });
+    countEvent('group.create');
     return id;
   });
   const { group, me } = loadGroupFor(String(groupId), user.id);
@@ -219,6 +221,7 @@ api.post('/groups/:id/export', async (c) => {
     t('export.caption', { name: group.name, count: d.expenses.length }),
   );
   if (!sent) throw fail(409, 'errors.exportBotUnavailable');
+  countEventSafe('export.csv');
   return c.json({ ok: true });
 });
 
@@ -379,6 +382,7 @@ api.post('/invite/:code/join', async (c) => {
         if (res.changes === 0) throw fail(409, 'errors.memberTaken');
         const claimed = one<MemberRow>('SELECT * FROM members WHERE id = ?', body.claimMemberId)!;
         logActivity(group.id, user.id, 'member.claim', { memberId: claimed.id, name: claimed.name });
+        countEvent('member.claim');
       } else {
         const res = run(
           'INSERT INTO members (group_id, user_id, name) VALUES (?, ?, ?)',
@@ -390,6 +394,7 @@ api.post('/invite/:code/join', async (c) => {
           memberId: Number(res.lastInsertRowid),
           name: displayName(user),
         });
+        countEvent('member.join');
       }
     });
   }
@@ -634,6 +639,7 @@ api.post('/groups/:id/remind', async (c) => {
       name: debtor.name,
       amount: debt.amount,
     });
+    countEvent('debt.remind');
   });
   notifyRemind(group, debtor.userId, creditor.name, debt.amount, !isEmpty(creditor.paymentInfo));
   return c.json({ ok: true });
