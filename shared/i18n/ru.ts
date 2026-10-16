@@ -76,6 +76,9 @@ export const ru = {
     howToSettle: 'Как рассчитаться',
     allSettled: 'Все в расчёте 🎉',
     returned: 'Вернул',
+    remind: 'Напомнить',
+    reminded: 'Напомнили',
+    remindNoNotify: '{name} не подключил(а) уведомления',
     manualTransfer: 'Записать перевод вручную',
     statsTitle: 'Статистика',
     statsGroup: 'Вся группа',
@@ -118,6 +121,7 @@ export const ru = {
     empty: 'Пока ничего не менялось',
     emptyHint: 'Здесь появятся все изменения в группе: кто и что добавил, исправил или удалил.',
     loadMore: 'Показать ещё',
+    remind: '{actor} напомнил(а) о долге: {name}, {amount}',
   },
   payment: {
     mySection: 'Мои реквизиты',
@@ -222,6 +226,8 @@ export const ru = {
     changeTitle: 'название «{from}» → «{to}»',
     changePayer: 'платил(а) {from} → {to}',
     shareRemoved: 'Вас убрали из этой траты',
+    remind: '{author} напоминает о долге: {amount}',
+    remindPayment: 'Реквизиты — в приложении',
   },
   dev: {
     userName: 'Тестер {id}',
@@ -233,6 +239,9 @@ export const ru = {
     groupNotFound: 'Группа не найдена',
     ownerOnlyDelete: 'Удалить группу может только её создатель',
     memberNotFound: 'Участник не найден',
+    remindNotAllowed: 'Этот участник вам сейчас не должен',
+    remindNoNotify: 'Участник не подключил уведомления, напомнить не получится',
+    remindToday: 'Уже напоминали сегодня',
     memberHasTelegram: 'Нельзя удалить участника, который вошёл через Telegram',
     paymentInfoTelegram: 'Свои реквизиты участник с Telegram указывает сам — на главном экране',
     payment: {

@@ -509,3 +509,87 @@ test('history is visible to members only', async () => {
   assert.equal((await call(newUser(), 'GET', `/groups/${g.id}/activity`)).status, 404);
   assert.equal((await call(null, 'GET', `/groups/${g.id}/activity`)).status, 401);
 });
+
+// --- Debt reminders ---
+async function debtSetup(opts: { notify?: boolean } = {}) {
+  const owner = newUser();
+  const guest = newUser();
+  const g = await createGroup(owner);
+  await call(guest, 'POST', `/invite/${g.inviteCode}/join`, {});
+  if (opts.notify !== false) await call(guest, 'PUT', '/me', { notify: true });
+  const full = (await call(owner, 'GET', `/groups/${g.id}`)).body as Json;
+  const guestMember = full.members.find((m: Json) => m.userId === guest);
+  // The owner paid for both: the guest owes the owner.
+  const res = await call(owner, 'POST', `/groups/${g.id}/expenses`, expense(full));
+  assert.equal(res.status, 201);
+  return { owner, guest, g, ownerMember: full.meId as number, guestMember };
+}
+
+test('remind: creditor can remind a debtor, history gets an entry', async () => {
+  const { owner, g, guestMember } = await debtSetup();
+  const res = await call(owner, 'POST', `/groups/${g.id}/remind`, { memberId: guestMember.id });
+  assert.equal(res.status, 200);
+  const h = (await call(owner, 'GET', `/groups/${g.id}/activity`)).body as Json;
+  assert.equal(h.items[0].action, 'debt.remind');
+  assert.equal(h.items[0].payload.amount, 5000);
+});
+
+test('remind: a second reminder within 24h gets 429, and works again after', async () => {
+  const { owner, g, guestMember } = await debtSetup();
+  const url = `/groups/${g.id}/remind`;
+  assert.equal((await call(owner, 'POST', url, { memberId: guestMember.id })).status, 200);
+  const again = await call(owner, 'POST', url, { memberId: guestMember.id });
+  assert.equal(again.status, 429);
+  assert.equal(again.body.error, 'Уже напоминали сегодня');
+  const en = await api.request(url, {
+    method: 'POST',
+    headers: { Authorization: `dev ${owner}`, 'Content-Type': 'application/json', 'X-Lang': 'en' },
+    body: JSON.stringify({ memberId: guestMember.id }),
+  });
+  assert.equal(((await en.json()) as Json).error, 'Already reminded today');
+  const { run } = await import('./db.ts');
+  run("UPDATE reminders SET created_at = datetime('now', '-25 hours') WHERE group_id = ?", g.id);
+  assert.equal((await call(owner, 'POST', url, { memberId: guestMember.id })).status, 200);
+});
+
+test('remind: only a debtor of the current plan, never the other way round or oneself', async () => {
+  const { owner, guest, g, ownerMember, guestMember } = await debtSetup();
+  const url = `/groups/${g.id}/remind`;
+  assert.equal((await call(guest, 'POST', url, { memberId: ownerMember })).status, 409);
+  assert.equal((await call(owner, 'POST', url, { memberId: ownerMember })).status, 409);
+  assert.equal((await call(owner, 'POST', url, { memberId: 999999 })).status, 409);
+  // Once the debt is repaid there is nothing to remind about.
+  const pay = await call(guest, 'POST', `/groups/${g.id}/expenses`, {
+    kind: 'transfer',
+    amount: 5000,
+    payerId: guestMember.id,
+    splitMode: 'exact',
+    spentOn: '2025-01-16',
+    shares: [{ memberId: ownerMember, value: 5000 }],
+  });
+  assert.equal(pay.status, 201);
+  assert.equal((await call(owner, 'POST', url, { memberId: guestMember.id })).status, 409);
+});
+
+test('remind: debtor without notifications or without Telegram gets a clear error', async () => {
+  const quiet = await debtSetup({ notify: false });
+  const res = await call(quiet.owner, 'POST', `/groups/${quiet.g.id}/remind`, { memberId: quiet.guestMember.id });
+  assert.equal(res.status, 409);
+  assert.match(res.body.error, /уведомления/);
+  const full = (await call(quiet.owner, 'GET', `/groups/${quiet.g.id}`)).body as Json;
+  assert.equal(full.members.find((m: Json) => m.id === quiet.guestMember.id).canNotify, false);
+
+  const owner = newUser();
+  const g = await createGroup(owner, ['Маша']);
+  const masha = g.members.find((m: Json) => m.userId === null);
+  await call(owner, 'POST', `/groups/${g.id}/expenses`, expense(g));
+  assert.equal((await call(owner, 'POST', `/groups/${g.id}/remind`, { memberId: masha.id })).status, 409);
+});
+
+test('remind: non-member gets 404, anonymous 401, canNotify follows notify', async () => {
+  const { owner, g, guestMember } = await debtSetup();
+  assert.equal((await call(newUser(), 'POST', `/groups/${g.id}/remind`, { memberId: guestMember.id })).status, 404);
+  assert.equal((await call(null, 'POST', `/groups/${g.id}/remind`, { memberId: guestMember.id })).status, 401);
+  const full = (await call(owner, 'GET', `/groups/${g.id}`)).body as Json;
+  assert.equal(full.members.find((m: Json) => m.id === guestMember.id).canNotify, true);
+});

@@ -5,10 +5,10 @@ import { createT, type Key, type Lang, type Params, pickLang, type TFn } from '.
 import { CURRENCIES, computeShares, SplitError } from '../../shared/money.ts';
 import { expenseSnapshot, listActivity, logActivity } from './activity.ts';
 import { type TelegramUser, validateInitData } from './auth.ts';
-import { appLink, loadExpenseSnap, notifyExpense, notifyExpenseChange } from './bot.ts';
+import { appLink, loadExpenseSnap, notifyExpense, notifyExpenseChange, notifyRemind } from './bot.ts';
 import { config } from './config.ts';
 import { all, one, run, tx } from './db.ts';
-import { deserialize, PaymentInfoError, parsePaymentInfo, serialize } from './paymentInfo.ts';
+import { deserialize, isEmpty, PaymentInfoError, parsePaymentInfo, serialize } from './paymentInfo.ts';
 import { createRateLimiter } from './rateLimit.ts';
 import {
   displayName,
@@ -429,4 +429,36 @@ api.get('/groups/:id/activity', (c) => {
     })
     .parse(c.req.query());
   return c.json(listActivity(group.id, q.before, q.limit));
+});
+
+// --- Debt reminder: the creditor asks the bot to nudge a debtor from the current settlement plan ---
+const REMIND_WINDOW_SQL = "datetime('now', '-1 day')";
+
+api.post('/groups/:id/remind', async (c) => {
+  const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
+  const { memberId } = z.object({ memberId: z.number().int().positive() }).parse(await c.req.json());
+  const d = detail(group, me);
+  const debt = d.settlements.find((s) => s.from === memberId && s.to === me.id);
+  if (!debt) throw fail(409, 'errors.remindNotAllowed');
+  const debtor = d.members.find((m) => m.id === memberId)!;
+  if (!debtor.canNotify || debtor.userId === null) throw fail(409, 'errors.remindNoNotify');
+  const creditor = d.members.find((m) => m.id === me.id)!;
+
+  tx(() => {
+    const recent = one(
+      `SELECT id FROM reminders WHERE group_id = ? AND from_member = ? AND to_member = ? AND created_at > ${REMIND_WINDOW_SQL}`,
+      group.id,
+      me.id,
+      memberId,
+    );
+    if (recent) throw fail(429, 'errors.remindToday');
+    run('INSERT INTO reminders (group_id, from_member, to_member) VALUES (?, ?, ?)', group.id, me.id, memberId);
+    logActivity(group.id, c.get('user').id, 'debt.remind', {
+      memberId,
+      name: debtor.name,
+      amount: debt.amount,
+    });
+  });
+  notifyRemind(group, debtor.userId, creditor.name, debt.amount, !isEmpty(creditor.paymentInfo));
+  return c.json({ ok: true });
 });

@@ -92,9 +92,14 @@ export function findMembership(groupId: number, userId: number) {
 
 function loadLedger(groupId: number) {
   const members = all<
-    MemberRow & { username: string | null; photo_url: string | null; user_payment_info: string | null }
+    MemberRow & {
+      username: string | null;
+      photo_url: string | null;
+      user_payment_info: string | null;
+      user_notify: number | null;
+    }
   >(
-    `SELECT m.*, u.username, u.photo_url, u.payment_info AS user_payment_info FROM members m LEFT JOIN users u ON u.id = m.user_id
+    `SELECT m.*, u.username, u.photo_url, u.payment_info AS user_payment_info, u.notify AS user_notify FROM members m LEFT JOIN users u ON u.id = m.user_id
      WHERE m.group_id = ? ORDER BY m.id`,
     groupId,
   );
@@ -143,6 +148,8 @@ export function groupDetail(group: GroupRow, me: MemberRow, inviteLink: string |
       photoUrl: m.photo_url,
       // Only ever returned to members of this group (loadGroupFor guards every caller).
       paymentInfo: deserialize(m.user_id === null ? m.payment_info : m.user_payment_info),
+      // Whether the bot can write to this person; nothing else about their Telegram settings is exposed.
+      canNotify: m.user_id !== null && m.user_notify === 1,
       balance: balances.get(m.id) ?? 0,
     })),
     expenses: expenses.map((e) => ({

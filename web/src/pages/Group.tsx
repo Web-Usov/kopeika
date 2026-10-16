@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { type ActivityEntry, activityText } from '../../../shared/activity.ts';
 import { type CategoryId, categoryEmoji, categoryKey, categoryTotals } from '../../../shared/categories.ts';
 import {
+  type ApiError,
   api,
   type Expense,
   type GroupDetail,
@@ -12,7 +13,7 @@ import {
 } from '../api.ts';
 import { dateLocale, lang, rich, t } from '../i18n.ts';
 import { navigate } from '../router.ts';
-import { BackButton, copyText, haptic, MainButton, openLink, shareLink } from '../tg.tsx';
+import { alertDialog, BackButton, copyText, haptic, MainButton, openLink, shareLink } from '../tg.tsx';
 import { Avatar, ErrorView, formatDay, Loading, Money, Row, Section, Segmented } from '../ui.tsx';
 
 export type Tab = 'expenses' | 'balances' | 'history';
@@ -275,6 +276,7 @@ function BalancesTab({ g }: { g: GroupDetail }) {
                 }
               />
               {s.from === g.meId && <PaymentDetails to={member(s.to)} />}
+              {s.to === g.meId && <RemindRow g={g} debtor={member(s.from)} />}
             </Fragment>
           ))
         )}
@@ -370,6 +372,41 @@ function PaymentDetails({ to }: { to: Member }) {
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+/** "Remind" under a debt owed to me: the bot nudges the debtor; once a day per person. */
+function RemindRow({ g, debtor }: { g: GroupDetail; debtor: Member }) {
+  const [state, setState] = useState<'idle' | 'busy' | 'done'>('idle');
+  const remind = async () => {
+    setState('busy');
+    try {
+      await api.remind(g.id, debtor.id);
+      haptic.success();
+      setState('done');
+    } catch (e) {
+      haptic.error();
+      // 429 ("already reminded today") is final for today too: keep the button off.
+      setState((e as ApiError).status === 429 ? 'done' : 'idle');
+      await alertDialog((e as Error).message);
+    }
+  };
+  if (!debtor.canNotify) {
+    return (
+      <div className="row buttons-wrap-row">
+        <button type="button" className="small-btn" disabled>
+          {t('group.remind')}
+        </button>
+        <span className="hint small">{t('group.remindNoNotify', { name: debtor.name })}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="row buttons-wrap-row">
+      <button type="button" className="small-btn" disabled={state !== 'idle'} onClick={remind}>
+        {state === 'done' ? t('group.reminded') : t('group.remind')}
+      </button>
     </div>
   );
 }
