@@ -6,6 +6,7 @@ import { type TelegramUser, validateInitData } from './auth.ts';
 import { appLink, loadExpenseSnap, notifyExpense, notifyExpenseChange } from './bot.ts';
 import { config } from './config.ts';
 import { all, one, run, tx } from './db.ts';
+import { deserialize, PaymentInfoError, parsePaymentInfo, serialize } from './paymentInfo.ts';
 import { createRateLimiter } from './rateLimit.ts';
 import {
   displayName,
@@ -40,6 +41,7 @@ const fail = (status: ApiError['status'], key: Key, params?: Params) => new ApiE
 api.onError((err, c) => {
   const t: TFn = createT(c.get('lang') ?? 'ru');
   if (err instanceof ApiError) return c.json({ error: t(err.key, err.params) }, err.status);
+  if (err instanceof PaymentInfoError) return c.json({ error: t(err.key) }, 400);
   if (err instanceof SplitError) return c.json({ error: t(err.key, err.params) }, 400);
   if (err instanceof z.ZodError) return c.json({ error: t('errors.invalidData'), issues: err.issues }, 400);
   console.error(err);
@@ -103,6 +105,27 @@ api.put('/me', async (c) => {
   const body = z.object({ notify: z.boolean() }).parse(await c.req.json());
   run('UPDATE users SET notify = ? WHERE id = ?', body.notify ? 1 : 0, c.get('user').id);
   return c.json({ ok: true });
+});
+
+const paymentInfoBody = z
+  .object({
+    phone: z.string().max(40).optional(),
+    bank: z.string().max(500).optional(),
+    card: z.string().max(40).optional(),
+    link: z.string().max(1000).optional(),
+    note: z.string().max(1000).optional(),
+  })
+  .strict();
+
+api.get('/me/payment-info', (c) => {
+  const u = one<UserRow>('SELECT * FROM users WHERE id = ?', c.get('user').id)!;
+  return c.json(deserialize(u.payment_info));
+});
+
+api.put('/me/payment-info', async (c) => {
+  const info = parsePaymentInfo(paymentInfoBody.parse(await c.req.json()));
+  run('UPDATE users SET payment_info = ? WHERE id = ?', serialize(info), c.get('user').id);
+  return c.json(info);
 });
 
 // --- Groups ---
@@ -169,14 +192,20 @@ api.post('/groups/:id/members', async (c) => {
 
 api.patch('/groups/:id/members/:memberId', async (c) => {
   const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
-  const body = z.object({ name }).parse(await c.req.json());
-  const res = run(
-    'UPDATE members SET name = ? WHERE id = ? AND group_id = ?',
-    body.name,
-    idParam(c.req.param('memberId')),
-    group.id,
-  );
-  if (res.changes === 0) throw fail(404, 'errors.memberNotFound');
+  const body = z
+    .object({ name: name.optional(), paymentInfo: paymentInfoBody.optional() })
+    .refine((b) => b.name !== undefined || b.paymentInfo !== undefined)
+    .parse(await c.req.json());
+  const memberId = idParam(c.req.param('memberId'));
+  const member = one<MemberRow>('SELECT * FROM members WHERE id = ? AND group_id = ?', memberId, group.id);
+  if (!member) throw fail(404, 'errors.memberNotFound');
+  // People with Telegram edit their own payment details on the home screen, not through the group.
+  if (body.paymentInfo && member.user_id !== null) throw fail(409, 'errors.paymentInfoTelegram');
+  const info = body.paymentInfo && parsePaymentInfo(body.paymentInfo);
+  tx(() => {
+    if (body.name !== undefined) run('UPDATE members SET name = ? WHERE id = ?', body.name, memberId);
+    if (info) run('UPDATE members SET payment_info = ? WHERE id = ?', serialize(info), memberId);
+  });
   return c.json(detail(group, me));
 });
 

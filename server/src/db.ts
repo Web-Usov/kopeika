@@ -62,6 +62,9 @@ const migrations = [
   `,
   // Interface language of the user ('ru' | 'en'), for bot messages.
   `ALTER TABLE users ADD COLUMN lang TEXT;`,
+  // Payment details (JSON: phone, bank, card, link, note) to show to debtors: personal ones in users,
+  // for people without Telegram in members. The app never moves money, it only shows these.
+  `ALTER TABLE users ADD COLUMN payment_info TEXT; ALTER TABLE members ADD COLUMN payment_info TEXT;`,
 ];
 
 const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;

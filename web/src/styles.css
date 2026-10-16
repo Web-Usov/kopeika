@@ -609,3 +609,22 @@ select.field {
   color: var(--button-text);
   font-weight: 600;
 }
+
+/* --- Payment details --- */
+.payment-line {
+  display: block;
+  font-size: 13px;
+  color: var(--hint);
+  word-break: break-word;
+}
+
+.row.payment {
+  display: block;
+}
+
+.row.payment .buttons-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}

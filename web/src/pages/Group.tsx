@@ -1,7 +1,8 @@
-import { type Expense, type GroupDetail, useGroup } from '../api.ts';
+import { Fragment, useState } from 'react';
+import { type Expense, type GroupDetail, hasPaymentInfo, type Member, type PaymentInfo, useGroup } from '../api.ts';
 import { rich, t } from '../i18n.ts';
 import { navigate } from '../router.ts';
-import { BackButton, haptic, MainButton, shareLink } from '../tg.tsx';
+import { BackButton, copyText, haptic, MainButton, openLink, shareLink } from '../tg.tsx';
 import { Avatar, ErrorView, formatDay, Loading, Money, Row, Section, Segmented } from '../ui.tsx';
 
 type Tab = 'expenses' | 'balances';
@@ -171,24 +172,26 @@ function BalancesTab({ g }: { g: GroupDetail }) {
           <div className="row hint">{t('group.allSettled')}</div>
         ) : (
           g.settlements.map((s) => (
-            <Row
-              key={`${s.from}-${s.to}`}
-              title={
-                <>
-                  {label(s.from)} → {label(s.to)}
-                </>
-              }
-              subtitle={<Money value={s.amount} currency={g.currency} />}
-              right={
-                <button
-                  type="button"
-                  className="small-btn"
-                  onClick={() => navigate(`/g/${g.id}/transfer/new?from=${s.from}&to=${s.to}&amount=${s.amount}`)}
-                >
-                  {t('group.returned')}
-                </button>
-              }
-            />
+            <Fragment key={`${s.from}-${s.to}`}>
+              <Row
+                title={
+                  <>
+                    {label(s.from)} → {label(s.to)}
+                  </>
+                }
+                subtitle={<Money value={s.amount} currency={g.currency} />}
+                right={
+                  <button
+                    type="button"
+                    className="small-btn"
+                    onClick={() => navigate(`/g/${g.id}/transfer/new?from=${s.from}&to=${s.to}&amount=${s.amount}`)}
+                  >
+                    {t('group.returned')}
+                  </button>
+                }
+              />
+              {s.from === g.meId && <PaymentDetails to={member(s.to)} />}
+            </Fragment>
           ))
         )}
       </Section>
@@ -197,5 +200,46 @@ function BalancesTab({ g }: { g: GroupDetail }) {
         {t('group.manualTransfer')}
       </button>
     </>
+  );
+}
+
+const spaced = (digits: string, size: number) => digits.replace(new RegExp(`(.{${size}})(?=.)`, 'g'), '$1 ');
+
+/** What the debtor needs to pay the creditor: details with one-tap copy buttons. */
+function PaymentDetails({ to }: { to: Member }) {
+  const info: PaymentInfo = to.paymentInfo;
+  const [copied, setCopied] = useState<'phone' | 'card'>();
+  if (!hasPaymentInfo(info)) return <div className="row hint small">{t('payment.none', { name: to.name })}</div>;
+
+  const copy = async (what: 'phone' | 'card') => {
+    if (!(await copyText(info[what]!))) return;
+    setCopied(what);
+    setTimeout(() => setCopied(undefined), 2000);
+  };
+
+  return (
+    <div className="row payment">
+      {info.phone && <span className="payment-line">{[info.phone, info.bank].filter(Boolean).join(' · ')}</span>}
+      {!info.phone && info.bank && <span className="payment-line">{info.bank}</span>}
+      {info.card && <span className="payment-line">{spaced(info.card, 4)}</span>}
+      {info.note && <span className="payment-line">{info.note}</span>}
+      <div className="buttons-wrap">
+        {info.phone && (
+          <button type="button" className="small-btn" onClick={() => copy('phone')}>
+            {copied === 'phone' ? t('payment.copied') : t('payment.copyPhone')}
+          </button>
+        )}
+        {info.card && (
+          <button type="button" className="small-btn" onClick={() => copy('card')}>
+            {copied === 'card' ? t('payment.copied') : t('payment.copyCard')}
+          </button>
+        )}
+        {info.link && (
+          <button type="button" className="small-btn" onClick={() => openLink(info.link!)}>
+            {t('payment.openLink')}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
