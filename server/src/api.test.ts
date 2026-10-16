@@ -7,8 +7,9 @@ process.env.DEV_AUTH = '1';
 delete process.env.BOT_TOKEN;
 
 let api: typeof import('./api.ts').api;
+let rateLimiter: typeof import('./api.ts').rateLimiter;
 before(async () => {
-  ({ api } = await import('./api.ts'));
+  ({ api, rateLimiter } = await import('./api.ts'));
 });
 
 // Every test uses its own users so tests do not depend on order.
@@ -196,4 +197,18 @@ test('PUT on an expense recalculates shares and balances', async () => {
   );
   assert.deepEqual(balances(updated.body), [10000, -10000]);
   assert.equal(updated.body.totalSpent, 20000);
+});
+
+test('rate limit: requests over the limit get 429, other users are unaffected', async () => {
+  rateLimiter.setLimit(3);
+  try {
+    const user = newUser();
+    for (let i = 0; i < 3; i++) assert.equal((await call(user, 'GET', '/me')).status, 200);
+    const blocked = await call(user, 'GET', '/me');
+    assert.equal(blocked.status, 429);
+    assert.equal(blocked.body.error, 'Слишком много запросов, попробуйте через минуту');
+    assert.equal((await call(newUser(), 'GET', '/me')).status, 200);
+  } finally {
+    rateLimiter.setLimit(120);
+  }
 });

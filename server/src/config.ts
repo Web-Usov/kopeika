@@ -17,4 +17,6 @@ export const config = {
   devAuth: env.DEV_AUTH === '1',
   /** How long a Telegram initData signature stays valid. */
   initDataMaxAgeSec: Number(env.INIT_DATA_MAX_AGE ?? 24 * 60 * 60),
+  /** Max API requests per user per minute. */
+  rateLimitPerMin: Number(env.RATE_LIMIT_PER_MIN ?? 120),
 };
