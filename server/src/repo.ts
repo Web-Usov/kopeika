@@ -39,6 +39,7 @@ export interface ExpenseRow {
   payer_id: number;
   split_mode: SplitMode;
   spent_on: string;
+  category: string;
   created_by: number;
   created_at: string;
 }
@@ -145,6 +146,7 @@ export function groupDetail(group: GroupRow, me: MemberRow, inviteLink: string |
       payerId: e.payer_id,
       splitMode: e.split_mode,
       spentOn: e.spent_on,
+      category: e.kind === 'expense' ? e.category : null,
       createdAt: e.created_at,
       shares: (sharesByExpense.get(e.id) ?? []).map((s) => ({
         memberId: s.member_id,

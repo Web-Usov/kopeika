@@ -1,7 +1,14 @@
 import { useMemo, useState } from 'react';
+import {
+  CATEGORIES,
+  type CategoryId,
+  categoryKey,
+  DEFAULT_CATEGORY,
+  suggestCategory,
+} from '../../../shared/categories.ts';
 import { amountToInput, computeShares, parseAmount, type SplitInput, type SplitMode } from '../../../shared/money.ts';
 import { api, type Expense, type GroupDetail, setGroup, useGroup } from '../api.ts';
-import { errorText, rich, t } from '../i18n.ts';
+import { errorText, lang, rich, t } from '../i18n.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, confirmDialog, haptic, MainButton } from '../tg.tsx';
 import { Avatar, ErrorView, Loading, Money, Row, Section, Segmented, todayIso } from '../ui.tsx';
@@ -59,6 +66,9 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
   const [spentOn, setSpentOn] = useState(expense?.spentOn ?? todayIso());
   const [mode, setMode] = useState<SplitMode>(expense?.splitMode ?? 'equal');
   const [parts, setParts] = useState(() => initialParticipants(g, expense));
+  const [category, setCategory] = useState<CategoryId>(expense?.category ?? DEFAULT_CATEGORY);
+  // Until the user picks a category by hand, it follows the title; an existing expense keeps its own.
+  const [categoryPicked, setCategoryPicked] = useState(Boolean(expense));
   const [saving, setSaving] = useState(false);
 
   const amount = parseAmount(amountStr);
@@ -92,7 +102,7 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
   const save = async () => {
     if (!amount || !computed) return;
     setSaving(true);
-    const body = { title: title.trim(), amount, payerId, splitMode: mode, spentOn, shares: inputs };
+    const body = { title: title.trim(), amount, payerId, splitMode: mode, spentOn, category, shares: inputs };
     try {
       setGroup(expense ? await api.updateExpense(g.id, expense.id, body) : await api.addExpense(g.id, body));
       haptic.success();
@@ -126,8 +136,28 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
           placeholder={t('expense.titlePlaceholder')}
           value={title}
           maxLength={100}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => {
+            setTitle(e.target.value);
+            if (!categoryPicked) setCategory(suggestCategory(e.target.value, lang) ?? DEFAULT_CATEGORY);
+          }}
         />
+        <div className="chips">
+          {CATEGORIES.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className={`chip ${category === c.id ? 'active' : ''}`}
+              aria-pressed={category === c.id}
+              onClick={() => {
+                haptic.tap();
+                setCategory(c.id);
+                setCategoryPicked(true);
+              }}
+            >
+              <span aria-hidden="true">{c.emoji}</span> {t(categoryKey(c.id))}
+            </button>
+          ))}
+        </div>
         <div className="amount-field">
           <input
             className="field amount"

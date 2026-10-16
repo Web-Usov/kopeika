@@ -609,3 +609,28 @@ select.field {
   color: var(--button-text);
   font-weight: 600;
 }
+
+/* --- Categories --- */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 16px 12px;
+}
+
+.chip {
+  padding: 6px 10px;
+  border-radius: 16px;
+  font-size: 14px;
+  background: var(--bg);
+  border: 1px solid transparent;
+}
+
+.chip.active {
+  border-color: var(--button);
+  background: color-mix(in srgb, var(--button) 15%, transparent);
+}
+
+.bar span.accent {
+  background: var(--button);
+}

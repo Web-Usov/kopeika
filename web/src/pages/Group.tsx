@@ -1,3 +1,4 @@
+import { type CategoryId, categoryEmoji, categoryKey, categoryTotals } from '../../../shared/categories.ts';
 import { type Expense, type GroupDetail, useGroup } from '../api.ts';
 import { rich, t } from '../i18n.ts';
 import { navigate } from '../router.ts';
@@ -112,7 +113,7 @@ function ExpensesTab({ g }: { g: GroupDetail }) {
               <Row
                 key={e.id}
                 onClick={() => navigate(`/g/${g.id}/expense/${e.id}`)}
-                left={<span className="expense-icon">🧾</span>}
+                left={<span className="expense-icon">{categoryEmoji(e.category ?? 'other')}</span>}
                 title={e.title}
                 subtitle={paidByMe ? t('group.paidByMe') : t('group.paidBy', { name: name(e.payerId) })}
                 right={
@@ -196,6 +197,52 @@ function BalancesTab({ g }: { g: GroupDetail }) {
       <button type="button" className="text-btn" onClick={() => navigate(`/g/${g.id}/transfer/new`)}>
         {t('group.manualTransfer')}
       </button>
+
+      <Stats g={g} />
+    </>
+  );
+}
+
+function Stats({ g }: { g: GroupDetail }) {
+  const { group, mine } = categoryTotals(g.expenses, g.meId);
+  return (
+    <>
+      <Section title={`${t('group.statsTitle')} · ${t('group.statsGroup')}`}>
+        <CategoryBars totals={group} currency={g.currency} empty={t('group.statsEmpty')} />
+      </Section>
+      <Section title={`${t('group.statsTitle')} · ${t('group.statsMine')}`} footer={t('group.statsFooter')}>
+        <CategoryBars totals={mine} currency={g.currency} empty={t('group.statsMineEmpty')} />
+      </Section>
+    </>
+  );
+}
+
+function CategoryBars({
+  totals,
+  currency,
+  empty,
+}: {
+  totals: { category: CategoryId; amount: number }[];
+  currency: string;
+  empty: string;
+}) {
+  if (totals.length === 0) return <div className="row hint">{empty}</div>;
+  const max = totals[0].amount;
+  return (
+    <>
+      {totals.map((c) => (
+        <Row
+          key={c.category}
+          left={<span className="expense-icon">{categoryEmoji(c.category)}</span>}
+          title={t(categoryKey(c.category))}
+          subtitle={
+            <span className="bar">
+              <span className="accent" style={{ width: `${(c.amount / max) * 100}%` }} />
+            </span>
+          }
+          right={<Money value={c.amount} currency={currency} />}
+        />
+      ))}
     </>
   );
 }

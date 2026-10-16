@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { CATEGORY_IDS, DEFAULT_CATEGORY } from '../../shared/categories.ts';
 import { createT, type Key, type Lang, type Params, pickLang, type TFn } from '../../shared/i18n/index.ts';
 import { CURRENCIES, computeShares, SplitError } from '../../shared/money.ts';
 import { type TelegramUser, validateInitData } from './auth.ts';
@@ -239,6 +240,7 @@ const expenseBody = z.object({
   payerId: z.number().int().positive(),
   splitMode: z.enum(['equal', 'shares', 'exact']),
   spentOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  category: z.enum(CATEGORY_IDS).optional(),
   shares: z
     .array(z.object({ memberId: z.number().int().positive(), value: z.number().int().min(0) }))
     .min(1)
@@ -256,6 +258,7 @@ function validateExpense(groupId: number, body: ExpenseBody, lang: Lang) {
     body.splitMode = 'exact';
     body.shares[0].value = body.amount;
     body.title ||= createT(lang)('transfer.defaultTitle');
+    body.category = DEFAULT_CATEGORY;
   } else if (!body.title) {
     throw fail(400, 'errors.titleRequired');
   }
@@ -282,8 +285,8 @@ api.post('/groups/:id/expenses', async (c) => {
   const computed = validateExpense(group.id, body, c.get('lang'));
   const expense = tx(() => {
     const res = run(
-      `INSERT INTO expenses (group_id, kind, title, amount, payer_id, split_mode, spent_on, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO expenses (group_id, kind, title, amount, payer_id, split_mode, spent_on, category, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       group.id,
       body.kind,
       body.title,
@@ -291,6 +294,7 @@ api.post('/groups/:id/expenses', async (c) => {
       body.payerId,
       body.splitMode,
       body.spentOn,
+      body.category ?? DEFAULT_CATEGORY,
       user.id,
     );
     const id = Number(res.lastInsertRowid);
@@ -312,13 +316,14 @@ api.put('/groups/:id/expenses/:expenseId', async (c) => {
   const before = loadExpenseSnap(expenseId);
   tx(() => {
     run(
-      `UPDATE expenses SET title = ?, amount = ?, payer_id = ?, split_mode = ?, spent_on = ?, updated_at = datetime('now')
+      `UPDATE expenses SET title = ?, amount = ?, payer_id = ?, split_mode = ?, spent_on = ?, category = ?, updated_at = datetime('now')
        WHERE id = ?`,
       body.title,
       body.amount,
       body.payerId,
       body.splitMode,
       body.spentOn,
+      body.kind === 'transfer' ? DEFAULT_CATEGORY : (body.category ?? existing.category),
       expenseId,
     );
     saveShares(expenseId, body, computed);

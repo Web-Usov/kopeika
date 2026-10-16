@@ -62,6 +62,8 @@ const migrations = [
   `,
   // Interface language of the user ('ru' | 'en'), for bot messages.
   `ALTER TABLE users ADD COLUMN lang TEXT;`,
+  // Expense category id (see shared/categories.ts); transfers keep 'other' and never show it.
+  `ALTER TABLE expenses ADD COLUMN category TEXT NOT NULL DEFAULT 'other';`,
 ];
 
 const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
