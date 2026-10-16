@@ -1,5 +1,6 @@
 // Pure money logic shared by the server and the Mini App.
 // All amounts are integers in minor units (kopecks, cents).
+import { type Lang, locale, type Params } from './i18n/index.ts';
 
 export type SplitMode = 'equal' | 'shares' | 'exact';
 
@@ -9,35 +10,52 @@ export interface SplitInput {
   value: number;
 }
 
-export class SplitError extends Error {}
+type SplitKey =
+  | 'errors.split.amountPositive'
+  | 'errors.split.noParticipants'
+  | 'errors.split.duplicateParticipant'
+  | 'errors.split.badParticipantAmount'
+  | 'errors.split.sumMismatch'
+  | 'errors.split.sharesInteger'
+  | 'errors.split.sharesMissing';
+
+/** Carries a dictionary key (not a text): the caller translates it into the user's language. */
+export class SplitError extends Error {
+  constructor(
+    readonly key: SplitKey,
+    readonly params?: Params,
+  ) {
+    super(key);
+  }
+}
 
 /**
  * Turns the user's split input into exact per-member amounts that always sum to `amount`.
  * Leftover minor units from rounding go to members in input order (largest remainder first for shares).
  */
 export function computeShares(amount: number, mode: SplitMode, inputs: SplitInput[]): Map<number, number> {
-  if (!Number.isInteger(amount) || amount <= 0) throw new SplitError('Сумма должна быть больше нуля');
-  if (inputs.length === 0) throw new SplitError('Выберите хотя бы одного участника');
+  if (!Number.isInteger(amount) || amount <= 0) throw new SplitError('errors.split.amountPositive');
+  if (inputs.length === 0) throw new SplitError('errors.split.noParticipants');
   const ids = new Set(inputs.map((i) => i.memberId));
-  if (ids.size !== inputs.length) throw new SplitError('Участник указан дважды');
+  if (ids.size !== inputs.length) throw new SplitError('errors.split.duplicateParticipant');
 
   const result = new Map<number, number>();
 
   if (mode === 'exact') {
     let sum = 0;
     for (const i of inputs) {
-      if (!Number.isInteger(i.value) || i.value < 0) throw new SplitError('Некорректная сумма участника');
+      if (!Number.isInteger(i.value) || i.value < 0) throw new SplitError('errors.split.badParticipantAmount');
       sum += i.value;
       result.set(i.memberId, i.value);
     }
-    if (sum !== amount) throw new SplitError('Сумма долей не совпадает с общей суммой');
+    if (sum !== amount) throw new SplitError('errors.split.sumMismatch');
     return result;
   }
 
   const weights = inputs.map((i) => (mode === 'equal' ? 1 : i.value));
-  if (weights.some((w) => !Number.isInteger(w) || w < 0)) throw new SplitError('Доли должны быть целыми числами');
+  if (weights.some((w) => !Number.isInteger(w) || w < 0)) throw new SplitError('errors.split.sharesInteger');
   const total = weights.reduce((a, b) => a + b, 0);
-  if (total <= 0) throw new SplitError('Укажите доли');
+  if (total <= 0) throw new SplitError('errors.split.sharesMissing');
 
   // Largest remainder method: floor everyone, then hand out the leftover units.
   const raw = inputs.map((i, idx) => {
@@ -118,10 +136,10 @@ export function amountToInput(minor: number): string {
   return frac === 0 ? String(int) : `${int},${String(frac).padStart(2, '0').replace(/0$/, '')}`;
 }
 
-export function formatMoney(minor: number, currency: string): string {
+export function formatMoney(minor: number, currency: string, lang: Lang): string {
   const hasFrac = minor % 100 !== 0;
   try {
-    return new Intl.NumberFormat('ru-RU', {
+    return new Intl.NumberFormat(locale(lang), {
       style: 'currency',
       currency,
       minimumFractionDigits: hasFrac ? 2 : 0,
