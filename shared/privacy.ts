@@ -57,7 +57,7 @@ const ru: Policy = {
         'Через инлайн-режим бота вы сами можете отправить в любой чат карточку с балансом группы: в ней названия, имена и суммы.',
         'Выгрузка в CSV уходит только вам, в личные сообщения от бота.',
         'Курсы валют мы запрашиваем у сайта Банка России (cbr-xml-daily.ru): уходит только код валюты и дата, личных данных нет.',
-        'Если вы разбираете чек по фото, снимок отправляется на сервис распознавания (Anthropic), чтобы получить список позиций. Перед первым сканированием приложение спросит ваше согласие. На фото могут попасть название заведения, время и чужие позиции — не снимайте то, что не хотите отправлять третьей стороне, и закройте номер карты. Идентификаторы Telegram и имена участников мы в запрос не включаем. Позиции можно ввести и вручную, без отправки фото.',
+        'Если вы разбираете чек по фото, снимок отправляется на сервис распознавания (Anthropic), чтобы получить список позиций. Перед первым сканированием приложение спросит ваше согласие, и мы его запомним. В демо-группе чеки не работают. На фото могут попасть название заведения, время и чужие позиции — не снимайте то, что не хотите отправлять третьей стороне, и закройте номер карты. Идентификаторы Telegram и имена участников мы в запрос не включаем. Позиции можно ввести и вручную, без отправки фото.',
         'Сам Telegram видит всё, что вы делаете в Telegram, по своим правилам.',
       ],
     },
@@ -65,7 +65,7 @@ const ru: Policy = {
       heading: 'Где и сколько хранится',
       paragraphs: [
         'Данные лежат в базе на сервере владельца приложения. Пока вы пользуетесь Копейкой, они хранятся. Раз в сутки сервер делает резервную копию базы и держит последние 14 копий; после удаления данных они исчезнут и из копий в течение 14 дней. Отдельно владелец видит обезличенную статистику использования: дневные суммы по видам действий (сколько групп и трат создано и т. п.) и число активных пользователей — без имён, идентификаторов и содержимого.',
-        'Фото чека мы не сохраняем: оно живёт в памяти сервера только на время запроса и не попадает ни на диск, ни в логи. Распознанные позиции тоже не сохраняются — в трате остаются только итоговые доли. Мы учитываем лишь число сканирований и их стоимость, без содержимого чека. По документации Anthropic, её API по умолчанию не использует присланные данные для обучения моделей, но может хранить запросы на своей стороне до 30 дней (дольше — если запрос помечен как нарушающий правила сервиса).',
+        'Фото чека мы не сохраняем: оно живёт в памяти сервера только на время запроса и не попадает ни на диск, ни в логи. Распознанные позиции тоже не сохраняются — в трате остаются только итоговые доли. Мы учитываем лишь число сканирований и их стоимость (модель, число токенов, цена) — для лимитов и месячного бюджета, без содержимого чека. По документации Anthropic, её API по умолчанию не использует присланные данные для обучения моделей, но может хранить запросы на своей стороне до 30 дней (дольше — если запрос помечен как нарушающий правила сервиса).',
       ],
     },
     {
@@ -76,7 +76,7 @@ const ru: Policy = {
       items: [
         'в каждой группе, где есть другие участники с Telegram, вы станете участником без Telegram с тем же именем: траты и балансы остальных не меняются, а владельцем группы станет следующий участник;',
         'группы, где вы были единственным участником с Telegram, удаляются целиком, вместе с тратами и историей;',
-        'удаляются ваши имя, username, фото, язык, платёжные реквизиты и настройки уведомлений;',
+        'удаляются ваши имя, username, фото, язык, платёжные реквизиты, настройки уведомлений и согласие на распознавание чеков; записи о сканах чеков (только число и стоимость) отвязываются от вас и остаются без имени как учёт расхода на месячный бюджет;',
         'удаляются ваши напоминания и ссылки для привязки чатов; регулярные траты, которые вы создали, ставятся на паузу (группа может включить их снова);',
         'в истории групп записи остаются, но вместо вашего имени там «удалённый пользователь». Названия трат и имя, под которым вы были в группе, остаются в старых записях у остальных участников — как после выхода из группы;',
         'сообщения бота, уже отправленные в Telegram-чаты, остаются в этих чатах.',
@@ -136,7 +136,7 @@ const en: Policy = {
         'With the bot’s inline mode you can send a group balance card to any chat yourself: it contains titles, names and amounts.',
         'The CSV export goes only to you, as a private message from the bot.',
         'We request exchange rates from the Bank of Russia website (cbr-xml-daily.ru): only a currency code and a date are sent, no personal data.',
-        'If you scan a receipt photo, the image is sent to a recognition service (Anthropic) to get the list of items. The app asks for your consent before the first scan. A photo can include the venue name, the time and other people’s items, so do not photograph anything you would not want to send to a third party, and cover the card number. We do not include Telegram identifiers or member names in the request. You can always enter the items by hand without sending a photo.',
+        'If you scan a receipt photo, the image is sent to a recognition service (Anthropic) to get the list of items. The app asks for your consent before the first scan, and we remember it. Receipts do not work in the demo group. A photo can include the venue name, the time and other people’s items, so do not photograph anything you would not want to send to a third party, and cover the card number. We do not include Telegram identifiers or member names in the request. You can always enter the items by hand without sending a photo.',
         'Telegram itself sees whatever you do in Telegram, under its own rules.',
       ],
     },
@@ -144,7 +144,7 @@ const en: Policy = {
       heading: 'Where and for how long',
       paragraphs: [
         'Data lives in a database on the app owner’s server and is kept while you use Kopeika. Once a day the server makes a database backup and keeps the last 14; after you delete your data it disappears from the backups within 14 days. Separately, the owner sees anonymous usage statistics: daily totals per kind of action (how many groups and expenses were created, etc.) and the number of active users, with no names, IDs or content.',
-        'We do not store receipt photos: the image lives in the server’s memory only for the duration of the request and never reaches the disk or the logs. Recognized items are not stored either; an expense keeps only the final shares. We record only the number of scans and their cost, never the content of a receipt. According to Anthropic’s documentation, its API does not use submitted data to train models by default, but may keep requests on its side for up to 30 days (longer if a request is flagged as violating the service’s usage policy).',
+        'We do not store receipt photos: the image lives in the server’s memory only for the duration of the request and never reaches the disk or the logs. Recognized items are not stored either; an expense keeps only the final shares. We record only the number of scans and their cost (model, token count, price) for limits and the monthly budget, never the content of a receipt. According to Anthropic’s documentation, its API does not use submitted data to train models by default, but may keep requests on its side for up to 30 days (longer if a request is flagged as violating the service’s usage policy).',
       ],
     },
     {
@@ -153,7 +153,7 @@ const en: Policy = {
       items: [
         'in every group that has other members with Telegram, you become a member without Telegram under the same name: other people’s expenses and balances do not change, and the next member becomes the group owner;',
         'groups where you were the only member with Telegram are deleted entirely, with their expenses and history;',
-        'your name, username, photo, language, payment details and notification settings are deleted;',
+        'your name, username, photo, language, payment details, notification settings and receipt-scanning consent are deleted; receipt scan records (only count and cost) are detached from you and kept without a name as cost accounting for the monthly budget;',
         'your reminders and chat-linking links are deleted; recurring expenses you created are paused (the group can turn them back on);',
         'history entries stay in the groups, but your name is replaced with “deleted user”. Expense titles and the name you had in the group remain in older entries for the other members, as after leaving a group;',
         'bot messages already sent to Telegram chats stay in those chats.',
