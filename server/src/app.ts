@@ -9,6 +9,12 @@ import { sha, version } from './version.ts';
 export function createApp(staticDir: string) {
   const app = new Hono();
 
+  app.use('*', async (c, next) => {
+    await next();
+    c.header('X-Content-Type-Options', 'nosniff');
+    c.header('Referrer-Policy', 'no-referrer');
+  });
+
   app.get('/healthz', (c) => c.text('ok'));
   app.get('/version', (c) => c.json({ version, sha }));
   app.route('/api', api);

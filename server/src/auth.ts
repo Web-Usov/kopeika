@@ -23,7 +23,7 @@ export interface InitData {
 export function validateInitData(raw: string, botToken: string, maxAgeSec: number, now = Date.now()): InitData | null {
   const params = new URLSearchParams(raw);
   const hash = params.get('hash');
-  if (!hash || !botToken) return null;
+  if (!hash || !botToken || !/^[0-9a-f]{64}$/.test(hash)) return null;
 
   const dataCheckString = [...params.entries()]
     .filter(([k]) => k !== 'hash')
