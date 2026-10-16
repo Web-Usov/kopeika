@@ -54,13 +54,16 @@ test('buildCsv (ru): BOM, ; separator, CRLF, headers, rows sorted by date', () =
   const csv = buildCsv(group, 'ru');
   assert.ok(csv.startsWith('﻿'));
   const lines = csv.slice(1).split('\r\n');
-  assert.equal(lines[0], 'Дата;Название;Тип;Категория;Сумма;Валюта;Кто платил;Аня;"Боря ""Бо""; Иванов"');
-  assert.match(lines[1] ?? '', /^2025-01-15;"Ужин; с вином";Трата;.+;1500,50;RUB;Аня;750,25;750,25$/);
-  assert.equal(lines[2], '2025-01-16;Перевод;Перевод;;10,00;RUB;"Боря ""Бо""; Иванов";10,00;');
+  assert.equal(
+    lines[0],
+    'Дата;Название;Тип;Категория;Сумма;Валюта;Кто платил;Сумма в валюте покупки;Валюта покупки;Аня;"Боря ""Бо""; Иванов"',
+  );
+  assert.match(lines[1] ?? '', /^2025-01-15;"Ужин; с вином";Трата;.+;1500,50;RUB;Аня;;;750,25;750,25$/);
+  assert.equal(lines[2], '2025-01-16;Перевод;Перевод;;10,00;RUB;"Боря ""Бо""; Иванов";;;10,00;');
   assert.equal(lines[3], '');
-  assert.equal(lines[4], ';Итого заплатил(а);;;;RUB;;1500,50;10,00');
-  assert.equal(lines[5], ';Итого доля;;;;RUB;;760,25;750,25');
-  assert.equal(lines[6], ';Баланс;;;;RUB;;50,00;-50,00');
+  assert.equal(lines[4], ';Итого заплатил(а);;;;RUB;;;;1500,50;10,00');
+  assert.equal(lines[5], ';Итого доля;;;;RUB;;;;760,25;750,25');
+  assert.equal(lines[6], ';Баланс;;;;RUB;;;;50,00;-50,00');
   assert.ok(csv.endsWith('\r\n'));
 });
 
@@ -69,6 +72,12 @@ test('buildCsv (en): English headers and dot decimals', () => {
   assert.ok(lines[0]?.startsWith('Date;Title;Type;Category;Amount;Currency;Paid by;'));
   assert.ok(lines[1]?.includes(';Expense;'));
   assert.ok(lines[1]?.includes(';1500.50;RUB;'));
+});
+
+test('buildCsv: foreign-currency expense gets original amount and currency', () => {
+  const g = { ...group, expenses: [{ ...group.expenses[1], originalAmount: 10000, originalCurrency: 'GEL' }] };
+  const lines = buildCsv(g, 'en').slice(1).split('\r\n');
+  assert.match(lines[1] ?? '', /;1500\.50;RUB;Аня;100\.00;GEL;750\.25;750\.25$/);
 });
 
 test('buildCsv neutralises formula injection in titles', () => {

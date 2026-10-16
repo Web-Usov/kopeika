@@ -1,6 +1,18 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { amountToInput, computeBalances, computeShares, parseAmount, SplitError, settleUp } from './money.ts';
+import {
+  amountToInput,
+  computeBalances,
+  computeShares,
+  convertAmount,
+  convertExactShares,
+  formatRate,
+  minorDigits,
+  normalizeRate,
+  parseAmount,
+  SplitError,
+  settleUp,
+} from './money.ts';
 
 const sum = (m: Map<number, number>) => [...m.values()].reduce((a, b) => a + b, 0);
 
@@ -115,4 +127,94 @@ test('parseAmount / amountToInput', () => {
   assert.equal(amountToInput(123450), '1234,5');
   assert.equal(amountToInput(9905), '99,05');
   assert.equal(amountToInput(1200), '12');
+});
+
+test('minorDigits defaults to 2', () => {
+  assert.equal(minorDigits('RUB'), 2);
+  assert.equal(minorDigits('GEL'), 2);
+  assert.equal(minorDigits('JPY'), 0);
+});
+
+test('normalizeRate accepts comma, trims zeros and rejects junk', () => {
+  assert.equal(normalizeRate('34,5'), '34.5');
+  assert.equal(normalizeRate(' 034.500 '), '34.5');
+  assert.equal(normalizeRate('0.0295'), '0.0295');
+  assert.equal(normalizeRate('7'), '7');
+  for (const bad of ['', '0', '0.0', '-1', 'abc', '1e3', '1.2.3', '99999999999', '0.00000000001']) {
+    assert.equal(normalizeRate(bad), null, bad);
+  }
+});
+
+test('formatRate keeps ~6 significant digits without exponent', () => {
+  assert.equal(formatRate(34.5), '34.5');
+  assert.equal(formatRate(0.029512345), '0.0295123');
+  assert.equal(formatRate(1 / 3), '0.333333');
+  assert.equal(formatRate(95.123456789), '95.1235');
+});
+
+test('convertAmount: 100 GEL at 34.5 RUB = 3450 RUB', () => {
+  assert.equal(convertAmount(10000, '34.5', 'GEL', 'RUB'), 345000);
+});
+
+test('convertAmount rounds half up and is exact (no float drift)', () => {
+  // 0.01 * 0.5 = 0.005 -> rounds up to 0.01
+  assert.equal(convertAmount(1, '0.5', 'USD', 'EUR'), 1);
+  assert.equal(convertAmount(3, '0.5', 'USD', 'EUR'), 2); // 1.5 -> 2
+  assert.equal(convertAmount(10000, '0.1', 'USD', 'EUR'), 1000);
+  assert.equal(convertAmount(333333, '1.000003', 'USD', 'EUR'), 333334); // 333334.0 exactly (333333 + 0.999999)
+  assert.equal(convertAmount(123456789012, '1', 'USD', 'EUR'), 123456789012);
+});
+
+test('convertAmount rejects bad rate and amounts that round to zero', () => {
+  assert.throws(
+    () => convertAmount(100, 'x', 'USD', 'EUR'),
+    (e) => e instanceof SplitError && e.key === 'errors.rate.invalid',
+  );
+  assert.throws(
+    () => convertAmount(1, '0.001', 'USD', 'EUR'),
+    (e) => e instanceof SplitError && e.key === 'errors.rate.tooSmall',
+  );
+  assert.throws(() => convertAmount(0, '1', 'USD', 'EUR'), SplitError);
+});
+
+test('convertAmount respects minor digits of the currencies', () => {
+  // 1000 JPY (no minor digits) at 0.0065 EUR = 6.50 EUR = 650 cents
+  assert.equal(convertAmount(1000, '0.0065', 'JPY', 'EUR'), 650);
+  // 10.00 EUR at 150 JPY = 1500 JPY (minor = whole yen)
+  assert.equal(convertAmount(1000, '150', 'EUR', 'JPY'), 1500);
+});
+
+test('convertExactShares sums exactly to the converted total', () => {
+  const inputs = [
+    { memberId: 1, value: 3333 },
+    { memberId: 2, value: 3333 },
+    { memberId: 3, value: 3334 },
+  ];
+  const out = convertExactShares(inputs, '34.567', 'GEL', 'RUB');
+  const total = convertAmount(10000, '34.567', 'GEL', 'RUB');
+  assert.equal(
+    out.reduce((a, i) => a + i.value, 0),
+    total,
+  );
+  // each converted share stays within one minor unit of its exact value
+  for (const [k, i] of inputs.entries()) assert.ok(Math.abs(out[k].value - i.value * 34.567) <= 1);
+  // and the result is accepted as an exact split of the converted amount
+  assert.equal(sum(computeShares(total, 'exact', out)), total);
+});
+
+test('convertExactShares keeps zero-weight members at zero and is stable', () => {
+  const out = convertExactShares(
+    [
+      { memberId: 1, value: 1 },
+      { memberId: 2, value: 1 },
+      { memberId: 3, value: 1 },
+    ],
+    '0.5',
+    'USD',
+    'EUR',
+  );
+  assert.equal(
+    out.reduce((a, i) => a + i.value, 0),
+    convertAmount(3, '0.5', 'USD', 'EUR'),
+  );
 });

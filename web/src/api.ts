@@ -31,6 +31,11 @@ export interface Expense {
   kind: 'expense' | 'transfer';
   title: string;
   amount: number;
+  /** Set when the expense was entered in another currency: `amount` is then the converted value. */
+  originalAmount: number | null;
+  originalCurrency: string | null;
+  /** Group-currency units per 1 original unit, decimal string. */
+  rate: string | null;
   payerId: number;
   splitMode: SplitMode;
   spentOn: string;
@@ -74,7 +79,11 @@ export interface InvitePreview {
 export interface ExpenseInput {
   kind?: 'expense' | 'transfer';
   title: string;
+  /** Ignored by the server when originalAmount is given. */
   amount: number;
+  originalAmount?: number;
+  originalCurrency?: string;
+  rate?: string;
   payerId: number;
   splitMode: SplitMode;
   spentOn: string;
@@ -189,6 +198,11 @@ export const api = {
   addExpense: (id: number, body: ExpenseInput) => request<GroupDetail>('POST', `/groups/${id}/expenses`, body),
   updateExpense: (id: number, expenseId: number, body: ExpenseInput) =>
     request<GroupDetail>('PUT', `/groups/${id}/expenses/${expenseId}`, body),
+  rate: (base: string, currency: string, date: string) =>
+    request<{ rate: string; source: string; date: string }>(
+      'GET',
+      `/rates?base=${base}&currency=${currency}&date=${date}`,
+    ),
   activity: (id: number, before?: number) =>
     request<{ items: ActivityEntry[]; nextBefore: number | null }>(
       'GET',

@@ -44,6 +44,9 @@ export interface ExpenseRow {
   split_mode: SplitMode;
   spent_on: string;
   category: string;
+  original_amount: number | null;
+  original_currency: string | null;
+  rate: string | null;
   created_by: number;
   created_at: string;
 }
@@ -159,6 +162,9 @@ export function groupDetail(group: GroupRow, me: MemberRow, inviteLink: string |
       kind: e.kind,
       title: e.title,
       amount: e.amount,
+      originalAmount: e.original_amount,
+      originalCurrency: e.original_currency,
+      rate: e.rate,
       payerId: e.payer_id,
       splitMode: e.split_mode,
       spentOn: e.spent_on,

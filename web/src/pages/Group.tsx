@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { type ActivityEntry, activityText } from '../../../shared/activity.ts';
 import { type CategoryId, categoryEmoji, categoryKey, categoryTotals } from '../../../shared/categories.ts';
+import { formatMoney } from '../../../shared/money.ts';
 import {
   type ApiError,
   api,
@@ -131,6 +132,9 @@ function ExpensesTab({ g }: { g: GroupDetail }) {
                 right={
                   <span className="stack-right">
                     <Money value={e.amount} currency={g.currency} />
+                    {e.originalAmount !== null && e.originalCurrency && (
+                      <span className="hint small">{formatMoney(e.originalAmount, e.originalCurrency, lang)}</span>
+                    )}
                     <span className="hint small">
                       {myShare
                         ? rich('group.myShare', { amount: <Money value={myShare} currency={g.currency} /> })
@@ -180,7 +184,6 @@ function HistoryTab({ g }: { g: GroupDetail }) {
     }
   };
   // Reload when the group changes under us (e.g. a rename), so fresh entries show up.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `load` is recreated every render
   useEffect(() => {
     load();
   }, [g.id, g.expenses.length, g.name, g.members.length]);

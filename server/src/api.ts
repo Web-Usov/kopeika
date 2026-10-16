@@ -2,7 +2,15 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { CATEGORY_IDS, DEFAULT_CATEGORY } from '../../shared/categories.ts';
 import { createT, type Key, type Lang, type Params, pickLang, type TFn } from '../../shared/i18n/index.ts';
-import { CURRENCIES, computeShares, SplitError } from '../../shared/money.ts';
+import {
+  CURRENCIES,
+  computeShares,
+  convertAmount,
+  convertExactShares,
+  normalizeRate,
+  SplitError,
+  type SplitInput,
+} from '../../shared/money.ts';
 import { expenseSnapshot, listActivity, logActivity } from './activity.ts';
 import { type TelegramUser, validateInitData } from './auth.ts';
 import { appLink, loadExpenseSnap, notifyExpense, notifyExpenseChange, notifyRemind, sendExportFile } from './bot.ts';
@@ -11,6 +19,7 @@ import { all, one, run, tx } from './db.ts';
 import { buildCsv, exportFileName } from './export.ts';
 import { deserialize, isEmpty, PaymentInfoError, parsePaymentInfo, serialize } from './paymentInfo.ts';
 import { createRateLimiter } from './rateLimit.ts';
+import { getRate, RatesError } from './rates.ts';
 import {
   displayName,
   type ExpenseRow,
@@ -31,7 +40,7 @@ export const api = new Hono<Env>();
 /** An API error: carries a dictionary key, translated into the request user's language in `onError`. */
 class ApiError extends Error {
   constructor(
-    readonly status: 400 | 401 | 403 | 404 | 409 | 429,
+    readonly status: 400 | 401 | 403 | 404 | 409 | 429 | 503,
     readonly key: Key,
     readonly params?: Params,
   ) {
@@ -44,6 +53,7 @@ const fail = (status: ApiError['status'], key: Key, params?: Params) => new ApiE
 api.onError((err, c) => {
   const t: TFn = createT(c.get('lang') ?? 'ru');
   if (err instanceof ApiError) return c.json({ error: t(err.key, err.params) }, err.status);
+  if (err instanceof RatesError) return c.json({ error: t(err.key) }, err.status);
   if (err instanceof PaymentInfoError) return c.json({ error: t(err.key) }, 400);
   if (err instanceof SplitError) return c.json({ error: t(err.key, err.params) }, 400);
   if (err instanceof z.ZodError) return c.json({ error: t('errors.invalidData'), issues: err.issues }, 400);
@@ -352,11 +362,30 @@ api.post('/invite/:code/join', async (c) => {
   return c.json({ groupId: group.id });
 });
 
+// --- Exchange rates: suggested rate for a foreign-currency expense (the user can still edit it) ---
+api.get('/rates', async (c) => {
+  const q = z
+    .object({
+      base: z.enum(CURRENCIES as [string, ...string[]]),
+      currency: z.enum(CURRENCIES as [string, ...string[]]),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    })
+    .parse(c.req.query());
+  if (q.base === q.currency) throw fail(400, 'errors.rate.sameCurrency');
+  if (Number.isNaN(Date.parse(`${q.date}T00:00:00Z`))) throw fail(400, 'errors.invalidData');
+  return c.json(await getRate(q.base, q.currency, q.date));
+});
+
 // --- Expenses ---
 const expenseBody = z.object({
   kind: z.enum(['expense', 'transfer']).default('expense'),
   title: z.string().trim().max(100).default(''),
-  amount: z.number().int().positive().max(1e12),
+  // Ignored when originalAmount is given: the server computes it from the original amount and the rate.
+  amount: z.number().int().min(0).max(1e12).default(0),
+  // Foreign currency: all three or none. For splitMode "exact" the shares are then in the original currency.
+  originalAmount: z.number().int().positive().max(1e12).optional(),
+  originalCurrency: z.string().max(8).optional(),
+  rate: z.string().max(32).optional(),
   payerId: z.number().int().positive(),
   splitMode: z.enum(['equal', 'shares', 'exact']),
   spentOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -368,7 +397,14 @@ const expenseBody = z.object({
 });
 type ExpenseBody = z.infer<typeof expenseBody>;
 
-function validateExpense(groupId: number, body: ExpenseBody, lang: Lang) {
+interface Validated {
+  computed: Map<number, number>;
+  /** Canonical rate string when the expense is in a foreign currency. */
+  rate: string | null;
+}
+
+function validateExpense(group: GroupRow, body: ExpenseBody, lang: Lang): Validated {
+  const groupId = group.id;
   const memberIds = new Set(all<{ id: number }>('SELECT id FROM members WHERE group_id = ?', groupId).map((m) => m.id));
   if (!memberIds.has(body.payerId) || body.shares.some((s) => !memberIds.has(s.memberId))) {
     throw fail(400, 'errors.foreignMember');
@@ -382,7 +418,21 @@ function validateExpense(groupId: number, body: ExpenseBody, lang: Lang) {
   } else if (!body.title) {
     throw fail(400, 'errors.titleRequired');
   }
-  return computeShares(body.amount, body.splitMode, body.shares);
+  const foreign = [body.originalAmount, body.originalCurrency, body.rate].filter((v) => v !== undefined).length;
+  if (foreign === 0) return { computed: computeShares(body.amount, body.splitMode, body.shares), rate: null };
+  if (foreign !== 3 || body.kind === 'transfer') throw fail(400, 'errors.invalidData');
+  const original = body.originalCurrency as string;
+  if (!CURRENCIES.includes(original)) throw fail(400, 'errors.rate.unknownCurrency');
+  if (original === group.currency) throw fail(400, 'errors.rate.sameCurrency');
+  const rate = normalizeRate(body.rate as string);
+  if (!rate) throw fail(400, 'errors.rate.invalid');
+  const originalAmount = body.originalAmount as number;
+  body.amount = convertAmount(originalAmount, rate, original, group.currency);
+  if (body.splitMode !== 'exact') return { computed: computeShares(body.amount, body.splitMode, body.shares), rate };
+  // Exact shares come in the original currency: check they add up there, then convert without losing a unit.
+  computeShares(originalAmount, 'exact', body.shares);
+  const converted: SplitInput[] = convertExactShares(body.shares, rate, original, group.currency);
+  return { computed: computeShares(body.amount, 'exact', converted), rate };
 }
 
 function saveShares(expenseId: number, body: ExpenseBody, computed: Map<number, number>) {
@@ -402,11 +452,12 @@ api.post('/groups/:id/expenses', async (c) => {
   const user = c.get('user');
   const { group, me } = loadGroupFor(c.req.param('id'), user.id);
   const body = expenseBody.parse(await c.req.json());
-  const computed = validateExpense(group.id, body, c.get('lang'));
+  const { computed, rate } = validateExpense(group, body, c.get('lang'));
   const expense = tx(() => {
     const res = run(
-      `INSERT INTO expenses (group_id, kind, title, amount, payer_id, split_mode, spent_on, category, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO expenses (group_id, kind, title, amount, payer_id, split_mode, spent_on, category, created_by,
+                             original_amount, original_currency, rate)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       group.id,
       body.kind,
       body.title,
@@ -416,6 +467,9 @@ api.post('/groups/:id/expenses', async (c) => {
       body.spentOn,
       body.category ?? DEFAULT_CATEGORY,
       user.id,
+      rate ? (body.originalAmount as number) : null,
+      rate ? (body.originalCurrency as string) : null,
+      rate,
     );
     const id = Number(res.lastInsertRowid);
     saveShares(id, body, computed);
@@ -434,12 +488,13 @@ api.put('/groups/:id/expenses/:expenseId', async (c) => {
   if (!existing) throw fail(404, 'errors.expenseNotFound');
   const body = expenseBody.parse(await c.req.json());
   body.kind = existing.kind;
-  const computed = validateExpense(group.id, body, c.get('lang'));
+  const { computed, rate } = validateExpense(group, body, c.get('lang'));
   const before = loadExpenseSnap(expenseId);
   tx(() => {
     const snapBefore = expenseSnapshot(expenseId)!;
     run(
-      `UPDATE expenses SET title = ?, amount = ?, payer_id = ?, split_mode = ?, spent_on = ?, category = ?, updated_at = datetime('now')
+      `UPDATE expenses SET title = ?, amount = ?, payer_id = ?, split_mode = ?, spent_on = ?, category = ?,
+         original_amount = ?, original_currency = ?, rate = ?, updated_at = datetime('now')
        WHERE id = ?`,
       body.title,
       body.amount,
@@ -447,6 +502,9 @@ api.put('/groups/:id/expenses/:expenseId', async (c) => {
       body.splitMode,
       body.spentOn,
       body.kind === 'transfer' ? DEFAULT_CATEGORY : (body.category ?? existing.category),
+      rate ? (body.originalAmount as number) : null,
+      rate ? (body.originalCurrency as string) : null,
+      rate,
       expenseId,
     );
     saveShares(expenseId, body, computed);
