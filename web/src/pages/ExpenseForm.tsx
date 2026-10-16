@@ -22,6 +22,7 @@ import { addDays, isoWeekday, nextOccurrence, type Period } from '../../../share
 import { api, type Expense, type GroupDetail, useExpense, useGroup } from '../api.ts';
 import { applySavedGroup } from '../celebration.ts';
 import { dateLocale, errorText, lang, rich, t } from '../i18n.ts';
+import { setReceiptDraft } from '../receiptDraft.ts';
 import { scheduleText, shortDate } from '../recurring.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, confirmDialog, haptic, MainButton } from '../tg.tsx';
@@ -88,6 +89,52 @@ function rateDay(iso: string): string {
 const showRate = (rate: string) => (lang === 'ru' ? rate.replace('.', ',') : rate);
 
 type RateInfo = { status: 'idle' | 'loading' | 'ok' | 'error'; date?: string; error?: string };
+
+/** «Разобрать чек» for a new expense: only when the feature is on; shows what is left of the trial quota. */
+function ReceiptEntry({ g }: { g: GroupDetail }) {
+  // Servers with quotas (#102) say it per group; older ones only in /me.
+  const [enabled, setEnabled] = useState<boolean | undefined>(g.receipts?.enabled);
+  useEffect(() => {
+    if (g.receipts) return setEnabled(g.receipts.enabled);
+    api.me().then(
+      (me) => setEnabled(Boolean(me.receiptsEnabled)),
+      () => setEnabled(false),
+    );
+  }, [g.receipts]);
+  if (!enabled) return null;
+
+  const q = g.receipts;
+  const limited = Boolean(q && !q.unlimited && q.limit > 0);
+  const left = q ? Math.max(0, q.limit - q.used) : 0;
+  const exhausted = limited && left === 0;
+  const reset = q?.resetsAt ? shortDate(q.resetsAt.slice(0, 10)) : '';
+  return (
+    <Section
+      footer={
+        exhausted
+          ? reset
+            ? t('receipt.buttonLimitReset', { date: reset })
+            : t('receipt.buttonLimit')
+          : limited && q
+            ? t('receipt.buttonLeft', { left, limit: q.limit })
+            : undefined
+      }
+    >
+      <Row
+        className="link"
+        title={t('receipt.button')}
+        onClick={
+          exhausted
+            ? undefined
+            : () => {
+                setReceiptDraft(g.id, null);
+                navigate(`/g/${g.id}/receipt`);
+              }
+        }
+      />
+    </Section>
+  );
+}
 
 function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
   const [title, setTitle] = useState(expense?.title ?? '');
@@ -250,6 +297,8 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
   return (
     <>
       <h2 className="page-title">{expense ? t('expense.titleEdit') : t('expense.titleNew')}</h2>
+
+      {!expense && <ReceiptEntry g={g} />}
 
       <Section>
         <input
