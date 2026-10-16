@@ -35,10 +35,20 @@ npm run typecheck
 
 ## Деплой
 
+Образ собирается GitHub Actions при каждом пуше в `main` и публикуется в GitHub Container Registry (amd64 и arm64):
+
+- `ghcr.io/web-usov/kopeika:latest` — последняя версия из `main`;
+- `ghcr.io/web-usov/kopeika:sha-<коммит>` — конкретная сборка, для отката;
+- `ghcr.io/web-usov/kopeika:1.2.3` — если поставить git-тег `v1.2.3`.
+
 ```bash
 cp .env.example .env   # BOT_TOKEN, APP_URL, APP_SHORT_NAME
-docker compose up -d --build
+docker compose pull && docker compose up -d
 ```
+
+В Portainer можно вставить [docker-compose.yml](docker-compose.yml) как stack, а переменные из `.env.example` задать в Environment variables. Обновление: pull + redeploy стека.
+
+Собрать образ локально: `docker build -t kopeika .`
 
 Контейнер слушает порт `3000`, база лежит в volume `kopeika-data` (`/data/kopeika.db`). Для бэкапа достаточно скопировать этот файл. HTTPS и домен настраиваются в Traefik.
 

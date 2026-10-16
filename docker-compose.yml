@@ -1,10 +1,15 @@
 services:
   kopeika:
-    build: .
-    image: kopeika:latest
+    # Built by GitHub Actions on every push to main (.github/workflows/docker.yml).
+    # Pin a specific build for rollbacks, e.g. ghcr.io/web-usov/kopeika:sha-851b521
+    image: ghcr.io/web-usov/kopeika:latest
     container_name: kopeika
     restart: unless-stopped
-    env_file: .env
+    # Values come from .env next to this file (docker compose) or the stack's Environment variables (Portainer).
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN:?BOT_TOKEN is required}
+      APP_URL: ${APP_URL:-https://kopeika.usov-home.ru}
+      APP_SHORT_NAME: ${APP_SHORT_NAME:-}
     volumes:
       - kopeika-data:/data
     # The app listens on port 3000 inside the container. Put it behind your reverse proxy (Traefik)

@@ -1,5 +1,6 @@
 # --- Build: the Mini App (static files) and the server (one bundled JS file) ---
-FROM node:24-slim AS build
+# The output is plain JS/HTML, so this stage always runs natively, even for multi-arch builds.
+FROM --platform=$BUILDPLATFORM node:24-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY server/package.json server/
