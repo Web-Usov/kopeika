@@ -6,7 +6,16 @@ import { CURRENCIES, SplitError } from '../../shared/money.ts';
 import { firstOccurrence } from '../../shared/recurring.ts';
 import { expenseSnapshot, listActivity, logActivity } from './activity.ts';
 import { type TelegramUser, validateInitData } from './auth.ts';
-import { appLink, loadExpenseSnap, notifyExpense, notifyExpenseChange, notifyRemind, sendExportFile } from './bot.ts';
+import {
+  appLink,
+  loadExpenseSnap,
+  notifyChatLinked,
+  notifyExpense,
+  notifyExpenseChange,
+  notifyRemind,
+  sendExportFile,
+} from './bot.ts';
+import { attachChat, checkChatLink, groupOfChat, unlinkGroup } from './chatLink.ts';
 import { config } from './config.ts';
 import { all, one, run, tx } from './db.ts';
 import { ApiError, fail } from './errors.ts';
@@ -303,6 +312,40 @@ api.delete('/groups/:id/members/:memberId', (c) => {
     logActivity(group.id, c.get('user').id, 'member.delete', { memberId, name: member.name });
   });
   return c.json(detail(group, me));
+});
+
+// --- Chat links ---
+function loadChatLink(token: string) {
+  const { link, problem } = checkChatLink(token);
+  if (problem === 'invalid') throw fail(404, 'errors.chatLinkInvalid');
+  if (problem === 'expired') throw fail(404, 'errors.chatLinkExpired');
+  if (problem === 'used') throw fail(409, 'errors.chatLinkUsed');
+  return link!;
+}
+
+api.get('/chat-links/:token', (c) => {
+  const link = loadChatLink(c.req.param('token'));
+  // Name of the group the chat is linked to now: only if the caller is a member of it.
+  const prev = groupOfChat(link.chat_id);
+  const replaces = prev && findMembership(prev.id, c.get('user').id) ? { name: prev.name } : null;
+  return c.json({ chatTitle: link.chat_title, replaces });
+});
+
+api.post('/chat-links/:token/attach', async (c) => {
+  const user = c.get('user');
+  const body = z.object({ groupId: z.number().int().positive() }).parse(await c.req.json());
+  const link = loadChatLink(c.req.param('token'));
+  const { group, me } = loadGroupFor(String(body.groupId), user.id);
+  attachChat(link, group, user.id);
+  const linked = one<GroupRow>('SELECT * FROM groups WHERE id = ?', group.id)!;
+  notifyChatLinked(link.chat_id, linked, c.get('lang'));
+  return c.json(detail(linked, me));
+});
+
+api.post('/groups/:id/chat/unlink', (c) => {
+  const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
+  unlinkGroup(group, c.get('user').id);
+  return c.json(detail({ ...group, chat_id: null, chat_title: null }, me));
 });
 
 // --- Invites ---

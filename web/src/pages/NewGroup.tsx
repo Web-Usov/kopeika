@@ -7,7 +7,8 @@ import { navigate } from '../router.ts';
 import { alertDialog, BackButton, haptic, MainButton } from '../tg.tsx';
 import { Section } from '../ui.tsx';
 
-export function NewGroup() {
+/** `linkToken`: opened from the chat link screen; the new group gets that chat attached right away. */
+export function NewGroup({ linkToken }: { linkToken?: string | null }) {
   const [name, setName] = useState('');
   const [currency, setCurrency] = useState('RUB');
   const [others, setOthers] = useState<string[]>([]);
@@ -16,11 +17,19 @@ export function NewGroup() {
   const create = async () => {
     setSaving(true);
     try {
-      const g = await api.createGroup({
+      const created = await api.createGroup({
         name: name.trim(),
         currency,
         memberNames: others.map((n) => n.trim()).filter(Boolean),
       });
+      let g = created;
+      if (linkToken) {
+        // The group already exists; if linking fails (token expired), the user can retry from the chat.
+        g = await api.attachChat(linkToken, created.id).catch(async (e: Error) => {
+          await alertDialog(e.message);
+          return created;
+        });
+      }
       setGroup(g);
       haptic.success();
       navigate(`/g/${g.id}`, { replace: true });
@@ -34,7 +43,7 @@ export function NewGroup() {
 
   return (
     <div className="page">
-      <BackButton onClick={() => navigate('/', { replace: true })} />
+      <BackButton onClick={() => navigate(linkToken ? `/link/${linkToken}` : '/', { replace: true })} />
       <h2 className="page-title">{t('newGroup.title')}</h2>
 
       <Section title={t('newGroup.nameSection')}>

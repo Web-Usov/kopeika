@@ -8,8 +8,10 @@ delete process.env.BOT_TOKEN;
 
 let api: typeof import('./api.ts').api;
 let rateLimiter: typeof import('./api.ts').rateLimiter;
+let chatLink: typeof import('./chatLink.ts');
 before(async () => {
   ({ api, rateLimiter } = await import('./api.ts'));
+  chatLink = await import('./chatLink.ts');
 });
 
 // Every test uses its own users so tests do not depend on order.
@@ -839,4 +841,122 @@ test('foreign expense: PUT can change the rate, switch to the group currency and
   );
   assert.equal(r3.body.expenses[0].originalCurrency, 'USD');
   assert.equal(r3.body.expenses[0].amount, 900000);
+});
+
+// --- Chat links ---
+
+let nextChat = -1001000;
+const newChat = () => nextChat--;
+const entries = async (user: number, g: Json) => (await history(user, g)).items;
+
+test('chat link token: 24 URL-safe characters', () => {
+  assert.match(chatLink.newChatToken(), /^[A-Za-z0-9_-]{24}$/);
+});
+
+test('chat link preview shows the chat title; garbage token is 404', async () => {
+  const u = newUser();
+  const token = chatLink.createChatLink(newChat(), 'Друзья', u);
+  const res = await call(u, 'GET', `/chat-links/${token}`);
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, { chatTitle: 'Друзья', replaces: null });
+  assert.equal((await call(u, 'GET', '/chat-links/nope')).status, 404);
+  assert.equal((await call(null, 'GET', `/chat-links/${token}`)).status, 401);
+});
+
+test('attaching a chat: group gets the chat (title only in the API), activity entry, token becomes used', async () => {
+  const u = newUser();
+  const g = await createGroup(u);
+  const chatId = newChat();
+  const token = chatLink.createChatLink(chatId, 'Друзья', u);
+  const res = await call(u, 'POST', `/chat-links/${token}/attach`, { groupId: g.id });
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.chat, { title: 'Друзья' });
+  assert.equal(JSON.stringify(res.body).includes(String(chatId)), false);
+  assert.equal((await call(u, 'GET', `/groups/${g.id}`)).body.chat.title, 'Друзья');
+  const h = await entries(u, g);
+  assert.equal(h[0].action, 'group.chat_link');
+  assert.equal(h[0].payload.name, 'Друзья');
+  // the token works once
+  const again = await call(u, 'POST', `/chat-links/${token}/attach`, { groupId: g.id });
+  assert.equal(again.status, 409);
+  assert.equal((await call(u, 'GET', `/chat-links/${token}`)).status, 409);
+});
+
+test('expired token is rejected', async () => {
+  const u = newUser();
+  const g = await createGroup(u);
+  const token = chatLink.createChatLink(newChat(), 'Старый', u, new Date(Date.now() - 25 * 3600_000));
+  assert.equal((await call(u, 'GET', `/chat-links/${token}`)).status, 404);
+  assert.equal((await call(u, 'POST', `/chat-links/${token}/attach`, { groupId: g.id })).status, 404);
+  assert.equal((await call(u, 'GET', `/groups/${g.id}`)).body.chat, null);
+});
+
+test('cannot attach a chat to a group you are not in', async () => {
+  const owner = newUser();
+  const stranger = newUser();
+  const g = await createGroup(owner);
+  const token = chatLink.createChatLink(newChat(), 'Чат', stranger);
+  assert.equal((await call(stranger, 'POST', `/chat-links/${token}/attach`, { groupId: g.id })).status, 404);
+  assert.equal((await call(owner, 'GET', `/groups/${g.id}`)).body.chat, null);
+  // the failed attempt did not burn the token
+  const mine = await createGroup(stranger);
+  assert.equal((await call(stranger, 'POST', `/chat-links/${token}/attach`, { groupId: mine.id })).status, 200);
+});
+
+test('relinking a chat to another group takes it away from the first', async () => {
+  const u = newUser();
+  const a = await createGroup(u);
+  const b = await createGroup(u);
+  const chatId = newChat();
+  await call(u, 'POST', `/chat-links/${chatLink.createChatLink(chatId, 'Чат', u)}/attach`, { groupId: a.id });
+  const second = chatLink.createChatLink(chatId, 'Чат', u);
+  const preview = await call(u, 'GET', `/chat-links/${second}`);
+  assert.deepEqual(preview.body.replaces, { name: 'Поездка' });
+  assert.equal((await call(u, 'POST', `/chat-links/${second}/attach`, { groupId: b.id })).status, 200);
+  assert.equal((await call(u, 'GET', `/groups/${a.id}`)).body.chat, null);
+  assert.equal((await call(u, 'GET', `/groups/${b.id}`)).body.chat.title, 'Чат');
+  assert.equal((await entries(u, a))[0].action, 'group.chat_unlink');
+});
+
+test('relinking a group to another chat replaces the old chat', async () => {
+  const u = newUser();
+  const g = await createGroup(u);
+  await call(u, 'POST', `/chat-links/${chatLink.createChatLink(newChat(), 'Первый', u)}/attach`, { groupId: g.id });
+  const t2 = chatLink.createChatLink(newChat(), 'Второй', u);
+  const res = await call(u, 'POST', `/chat-links/${t2}/attach`, { groupId: g.id });
+  assert.equal(res.body.chat.title, 'Второй');
+});
+
+test('any member can unlink; non-member gets 404; activity is logged', async () => {
+  const owner = newUser();
+  const friend = newUser();
+  const g = await createGroup(owner);
+  await call(friend, 'POST', `/invite/${g.inviteCode}/join`, {});
+  await call(owner, 'POST', `/chat-links/${chatLink.createChatLink(newChat(), 'Друзья', owner)}/attach`, {
+    groupId: g.id,
+  });
+  assert.equal((await call(newUser(), 'POST', `/groups/${g.id}/chat/unlink`)).status, 404);
+  const res = await call(friend, 'POST', `/groups/${g.id}/chat/unlink`);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.chat, null);
+  const h = await entries(owner, g);
+  assert.equal(h[0].action, 'group.chat_unlink');
+  assert.equal(h[0].payload.name, 'Друзья');
+  // unlinking again is harmless and writes nothing
+  assert.equal((await call(friend, 'POST', `/groups/${g.id}/chat/unlink`)).status, 200);
+  assert.equal((await entries(owner, g)).length, h.length);
+});
+
+test('bot removed from the chat / chat migrated to a supergroup', async () => {
+  const u = newUser();
+  const g = await createGroup(u);
+  const chatId = newChat();
+  await call(u, 'POST', `/chat-links/${chatLink.createChatLink(chatId, 'Друзья', u)}/attach`, { groupId: g.id });
+  const superId = -1002000000 - chatId;
+  chatLink.migrateChat(chatId, superId);
+  assert.equal(chatLink.groupOfChat(superId)?.id, g.id);
+  assert.equal(chatLink.groupOfChat(chatId), undefined);
+  assert.equal(chatLink.unlinkChat(superId, u)?.id, g.id);
+  assert.equal((await call(u, 'GET', `/groups/${g.id}`)).body.chat, null);
+  assert.equal(chatLink.unlinkChat(superId, u), undefined);
 });

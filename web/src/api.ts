@@ -54,6 +54,8 @@ export interface GroupDetail {
   inviteLink: string | null;
   isOwner: boolean;
   archived: boolean;
+  /** Linked Telegram chat (title only), if any. */
+  chat: { title: string } | null;
   meId: number;
   totalSpent: number;
   members: Member[];
@@ -75,6 +77,12 @@ export interface InvitePreview {
   group: { id: number; name: string; currency: string; membersCount: number };
   isMember: boolean;
   unclaimed: { id: number; name: string }[];
+}
+
+export interface ChatLinkPreview {
+  chatTitle: string;
+  /** Group (of this user) the chat is linked to right now; linking replaces it. */
+  replaces: { name: string } | null;
 }
 
 export interface ExpenseInput {
@@ -227,6 +235,10 @@ export const api = {
   invite: (code: string) => request<InvitePreview>('GET', `/invite/${encodeURIComponent(code)}`),
   join: (code: string, claimMemberId?: number) =>
     request<{ groupId: number }>('POST', `/invite/${encodeURIComponent(code)}/join`, { claimMemberId }),
+  chatLink: (token: string) => request<ChatLinkPreview>('GET', `/chat-links/${encodeURIComponent(token)}`),
+  attachChat: (token: string, groupId: number) =>
+    request<GroupDetail>('POST', `/chat-links/${encodeURIComponent(token)}/attach`, { groupId }),
+  unlinkChat: (id: number) => request<GroupDetail>('POST', `/groups/${id}/chat/unlink`),
   addExpense: (id: number, body: ExpenseInput) => request<GroupDetail>('POST', `/groups/${id}/expenses`, body),
   updateExpense: (id: number, expenseId: number, body: ExpenseInput) =>
     request<GroupDetail>('PUT', `/groups/${id}/expenses/${expenseId}`, body),
