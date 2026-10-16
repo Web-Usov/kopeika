@@ -1,11 +1,20 @@
-import { Fragment, useState } from 'react';
-import { type Expense, type GroupDetail, hasPaymentInfo, type Member, type PaymentInfo, useGroup } from '../api.ts';
-import { rich, t } from '../i18n.ts';
+import { Fragment, useEffect, useState } from 'react';
+import { type ActivityEntry, activityText } from '../../../shared/activity.ts';
+import {
+  api,
+  type Expense,
+  type GroupDetail,
+  hasPaymentInfo,
+  type Member,
+  type PaymentInfo,
+  useGroup,
+} from '../api.ts';
+import { dateLocale, lang, rich, t } from '../i18n.ts';
 import { navigate } from '../router.ts';
 import { BackButton, copyText, haptic, MainButton, openLink, shareLink } from '../tg.tsx';
 import { Avatar, ErrorView, formatDay, Loading, Money, Row, Section, Segmented } from '../ui.tsx';
 
-type Tab = 'expenses' | 'balances';
+export type Tab = 'expenses' | 'balances' | 'history';
 
 export function Group({ id, tab }: { id: number; tab: Tab }) {
   const { data: g, error } = useGroup(id);
@@ -51,14 +60,15 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
         options={[
           { value: 'expenses', label: t('group.tabExpenses') },
           { value: 'balances', label: t('group.tabBalances') },
+          { value: 'history', label: t('activity.tab') },
         ]}
         onChange={(t) => {
           haptic.tap();
-          navigate(`/g/${g.id}${t === 'balances' ? '?tab=balances' : ''}`, { replace: true });
+          navigate(`/g/${g.id}${t === 'expenses' ? '' : `?tab=${t}`}`, { replace: true });
         }}
       />
 
-      {tab === 'expenses' ? <ExpensesTab g={g} /> : <BalancesTab g={g} />}
+      {tab === 'expenses' ? <ExpensesTab g={g} /> : tab === 'balances' ? <BalancesTab g={g} /> : <HistoryTab g={g} />}
 
       <MainButton text={t('group.addExpense')} onClick={() => navigate(`/g/${g.id}/expense/new`)} />
     </div>
@@ -132,6 +142,79 @@ function ExpensesTab({ g }: { g: GroupDetail }) {
         </Section>
       ))}
     </>
+  );
+}
+
+function whenText(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const time = new Intl.DateTimeFormat(dateLocale, { hour: '2-digit', minute: '2-digit' }).format(d);
+  if (d.toDateString() === now.toDateString()) return time;
+  const date = new Intl.DateTimeFormat(dateLocale, {
+    day: 'numeric',
+    month: 'short',
+    ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
+  }).format(d);
+  return `${date}, ${time}`;
+}
+
+function HistoryTab({ g }: { g: GroupDetail }) {
+  const [items, setItems] = useState<ActivityEntry[]>();
+  const [next, setNext] = useState<number | null>(null);
+  const [error, setError] = useState<string>();
+  const [busy, setBusy] = useState(false);
+
+  const load = async (before?: number) => {
+    setBusy(true);
+    try {
+      const page = await api.activity(g.id, before);
+      setItems((old) => [...(before ? (old ?? []) : []), ...page.items]);
+      setNext(page.nextBefore);
+      setError(undefined);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  // Reload when the group changes under us (e.g. a rename), so fresh entries show up.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `load` is recreated every render
+  useEffect(() => {
+    load();
+  }, [g.id, g.expenses.length, g.name, g.members.length]);
+
+  if (error && !items) return <ErrorView message={error} />;
+  if (!items) return <Loading />;
+  if (items.length === 0) {
+    return (
+      <div className="empty">
+        <div className="empty-emoji">🕓</div>
+        <p>{t('activity.empty')}</p>
+        <p className="hint">{t('activity.emptyHint')}</p>
+      </div>
+    );
+  }
+  return (
+    <Section>
+      {items.map((e) => (
+        <Row
+          key={e.id}
+          className="activity"
+          left={
+            <Avatar
+              member={g.members.find((m) => m.id === e.actor.memberId) ?? { id: 0, name: e.actor.name, photoUrl: null }}
+            />
+          }
+          title={activityText(lang, e, g.currency)}
+          subtitle={whenText(e.createdAt)}
+        />
+      ))}
+      {next !== null && (
+        <button type="button" className="text-btn" disabled={busy} onClick={() => load(next)}>
+          {t('activity.loadMore')}
+        </button>
+      )}
+    </Section>
   );
 }
 

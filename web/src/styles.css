@@ -628,3 +628,8 @@ select.field {
   gap: 8px;
   margin-top: 8px;
 }
+
+.row.activity .row-title {
+  white-space: normal;
+  overflow: visible;
+}

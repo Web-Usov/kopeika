@@ -27,6 +27,11 @@ test('создать группу, добавить трату, присоеди
   const balance = page.locator('.my-balance');
   await expect.poll(async () => text(await balance.textContent())).toBe('Вам должны 666,66 ₽');
 
+  // В «Истории» видно, что трата добавлена.
+  await page.getByRole('button', { name: 'История' }).click();
+  await expect(page.locator('.row.activity').first()).toContainText('добавил(а) «Ужин»');
+  await page.getByRole('button', { name: 'Траты' }).click();
+
   // Код приглашения — из API.
   const groupId = Number(new URL(page.url()).hash.match(/\/g\/(\d+)/)?.[1]);
   expect(groupId).toBeGreaterThan(0);

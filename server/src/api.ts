@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { createT, type Key, type Lang, type Params, pickLang, type TFn } from '../../shared/i18n/index.ts';
 import { CURRENCIES, computeShares, SplitError } from '../../shared/money.ts';
+import { expenseSnapshot, listActivity, logActivity } from './activity.ts';
 import { type TelegramUser, validateInitData } from './auth.ts';
 import { appLink, loadExpenseSnap, notifyExpense, notifyExpenseChange } from './bot.ts';
 import { config } from './config.ts';
@@ -151,6 +152,7 @@ api.post('/groups', async (c) => {
     const id = Number(g.lastInsertRowid);
     run('INSERT INTO members (group_id, user_id, name) VALUES (?, ?, ?)', id, user.id, displayName(user));
     for (const n of body.memberNames) run('INSERT INTO members (group_id, name) VALUES (?, ?)', id, n);
+    logActivity(id, user.id, 'group.create', { name: body.name });
     return id;
   });
   const { group, me } = loadGroupFor(String(groupId), user.id);
@@ -165,7 +167,11 @@ api.get('/groups/:id', (c) => {
 api.patch('/groups/:id', async (c) => {
   const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
   const body = z.object({ name }).parse(await c.req.json());
-  run('UPDATE groups SET name = ? WHERE id = ?', body.name, group.id);
+  tx(() => {
+    run('UPDATE groups SET name = ? WHERE id = ?', body.name, group.id);
+    if (body.name !== group.name)
+      logActivity(group.id, c.get('user').id, 'group.rename', { from: group.name, to: body.name });
+  });
   return c.json(detail({ ...group, name: body.name }, me));
 });
 
@@ -186,7 +192,10 @@ api.delete('/groups/:id', (c) => {
 api.post('/groups/:id/members', async (c) => {
   const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
   const body = z.object({ name }).parse(await c.req.json());
-  run('INSERT INTO members (group_id, name) VALUES (?, ?)', group.id, body.name);
+  tx(() => {
+    const res = run('INSERT INTO members (group_id, name) VALUES (?, ?)', group.id, body.name);
+    logActivity(group.id, c.get('user').id, 'member.add', { memberId: Number(res.lastInsertRowid), name: body.name });
+  });
   return c.json(detail(group, me), 201);
 });
 
@@ -203,8 +212,17 @@ api.patch('/groups/:id/members/:memberId', async (c) => {
   if (body.paymentInfo && member.user_id !== null) throw fail(409, 'errors.paymentInfoTelegram');
   const info = body.paymentInfo && parsePaymentInfo(body.paymentInfo);
   tx(() => {
-    if (body.name !== undefined) run('UPDATE members SET name = ? WHERE id = ?', body.name, memberId);
-    if (info) run('UPDATE members SET payment_info = ? WHERE id = ?', serialize(info), memberId);
+    const actor = c.get('user').id;
+    if (body.name !== undefined) {
+      run('UPDATE members SET name = ? WHERE id = ?', body.name, memberId);
+      if (body.name !== member.name)
+        logActivity(group.id, actor, 'member.rename', { memberId, from: member.name, to: body.name });
+    }
+    if (info) {
+      run('UPDATE members SET payment_info = ? WHERE id = ?', serialize(info), memberId);
+      // Only the fact is logged, never the requisites themselves.
+      logActivity(group.id, actor, 'member.payment_info', { memberId, name: body.name ?? member.name });
+    }
   });
   return c.json(detail(group, me));
 });
@@ -221,7 +239,10 @@ api.delete('/groups/:id/members/:memberId', (c) => {
     memberId,
   );
   if (used) throw fail(409, 'errors.memberHasExpenses');
-  run('DELETE FROM members WHERE id = ?', memberId);
+  tx(() => {
+    run('DELETE FROM members WHERE id = ?', memberId);
+    logActivity(group.id, c.get('user').id, 'member.delete', { memberId, name: member.name });
+  });
   return c.json(detail(group, me));
 });
 
@@ -244,18 +265,31 @@ api.post('/invite/:code/join', async (c) => {
   const group = one<GroupRow>('SELECT * FROM groups WHERE invite_code = ?', c.req.param('code'));
   if (!group) throw fail(404, 'errors.inviteInvalid');
   if (!findMembership(group.id, user.id)) {
-    if (body.claimMemberId) {
-      // "I am this person": link a name-only member to the Telegram account, keeping their history.
-      const res = run(
-        'UPDATE members SET user_id = ? WHERE id = ? AND group_id = ? AND user_id IS NULL',
-        user.id,
-        body.claimMemberId,
-        group.id,
-      );
-      if (res.changes === 0) throw fail(409, 'errors.memberTaken');
-    } else {
-      run('INSERT INTO members (group_id, user_id, name) VALUES (?, ?, ?)', group.id, user.id, displayName(user));
-    }
+    tx(() => {
+      if (body.claimMemberId) {
+        // "I am this person": link a name-only member to the Telegram account, keeping their history.
+        const res = run(
+          'UPDATE members SET user_id = ? WHERE id = ? AND group_id = ? AND user_id IS NULL',
+          user.id,
+          body.claimMemberId,
+          group.id,
+        );
+        if (res.changes === 0) throw fail(409, 'errors.memberTaken');
+        const claimed = one<MemberRow>('SELECT * FROM members WHERE id = ?', body.claimMemberId)!;
+        logActivity(group.id, user.id, 'member.claim', { memberId: claimed.id, name: claimed.name });
+      } else {
+        const res = run(
+          'INSERT INTO members (group_id, user_id, name) VALUES (?, ?, ?)',
+          group.id,
+          user.id,
+          displayName(user),
+        );
+        logActivity(group.id, user.id, 'member.join', {
+          memberId: Number(res.lastInsertRowid),
+          name: displayName(user),
+        });
+      }
+    });
   }
   return c.json({ groupId: group.id });
 });
@@ -324,6 +358,7 @@ api.post('/groups/:id/expenses', async (c) => {
     );
     const id = Number(res.lastInsertRowid);
     saveShares(id, body, computed);
+    logActivity(group.id, user.id, 'expense.create', { expenseId: id, expense: expenseSnapshot(id)! });
     return one<ExpenseRow>('SELECT * FROM expenses WHERE id = ?', id)!;
   });
   notifyExpense(group, expense, user.id, me.name);
@@ -340,6 +375,7 @@ api.put('/groups/:id/expenses/:expenseId', async (c) => {
   const computed = validateExpense(group.id, body, c.get('lang'));
   const before = loadExpenseSnap(expenseId);
   tx(() => {
+    const snapBefore = expenseSnapshot(expenseId)!;
     run(
       `UPDATE expenses SET title = ?, amount = ?, payer_id = ?, split_mode = ?, spent_on = ?, updated_at = datetime('now')
        WHERE id = ?`,
@@ -351,6 +387,11 @@ api.put('/groups/:id/expenses/:expenseId', async (c) => {
       expenseId,
     );
     saveShares(expenseId, body, computed);
+    logActivity(group.id, c.get('user').id, 'expense.update', {
+      expenseId,
+      before: snapBefore,
+      after: expenseSnapshot(expenseId)!,
+    });
   });
   const after = loadExpenseSnap(expenseId);
   if (before && after) notifyExpenseChange(group, before, after, c.get('user').id, me.name);
@@ -363,8 +404,24 @@ api.delete('/groups/:id/expenses/:expenseId', (c) => {
   const before = one<{ id: number }>('SELECT id FROM expenses WHERE id = ? AND group_id = ?', expenseId, group.id)
     ? loadExpenseSnap(expenseId)
     : null;
-  const res = run('DELETE FROM expenses WHERE id = ? AND group_id = ?', expenseId, group.id);
-  if (res.changes === 0) throw fail(404, 'errors.expenseNotFound');
+  tx(() => {
+    const snap = expenseSnapshot(expenseId);
+    const res = run('DELETE FROM expenses WHERE id = ? AND group_id = ?', expenseId, group.id);
+    if (res.changes === 0 || !snap) throw fail(404, 'errors.expenseNotFound');
+    logActivity(group.id, c.get('user').id, 'expense.delete', { expenseId, expense: snap });
+  });
   if (before) notifyExpenseChange(group, before, null, c.get('user').id, me.name);
   return c.json(detail(group, me));
+});
+
+// --- History ---
+api.get('/groups/:id/activity', (c) => {
+  const { group } = loadGroupFor(c.req.param('id'), c.get('user').id);
+  const q = z
+    .object({
+      before: z.coerce.number().int().positive().optional(),
+      limit: z.coerce.number().int().min(1).max(100).optional(),
+    })
+    .parse(c.req.query());
+  return c.json(listActivity(group.id, q.before, q.limit));
 });

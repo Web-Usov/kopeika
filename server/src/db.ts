@@ -65,6 +65,19 @@ const migrations = [
   // Payment details (JSON: phone, bank, card, link, note) to show to debtors: personal ones in users,
   // for people without Telegram in members. The app never moves money, it only shows these.
   `ALTER TABLE users ADD COLUMN payment_info TEXT; ALTER TABLE members ADD COLUMN payment_info TEXT;`,
+  // Group change log ("History" tab): written in the same transaction as the change itself.
+  // payload is JSON with snapshots (titles, amounts, names at that moment) so the text can be rendered later.
+  `
+  CREATE TABLE activity (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id    INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    user_id     INTEGER NOT NULL REFERENCES users(id),   -- who did it
+    action      TEXT NOT NULL,
+    payload     TEXT NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX activity_group ON activity(group_id, id);
+  `,
 ];
 
 const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
