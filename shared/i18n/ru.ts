@@ -18,6 +18,7 @@ export const ru = {
     save: 'Сохранить',
     done: 'Готово',
     add: 'Добавить',
+    version: 'Копейка {version}',
     errorStatus: 'Ошибка {status}',
     members: { one: '{count} участник', few: '{count} участника', many: '{count} участников' },
   },

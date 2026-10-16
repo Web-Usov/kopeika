@@ -18,6 +18,7 @@ export const en: Dict = {
     save: 'Save',
     done: 'Done',
     add: 'Add',
+    version: 'Kopeika {version}',
     errorStatus: 'Error {status}',
     members: { one: '{count} member', other: '{count} members' },
   },
