@@ -16,6 +16,9 @@ export interface UserRow {
   payment_info: string | null;
 }
 
+export type ChatFeed = 'off' | 'each' | 'daily';
+export const CHAT_FEEDS: ChatFeed[] = ['off', 'each', 'daily'];
+
 export interface GroupRow {
   id: number;
   name: string;
@@ -26,6 +29,9 @@ export interface GroupRow {
   archived_at: string | null;
   chat_id: number | null;
   chat_title: string | null;
+  chat_feed: ChatFeed;
+  last_digest_date: string | null;
+  last_digest_at: string | null;
 }
 
 export interface MemberRow {
@@ -146,7 +152,7 @@ export function groupDetail(group: GroupRow, me: MemberRow, inviteLink: string |
     isOwner: group.created_by === me.user_id,
     archived: group.archived_at !== null,
     // Only the title: the numeric chat id never leaves the server.
-    chat: group.chat_id === null ? null : { title: group.chat_title ?? '' },
+    chat: group.chat_id === null ? null : { title: group.chat_title ?? '', feed: group.chat_feed },
     meId: me.id,
     totalSpent: expenses.filter((e) => e.kind === 'expense').reduce((a, e) => a + e.amount, 0),
     members: members.map((m) => ({
@@ -181,6 +187,20 @@ export function groupDetail(group: GroupRow, me: MemberRow, inviteLink: string |
       })),
     })),
     settlements: settleUp(balances),
+  };
+}
+
+/** Current balances and the settlement plan of a group, by member name (for the chat digest). */
+export function balanceView(groupId: number) {
+  const { members, balances } = loadLedger(groupId);
+  const names = new Map(members.map((m) => [m.id, m.name]));
+  return {
+    balances: members.map((m) => ({ name: m.name, balance: balances.get(m.id) ?? 0 })),
+    settlements: settleUp(balances).map((s) => ({
+      from: names.get(s.from) ?? '',
+      to: names.get(s.to) ?? '',
+      amount: s.amount,
+    })),
   };
 }
 

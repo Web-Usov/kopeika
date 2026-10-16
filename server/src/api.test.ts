@@ -870,7 +870,7 @@ test('attaching a chat: group gets the chat (title only in the API), activity en
   const token = chatLink.createChatLink(chatId, 'Друзья', u);
   const res = await call(u, 'POST', `/chat-links/${token}/attach`, { groupId: g.id });
   assert.equal(res.status, 200);
-  assert.deepEqual(res.body.chat, { title: 'Друзья' });
+  assert.deepEqual(res.body.chat, { title: 'Друзья', feed: 'each' });
   assert.equal(JSON.stringify(res.body).includes(String(chatId)), false);
   assert.equal((await call(u, 'GET', `/groups/${g.id}`)).body.chat.title, 'Друзья');
   const h = await entries(u, g);
@@ -959,4 +959,21 @@ test('bot removed from the chat / chat migrated to a supergroup', async () => {
   assert.equal(chatLink.unlinkChat(superId, u)?.id, g.id);
   assert.equal((await call(u, 'GET', `/groups/${g.id}`)).body.chat, null);
   assert.equal(chatLink.unlinkChat(superId, u), undefined);
+});
+
+test('chat feed setting: members only, needs a linked chat, rejects garbage, reset to "each" on relink', async () => {
+  const u = newUser();
+  const g = await createGroup(u);
+  assert.equal((await call(u, 'PUT', `/groups/${g.id}/chat/feed`, { feed: 'off' })).status, 409);
+  await call(u, 'POST', `/chat-links/${chatLink.createChatLink(newChat(), 'Друзья', u)}/attach`, { groupId: g.id });
+  assert.equal((await call(newUser(), 'PUT', `/groups/${g.id}/chat/feed`, { feed: 'off' })).status, 404);
+  assert.equal((await call(null, 'PUT', `/groups/${g.id}/chat/feed`, { feed: 'off' })).status, 401);
+  assert.equal((await call(u, 'PUT', `/groups/${g.id}/chat/feed`, { feed: 'hourly' })).status, 400);
+  assert.equal((await call(u, 'PUT', `/groups/${g.id}/chat/feed`, {})).status, 400);
+  const res = await call(u, 'PUT', `/groups/${g.id}/chat/feed`, { feed: 'daily' });
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.chat, { title: 'Друзья', feed: 'daily' });
+  assert.equal((await call(u, 'GET', `/groups/${g.id}`)).body.chat.feed, 'daily');
+  await call(u, 'POST', `/chat-links/${chatLink.createChatLink(newChat(), 'Другой', u)}/attach`, { groupId: g.id });
+  assert.equal((await call(u, 'GET', `/groups/${g.id}`)).body.chat.feed, 'each');
 });

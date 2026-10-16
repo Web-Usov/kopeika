@@ -45,6 +45,9 @@ export interface Expense {
   shares: { memberId: number; input: number; amount: number }[];
 }
 
+/** What the bot posts to the linked chat. */
+export type ChatFeed = 'off' | 'each' | 'daily';
+
 export interface GroupDetail {
   id: number;
   name: string;
@@ -54,7 +57,7 @@ export interface GroupDetail {
   isOwner: boolean;
   archived: boolean;
   /** Linked Telegram chat (title only), if any. */
-  chat: { title: string } | null;
+  chat: { title: string; feed: ChatFeed } | null;
   meId: number;
   totalSpent: number;
   members: Member[];
@@ -208,6 +211,7 @@ export const api = {
   chatLink: (token: string) => request<ChatLinkPreview>('GET', `/chat-links/${encodeURIComponent(token)}`),
   attachChat: (token: string, groupId: number) =>
     request<GroupDetail>('POST', `/chat-links/${encodeURIComponent(token)}/attach`, { groupId }),
+  setChatFeed: (id: number, feed: ChatFeed) => request<GroupDetail>('PUT', `/groups/${id}/chat/feed`, { feed }),
   unlinkChat: (id: number) => request<GroupDetail>('POST', `/groups/${id}/chat/unlink`),
   addExpense: (id: number, body: ExpenseInput) => request<GroupDetail>('POST', `/groups/${id}/expenses`, body),
   updateExpense: (id: number, expenseId: number, body: ExpenseInput) =>

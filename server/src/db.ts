@@ -125,6 +125,13 @@ const migrations = [
   );
   CREATE INDEX chat_links_chat ON chat_links(chat_id);
   `,
+  // What the bot posts to the linked chat: 'off' | 'each' (every expense) | 'daily' (digest). last_digest_date is the
+  // server-local day of the last daily digest (one per day); last_digest_at (UTC) is the start of the next digest window.
+  `
+  ALTER TABLE groups ADD COLUMN chat_feed TEXT NOT NULL DEFAULT 'each';
+  ALTER TABLE groups ADD COLUMN last_digest_date TEXT;
+  ALTER TABLE groups ADD COLUMN last_digest_at TEXT;
+  `,
 ];
 
 const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;

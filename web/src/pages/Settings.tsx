@@ -1,10 +1,16 @@
 import { useState } from 'react';
-import { api, forgetGroup, type GroupDetail, type Member, setGroup, useGroup } from '../api.ts';
+import { api, type ChatFeed, forgetGroup, type GroupDetail, type Member, setGroup, useGroup } from '../api.ts';
 import { t } from '../i18n.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, confirmDialog, haptic, shareLink } from '../tg.tsx';
-import { Avatar, ErrorView, Loading, Row, Section } from '../ui.tsx';
+import { Avatar, ErrorView, Loading, Row, Section, Segmented } from '../ui.tsx';
 import { PaymentForm } from './PaymentForm.tsx';
+
+const FEED_FOOTER = {
+  off: 'settings.feedFooterOff',
+  each: 'settings.feedFooterEach',
+  daily: 'settings.feedFooterDaily',
+} as const;
 
 export function Settings({ id }: { id: number }) {
   const { data: g, error } = useGroup(id);
@@ -163,16 +169,27 @@ function SettingsView({ g }: { g: GroupDetail }) {
         </div>
       </Section>
 
-      <Section title={t('settings.chatSection')} footer={g.chat ? t('settings.chatFooter') : undefined}>
+      <Section title={t('settings.chatSection')} footer={g.chat ? t(FEED_FOOTER[g.chat.feed]) : undefined}>
         {g.chat ? (
-          <Row
-            title={t('settings.chatLinked', { title: g.chat.title })}
-            right={
-              <button type="button" className="small-btn" onClick={() => void unlinkChat()}>
-                {t('settings.chatUnlink')}
-              </button>
-            }
-          />
+          <>
+            <Row
+              title={t('settings.chatLinked', { title: g.chat.title })}
+              right={
+                <button type="button" className="small-btn" onClick={() => void unlinkChat()}>
+                  {t('settings.chatUnlink')}
+                </button>
+              }
+            />
+            <Segmented<ChatFeed>
+              value={g.chat.feed}
+              options={[
+                { value: 'off', label: t('settings.feedOff') },
+                { value: 'each', label: t('settings.feedEach') },
+                { value: 'daily', label: t('settings.feedDaily') },
+              ]}
+              onChange={(feed) => void run(() => api.setChatFeed(g.id, feed))}
+            />
+          </>
         ) : (
           <div className="row hint">{t('settings.chatNone')}</div>
         )}

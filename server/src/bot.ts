@@ -11,7 +11,13 @@ import {
 } from './chatLink.ts';
 import { config } from './config.ts';
 import { all, one, run } from './db.ts';
-import { buildChangeMessage, buildRemindMessage, changeAudience, type ExpenseSnap } from './notify.ts';
+import {
+  buildChangeMessage,
+  buildChatAddedMessage,
+  buildRemindMessage,
+  changeAudience,
+  type ExpenseSnap,
+} from './notify.ts';
 import { type ExpenseRow, type GroupRow, upsertUser } from './repo.ts';
 
 export const bot = config.botToken
@@ -208,9 +214,71 @@ export async function sendExportFile(userId: number, csv: string, fileName: stri
   }
 }
 
+/** Telegram says the bot can no longer write to this chat (removed, kicked, lost the right to send). */
+export function isChatGone(e: unknown): boolean {
+  if (!(e instanceof GrammyError)) return false;
+  if (e.error_code === 403) return true;
+  return (
+    e.error_code === 400 &&
+    /chat not found|bot was kicked|not enough rights|have no rights|CHAT_WRITE_FORBIDDEN/i.test(e.description)
+  );
+}
+
+/**
+ * Posts a message to the group's linked chat. Resolves true when it went out. If the chat is gone the group is
+ * unlinked; if it became a supergroup the link moves to the new id. Never throws.
+ */
+export async function sendToChat(group: GroupRow, text: string, button?: ChatMessage['button']): Promise<boolean> {
+  if (!bot || !botReady || group.chat_id === null) return false;
+  try {
+    await bot.api.sendMessage(group.chat_id, text, {
+      parse_mode: 'HTML',
+      reply_markup: button ? new InlineKeyboard().url(button.text, button.url) : undefined,
+      link_preview_options: { is_disabled: true },
+    });
+    return true;
+  } catch (e) {
+    const moved = e instanceof GrammyError ? e.parameters?.migrate_to_chat_id : undefined;
+    if (moved) migrateChat(group.chat_id, moved);
+    else if (isChatGone(e)) unlinkChat(group.chat_id, group.created_by);
+    else console.warn('chat post failed', e instanceof Error ? e.message : e);
+    return false;
+  }
+}
+
+/** Posts to the linked chat in "each" mode, in the author's language. Fire-and-forget. */
+function postEach(
+  group: GroupRow,
+  authorUserId: number,
+  build: (lang: Lang, names: Map<number, string>) => string | null,
+) {
+  if (group.chat_id === null || group.chat_feed !== 'each') return;
+  try {
+    const lang = pickLang(one<{ lang: string | null }>('SELECT lang FROM users WHERE id = ?', authorUserId)?.lang);
+    const names = new Map(
+      all<{ id: number; name: string }>('SELECT id, name FROM members WHERE group_id = ?', group.id).map((m) => [
+        m.id,
+        m.name,
+      ]),
+    );
+    const text = build(lang, names);
+    if (!text) return;
+    const url = appLink(group.invite_code);
+    void sendToChat(group, text, url ? { text: createT(lang)('bot.openGroup'), url } : undefined);
+  } catch (e) {
+    console.warn('chat feed failed', e);
+  }
+}
+
 /** Tells everyone involved in an expense (except the author) that it was added. Fire-and-forget. */
 export function notifyExpense(group: GroupRow, expense: ExpenseRow, authorUserId: number, authorName: string) {
   if (!bot || !botReady) return;
+  const snap = loadExpenseSnap(expense.id);
+  if (snap) {
+    postEach(group, authorUserId, (lang, memberNames) =>
+      buildChatAddedMessage({ lang, currency: group.currency, authorName, expense: snap, memberNames }),
+    );
+  }
   const recipients = all<{ user_id: number; member_id: number; share: number | null; lang: string | null }>(
     `SELECT m.user_id, m.id AS member_id, s.amount AS share, u.lang
      FROM members m
@@ -268,6 +336,19 @@ export function notifyExpenseChange(
   authorName: string,
 ) {
   if (!bot || !botReady) return;
+  postEach(group, authorUserId, (lang, memberNames) =>
+    buildChangeMessage({
+      before,
+      after,
+      recipientMemberId: -1,
+      lang,
+      currency: group.currency,
+      groupName: group.name,
+      authorName,
+      memberNames,
+      forChat: true,
+    }),
+  );
   try {
     const memberNames = new Map(
       all<{ id: number; name: string }>('SELECT id, name FROM members WHERE group_id = ?', group.id).map((m) => [

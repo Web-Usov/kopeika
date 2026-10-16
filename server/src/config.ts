@@ -18,6 +18,10 @@ export const config = {
   backupDir: env.BACKUP_DIR ?? path.join(path.dirname(path.resolve(env.DB_PATH ?? 'data/kopeika.db')), 'backups'),
   /** How many daily backups to keep. */
   backupKeep: Math.max(1, Math.floor(Number(env.BACKUP_KEEP ?? 14)) || 14),
+  /** Local server hour (0-23) when the daily chat digest is posted. */
+  chatDigestHour: Number.isFinite(Number(env.CHAT_DIGEST_HOUR ?? 20))
+    ? Math.min(23, Math.max(0, Math.floor(Number(env.CHAT_DIGEST_HOUR ?? 20))))
+    : 20,
   staticDir: env.STATIC_DIR ?? path.resolve('web/dist'),
   /** Run the bot with long polling. Disable locally if the production bot uses the same token. */
   botPolling: (env.BOT_POLLING ?? '1') === '1',

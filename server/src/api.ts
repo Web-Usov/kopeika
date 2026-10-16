@@ -30,6 +30,8 @@ import { deserialize, isEmpty, PaymentInfoError, parsePaymentInfo, serialize } f
 import { createRateLimiter } from './rateLimit.ts';
 import { getRate, RatesError } from './rates.ts';
 import {
+  CHAT_FEEDS,
+  type ChatFeed,
   displayName,
   type ExpenseRow,
   findMembership,
@@ -349,6 +351,14 @@ api.post('/chat-links/:token/attach', async (c) => {
   const linked = one<GroupRow>('SELECT * FROM groups WHERE id = ?', group.id)!;
   notifyChatLinked(link.chat_id, linked, c.get('lang'));
   return c.json(detail(linked, me));
+});
+
+api.put('/groups/:id/chat/feed', async (c) => {
+  const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
+  const { feed } = z.object({ feed: z.enum(CHAT_FEEDS as [ChatFeed, ...ChatFeed[]]) }).parse(await c.req.json());
+  if (group.chat_id === null) throw fail(409, 'errors.chatNotLinked');
+  run('UPDATE groups SET chat_feed = ? WHERE id = ?', feed, group.id);
+  return c.json(detail({ ...group, chat_feed: feed }, me));
 });
 
 api.post('/groups/:id/chat/unlink', (c) => {
