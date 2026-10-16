@@ -36,11 +36,19 @@ export function expenseSnapshot(expenseId: number): ExpenseSnapshot | null {
   return snap;
 }
 
+/** Stands in for a user whose account was deleted (see the last migration in db.ts). */
+export const DELETED_USER_ID = 0;
+
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 
 /** Newest first; `before` is the id of the last entry already shown. */
-export function listActivity(groupId: number, before: number | undefined, limitRaw: number | undefined) {
+export function listActivity(
+  groupId: number,
+  before: number | undefined,
+  limitRaw: number | undefined,
+  deletedName = 'deleted user',
+) {
   const limit = Math.min(Math.max(limitRaw ?? DEFAULT_LIMIT, 1), MAX_LIMIT);
   const rows = all<{
     id: number;
@@ -50,11 +58,11 @@ export function listActivity(groupId: number, before: number | undefined, limitR
     created_at: string;
     member_id: number | null;
     member_name: string | null;
-    first_name: string;
+    first_name: string | null;
   }>(
     `SELECT a.*, m.id AS member_id, m.name AS member_name, u.first_name
      FROM activity a
-     JOIN users u ON u.id = a.user_id
+     LEFT JOIN users u ON u.id = a.user_id
      LEFT JOIN members m ON m.group_id = a.group_id AND m.user_id = a.user_id
      WHERE a.group_id = ? AND (? IS NULL OR a.id < ?)
      ORDER BY a.id DESC LIMIT ?`,
@@ -67,7 +75,10 @@ export function listActivity(groupId: number, before: number | undefined, limitR
   const items: ActivityEntry[] = page.map((r) => ({
     id: r.id,
     action: r.action,
-    actor: { memberId: r.member_id, name: r.member_name ?? r.first_name },
+    actor: {
+      memberId: r.member_id,
+      name: r.member_name ?? (r.user_id === DELETED_USER_ID ? deletedName : (r.first_name ?? deletedName)),
+    },
     payload: JSON.parse(r.payload) as ActivityPayload,
     createdAt: `${r.created_at.replace(' ', 'T')}Z`,
   }));
