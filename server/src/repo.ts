@@ -184,6 +184,16 @@ export function groupDetail(group: GroupRow, me: MemberRow, inviteLink: string |
   };
 }
 
+/** Everything a chat message needs about a group's balances; no viewer, so it works for people who aren't members. */
+export function groupBalanceSnapshot(group: GroupRow) {
+  const { members, expenses, balances } = loadLedger(group.id);
+  return {
+    totalSpent: expenses.filter((e) => e.kind === 'expense').reduce((a, e) => a + e.amount, 0),
+    members: members.map((m) => ({ id: m.id, name: m.name, balance: balances.get(m.id) ?? 0 })),
+    settlements: settleUp(balances),
+  };
+}
+
 export function groupsForUser(userId: number) {
   const groups = all<GroupRow & { member_id: number }>(
     `SELECT g.*, m.id AS member_id FROM groups g JOIN members m ON m.group_id = g.id
