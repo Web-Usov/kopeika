@@ -23,3 +23,30 @@ test('isChatGone: kicked / no rights / forbidden are final, other errors are not
   assert.equal(isChatGone(err(400, 'Bad Request: message is too long')), false);
   assert.equal(isChatGone(new Error('network')), false);
 });
+
+test('logTelegramError: method, code and description only, never the request payload', async () => {
+  const { GrammyError, HttpError } = await import('grammy');
+  const { describeTelegramError, logTelegramError } = await import('./logging.ts');
+  const secret = 'Ужин в «Тайной группе»: 1500 ₽';
+  const e = new GrammyError(
+    'x',
+    { ok: false, error_code: 400, description: 'Bad Request: chat not found' },
+    'sendMessage',
+    { chat_id: 123456789, text: secret },
+  );
+  assert.equal(describeTelegramError(e), 'sendMessage 400 Bad Request: chat not found');
+  assert.equal(describeTelegramError(new Error('boom')), 'boom');
+  assert.ok(describeTelegramError(new HttpError('net down', new Error('ECONNRESET'))).startsWith('network error'));
+
+  const lines: unknown[][] = [];
+  const orig = console.warn;
+  console.warn = (...args: unknown[]) => void lines.push(args);
+  try {
+    logTelegramError('sendMessage failed', e);
+  } finally {
+    console.warn = orig;
+  }
+  const out = lines.flat().join(' ');
+  assert.equal(out, 'sendMessage failed: sendMessage 400 Bad Request: chat not found');
+  assert.ok(!out.includes('Тайной') && !out.includes('123456789'));
+});

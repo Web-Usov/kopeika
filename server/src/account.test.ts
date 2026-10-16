@@ -60,7 +60,7 @@ async function sharedSetup() {
   await call(guest, 'PUT', '/me', { notify: true });
   await call(guest, 'PUT', '/me/payment-info', { phone: '+7 900 000-00-00' });
   const full = (await call(owner, 'GET', `/groups/${g.id}`)).body as Json;
-  const guestMember = full.members.find((m: Json) => m.userId === guest);
+  const guestMember = full.members.filter((m: Json) => m.hasTelegram).at(-1);
   assert.equal((await call(owner, 'POST', `/groups/${g.id}/expenses`, expense(full))).status, 201);
   // The guest pays too, so there is an expense authored by the guest.
   const guestFull = (await call(guest, 'GET', `/groups/${g.id}`)).body as Json;
@@ -114,12 +114,12 @@ test('delete: user row with name, username, photo, language, payment details and
 test('delete: in a shared group the user becomes a name-only member, others keep expenses and balances', async () => {
   const { owner, guest, g } = await sharedSetup();
   const before = (await call(owner, 'GET', `/groups/${g.id}`)).body as Json;
-  const guestBefore = before.members.find((m: Json) => m.userId === guest);
+  const guestBefore = before.members.filter((m: Json) => m.hasTelegram).at(-1);
   await call(guest, 'DELETE', '/me');
 
   const after = (await call(owner, 'GET', `/groups/${g.id}`)).body as Json;
   const guestAfter = after.members.find((m: Json) => m.id === guestBefore.id);
-  assert.equal(guestAfter.userId, null);
+  assert.equal(guestAfter.hasTelegram, false);
   assert.equal(guestAfter.name, guestBefore.name);
   assert.deepEqual(guestAfter.paymentInfo, {});
   assert.equal(guestAfter.canNotify, false);

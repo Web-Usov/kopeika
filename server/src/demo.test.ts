@@ -38,7 +38,7 @@ test('demo group: made-up people, expenses of several kinds, balances add up', a
   assert.equal(g.currency, 'RUB');
   assert.equal(g.inviteLink, null);
   assert.equal(g.members.length, 4);
-  assert.equal(g.members.filter((m: Json) => m.userId === null).length, 3);
+  assert.equal(g.members.filter((m: Json) => !m.hasTelegram).length, 3);
   const expenses = g.expenses.filter((e: Json) => e.kind === 'expense');
   assert.ok(expenses.length >= 5 && expenses.length <= 6);
   assert.ok(new Set(expenses.map((e: Json) => e.category)).size >= 4);

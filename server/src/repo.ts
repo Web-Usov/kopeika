@@ -182,7 +182,8 @@ export function groupDetail(group: GroupRow, me: MemberRow, inviteLink: string |
     members: members.map((m) => ({
       id: m.id,
       name: m.name,
-      userId: m.user_id,
+      // The Telegram id stays on the server: the client only needs to know whether there is an account.
+      hasTelegram: m.user_id !== null,
       username: m.username,
       photoUrl: m.photo_url,
       // Only ever returned to members of this group (loadGroupFor guards every caller).

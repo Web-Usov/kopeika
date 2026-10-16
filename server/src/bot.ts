@@ -14,6 +14,7 @@ import { balanceText, esc, helpText, privateBalanceText } from './chatText.ts';
 import { config } from './config.ts';
 import { all, one, run } from './db.ts';
 import { buildInlineResults } from './inline.ts';
+import { describeTelegramError, logTelegramError } from './logging.ts';
 import {
   buildChangeMessage,
   buildChatAddedMessage,
@@ -97,8 +98,7 @@ async function connectBot(b: Bot) {
         return;
       }
       const delay = retryDelaySec(attempt);
-      const msg = e instanceof Error ? e.message : String(e);
-      console.warn(`Telegram unavailable (${msg}), retrying in ${delay}s (attempt ${attempt})`);
+      console.warn(`Telegram unavailable (${describeTelegramError(e)}), retrying in ${delay}s (attempt ${attempt})`);
       await new Promise((r) => setTimeout(r, delay * 1000));
     }
   }
@@ -116,7 +116,7 @@ async function connectBot(b: Bot) {
 
   registerChatHandlers(b);
 
-  b.catch((err) => console.error('Bot error', err.error));
+  b.catch((err) => logTelegramError('Bot error', err.error));
 
   // Menu button and profile don't block polling; failures are only logged.
   void setupBotProfile(b);
@@ -125,7 +125,7 @@ async function connectBot(b: Bot) {
     // Not awaited: bot.start() resolves only when polling stops.
     // No allowed_updates: Telegram's default set includes my_chat_member, which chat linking relies on.
     b.start({ drop_pending_updates: true, onStart: () => console.log('Bot polling started') }).catch((e) =>
-      console.error('Bot polling stopped', e),
+      logTelegramError('Bot polling stopped', e),
     );
   }
 }
@@ -152,7 +152,7 @@ function registerChatHandlers(b: Bot) {
       const msg = welcomeMessage(pickLang(from.language_code), url);
       await ctx.api
         .sendMessage(chat.id, msg.text, { reply_markup: chatKeyboard(msg) })
-        .catch((e) => console.warn('chat welcome failed', e instanceof Error ? e.message : e));
+        .catch((e) => logTelegramError('chat welcome failed', e));
     } else if (member.status === 'left' || member.status === 'kicked') {
       unlinkChat(chat.id, from.id);
     }
@@ -248,7 +248,7 @@ export function notifyChatLinked(chatId: number, group: GroupRow, lang: Lang) {
   const msg = linkedMessage(lang, group.name, appLink(group.invite_code));
   bot.api
     .sendMessage(chatId, msg.text, { reply_markup: chatKeyboard(msg) })
-    .catch((e) => console.warn('chat link confirmation failed', e instanceof Error ? e.message : e));
+    .catch((e) => logTelegramError('chat link confirmation failed', e));
 }
 
 async function setupBotProfile(b: Bot) {
@@ -258,7 +258,7 @@ async function setupBotProfile(b: Bot) {
       .setChatMenuButton({
         menu_button: { type: 'web_app', text: createT('ru')('common.brand'), web_app: { url: config.appUrl } },
       })
-      .catch((e) => console.warn('setChatMenuButton failed', e instanceof Error ? e.message : e));
+      .catch((e) => logTelegramError('setChatMenuButton failed', e));
   }
   await setBotProfile();
   await setBotCommands(b);
@@ -290,7 +290,7 @@ async function setBotCommands(b: Bot) {
     for (const { type, commands } of lists) {
       await b.api
         .setMyCommands(commands, { scope: { type }, ...(language_code && { language_code }) })
-        .catch((e) => console.warn('setMyCommands failed', e instanceof Error ? e.message : e));
+        .catch((e) => logTelegramError('setMyCommands failed', e));
     }
   }
 }
@@ -302,10 +302,12 @@ async function setBotProfile() {
   for (const [lang, language_code] of variants) {
     const t = createT(lang);
     const opts = language_code ? { language_code } : {};
-    await bot.api.setMyDescription(t('bot.description'), opts).catch((e) => console.warn('setMyDescription failed', e));
+    await bot.api
+      .setMyDescription(t('bot.description'), opts)
+      .catch((e) => logTelegramError('setMyDescription failed', e));
     await bot.api
       .setMyShortDescription(t('bot.shortDescription'), opts)
-      .catch((e) => console.warn('setMyShortDescription failed', e));
+      .catch((e) => logTelegramError('setMyShortDescription failed', e));
   }
 }
 
@@ -322,7 +324,7 @@ async function send(userId: number, text: string, group: GroupRow, lang: Lang) {
   } catch (e) {
     // 403: user blocked the bot or never started it. Stop trying until they allow it again.
     if (e instanceof GrammyError && e.error_code === 403) run('UPDATE users SET notify = 0 WHERE id = ?', userId);
-    else console.warn('sendMessage failed', e);
+    else logTelegramError('sendMessage failed', e);
   }
 }
 
@@ -368,7 +370,7 @@ export async function sendToChat(group: GroupRow, text: string, button?: ChatMes
     const moved = e instanceof GrammyError ? e.parameters?.migrate_to_chat_id : undefined;
     if (moved) migrateChat(group.chat_id, moved);
     else if (isChatGone(e)) unlinkChat(group.chat_id, group.created_by);
-    else console.warn('chat post failed', e instanceof Error ? e.message : e);
+    else logTelegramError('chat post failed', e);
     return false;
   }
 }
@@ -393,7 +395,7 @@ function postEach(
     const url = appLink(group.invite_code);
     void sendToChat(group, text, url ? { text: createT(lang)('bot.openGroup'), url } : undefined);
   } catch (e) {
-    console.warn('chat feed failed', e);
+    logTelegramError('chat feed failed', e);
   }
 }
 
@@ -506,7 +508,7 @@ export function notifyExpenseChange(
       if (text) void send(r.user_id, text, group, lang);
     }
   } catch (e) {
-    console.warn('notifyExpenseChange failed', e);
+    logTelegramError('notifyExpenseChange failed', e);
   }
 }
 
@@ -517,7 +519,7 @@ export function notifyMemberRemoved(group: GroupRow, userId: number) {
   const text = createT(lang)('bot.removed', { group: group.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') });
   void bot.api
     .sendMessage(userId, text, { parse_mode: 'HTML' })
-    .catch((e) => console.warn('notifyMemberRemoved failed', e));
+    .catch((e) => logTelegramError('notifyMemberRemoved failed', e));
 }
 
 /** Sends a debt reminder to the debtor's DM in their language. Fire-and-forget. */

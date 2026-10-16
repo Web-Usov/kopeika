@@ -1,3 +1,4 @@
+import { GrammyError, HttpError } from 'grammy';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
@@ -26,6 +27,7 @@ import { createDemoGroup } from './demo.ts';
 import { ApiError, fail } from './errors.ts';
 import { createExpense, expenseBody, saveShares, validateExpense } from './expenses.ts';
 import { buildCsv, exportFileName } from './export.ts';
+import { logTelegramError } from './logging.ts';
 import { deserialize, isEmpty, PaymentInfoError, parsePaymentInfo, serialize } from './paymentInfo.ts';
 import { createRateLimiter } from './rateLimit.ts';
 import { getRate, RatesError } from './rates.ts';
@@ -65,7 +67,9 @@ api.onError((err, c) => {
   if (err instanceof PaymentInfoError) return c.json({ error: t(err.key) }, 400);
   if (err instanceof SplitError) return c.json({ error: t(err.key, err.params) }, 400);
   if (err instanceof z.ZodError) return c.json({ error: t('errors.invalidData'), issues: err.issues }, 400);
-  console.error(err);
+  // A Telegram error would drag the request payload (message text) into the log.
+  if (err instanceof GrammyError || err instanceof HttpError) logTelegramError('API request failed', err);
+  else console.error(err);
   return c.json({ error: t('errors.internal') }, 500);
 });
 
@@ -125,7 +129,8 @@ const name = z.string().trim().min(1).max(64);
 // --- Me ---
 api.get('/me', (c) => {
   const u = one<UserRow>('SELECT * FROM users WHERE id = ?', c.get('user').id)!;
-  return c.json({ id: u.id, name: displayName(u), notify: u.notify === 1 });
+  // No Telegram id: the client identifies itself through `meId` of the group.
+  return c.json({ name: displayName(u), notify: u.notify === 1 });
 });
 
 api.put('/me', async (c) => {
@@ -683,7 +688,10 @@ api.post('/groups/:id/remind', async (c) => {
   const debt = d.settlements.find((s) => s.from === memberId && s.to === me.id);
   if (!debt) throw fail(409, 'errors.remindNotAllowed');
   const debtor = d.members.find((m) => m.id === memberId)!;
-  if (!debtor.canNotify || debtor.userId === null) throw fail(409, 'errors.remindNoNotify');
+  // The Telegram id is not part of the response model, so it is read here on the server only.
+  const debtorUserId =
+    one<{ user_id: number | null }>('SELECT user_id FROM members WHERE id = ?', memberId)?.user_id ?? null;
+  if (!debtor.canNotify || debtorUserId === null) throw fail(409, 'errors.remindNoNotify');
   const creditor = d.members.find((m) => m.id === me.id)!;
 
   tx(() => {
@@ -702,6 +710,6 @@ api.post('/groups/:id/remind', async (c) => {
     });
     if (!group.is_demo) countEvent('debt.remind');
   });
-  notifyRemind(group, debtor.userId, creditor.name, debt.amount, !isEmpty(creditor.paymentInfo));
+  notifyRemind(group, debtorUserId, creditor.name, debt.amount, !isEmpty(creditor.paymentInfo));
   return c.json({ ok: true });
 });
