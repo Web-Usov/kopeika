@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { amountToInput, computeShares, parseAmount, type SplitInput, type SplitMode } from '../../../shared/money.ts';
 import { api, type Expense, type GroupDetail, setGroup, useGroup } from '../api.ts';
+import { errorText, rich, t } from '../i18n.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, confirmDialog, haptic, MainButton } from '../tg.tsx';
 import { Avatar, ErrorView, Loading, Money, Row, Section, Segmented, todayIso } from '../ui.tsx';
@@ -21,7 +22,7 @@ export function ExpenseForm({ groupId, expenseId }: { groupId: number; expenseId
     return (
       <div className="page">
         {back}
-        <ErrorView message="Трата не найдена" />
+        <ErrorView message={t('expense.notFound')} />
       </div>
     );
   return (
@@ -83,7 +84,7 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
     try {
       computed = computeShares(amount, mode, inputs);
     } catch (e) {
-      splitError = (e as Error).message;
+      splitError = errorText(e);
     }
   }
   const valid = Boolean(title.trim() && amount && computed && !exactBadInput);
@@ -104,7 +105,7 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
   };
 
   const remove = async () => {
-    if (!expense || !(await confirmDialog(`Удалить трату «${expense.title}»?`))) return;
+    if (!expense || !(await confirmDialog(t('expense.confirmDelete', { title: expense.title })))) return;
     try {
       setGroup(await api.deleteExpense(g.id, expense.id));
       navigate(`/g/${g.id}`, { replace: true });
@@ -117,12 +118,12 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
 
   return (
     <>
-      <h2 className="page-title">{expense ? 'Трата' : 'Новая трата'}</h2>
+      <h2 className="page-title">{expense ? t('expense.titleEdit') : t('expense.titleNew')}</h2>
 
       <Section>
         <input
           className="field"
-          placeholder="За что? Например, ужин"
+          placeholder={t('expense.titlePlaceholder')}
           value={title}
           maxLength={100}
           onChange={(e) => setTitle(e.target.value)}
@@ -137,20 +138,20 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
           />
           <span className="currency">{g.currency}</span>
         </div>
-        {amountStr && amount === null && <div className="field-error">Введите сумму, например 1500 или 99,90</div>}
+        {amountStr && amount === null && <div className="field-error">{t('expense.amountError')}</div>}
       </Section>
 
-      <Section title="Кто платил">
+      <Section title={t('expense.whoPaid')}>
         <select className="field" value={payerId} onChange={(e) => setPayerId(Number(e.target.value))}>
           {g.members.map((m) => (
             <option key={m.id} value={m.id}>
-              {m.id === g.meId ? `${m.name} (вы)` : m.name}
+              {m.id === g.meId ? t('common.youParen', { name: m.name }) : m.name}
             </option>
           ))}
         </select>
       </Section>
 
-      <Section title="Когда">
+      <Section title={t('expense.when')}>
         <input
           className="field"
           type="date"
@@ -163,7 +164,7 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
       <Section
         title={
           <span className="section-title-row">
-            На кого делим
+            {t('expense.splitWith')}
             {mode === 'equal' && (
               <button
                 type="button"
@@ -172,7 +173,7 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
                   setParts((p) => Object.fromEntries(g.members.map((m) => [m.id, { ...p[m.id], on: !allOn }])))
                 }
               >
-                {allOn ? 'Снять всех' : 'Выбрать всех'}
+                {allOn ? t('expense.deselectAll') : t('expense.selectAll')}
               </button>
             )}
           </span>
@@ -180,20 +181,18 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
         footer={
           mode === 'exact' && amount ? (
             exactSum === amount ? (
-              <span className="pos">✓ Сумма распределена полностью</span>
+              <span className="pos">{t('expense.exactDone')}</span>
             ) : exactSum < amount ? (
-              <>
-                Осталось распределить <Money value={amount - exactSum} currency={g.currency} />
-              </>
+              rich('expense.exactLeft', { amount: <Money value={amount - exactSum} currency={g.currency} /> })
             ) : (
               <span className="neg">
-                Распределено больше на <Money value={exactSum - amount} currency={g.currency} />
+                {rich('expense.exactOver', { amount: <Money value={exactSum - amount} currency={g.currency} /> })}
               </span>
             )
           ) : splitError && amount ? (
             <span className="neg">{splitError}</span>
           ) : mode === 'shares' ? (
-            'Например, 2 доли — за двоих: себя и партнёра.'
+            t('expense.sharesHint')
           ) : undefined
         }
       >
@@ -204,16 +203,16 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
             setMode(m);
           }}
           options={[
-            { value: 'equal', label: 'Поровну' },
-            { value: 'shares', label: 'Долями' },
-            { value: 'exact', label: 'Суммами' },
+            { value: 'equal', label: t('expense.modeEqual') },
+            { value: 'shares', label: t('expense.modeShares') },
+            { value: 'exact', label: t('expense.modeExact') },
           ]}
         />
         {g.members.map((m) => {
           const p = parts[m.id];
           const share = computed?.get(m.id);
           const shareView = share ? <Money value={share} currency={g.currency} /> : <span className="hint">—</span>;
-          const name = m.id === g.meId ? `${m.name} (вы)` : m.name;
+          const name = m.id === g.meId ? t('common.youParen', { name: m.name }) : m.name;
 
           if (mode === 'equal') {
             return (
@@ -275,11 +274,16 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
 
       {expense && (
         <button type="button" className="danger-btn" onClick={remove}>
-          Удалить трату
+          {t('expense.delete')}
         </button>
       )}
 
-      <MainButton text={expense ? 'Сохранить' : 'Добавить трату'} onClick={save} disabled={!valid} loading={saving} />
+      <MainButton
+        text={expense ? t('expense.save') : t('expense.add')}
+        onClick={save}
+        disabled={!valid}
+        loading={saving}
+      />
     </>
   );
 }

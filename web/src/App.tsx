@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react';
+import { t } from './i18n.ts';
 import { ExpenseForm } from './pages/ExpenseForm.tsx';
 import { Group } from './pages/Group.tsx';
 import { Home } from './pages/Home.tsx';
@@ -39,5 +40,5 @@ export function App() {
     const params = match(pattern, path);
     if (params) return render(params, query);
   }
-  return <ErrorView message="Страница не найдена" />;
+  return <ErrorView message={t('common.pageNotFound')} />;
 }

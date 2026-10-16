@@ -1,6 +1,7 @@
 // Thin typed wrapper around the official telegram-web-app.js (loaded in index.html).
 // Outside Telegram (plain browser during development) everything degrades to HTML fallbacks.
 import { useEffect, useRef } from 'react';
+import { t } from './i18n.ts';
 
 interface BottomButton {
   setParams(p: { text?: string; is_active?: boolean; is_visible?: boolean }): void;
@@ -13,7 +14,10 @@ interface BottomButton {
 
 interface WebApp {
   initData: string;
-  initDataUnsafe: { user?: { id: number; first_name: string; allows_write_to_pm?: boolean }; start_param?: string };
+  initDataUnsafe: {
+    user?: { id: number; first_name: string; language_code?: string; allows_write_to_pm?: boolean };
+    start_param?: string;
+  };
   version: string;
   colorScheme: 'light' | 'dark';
   isVersionAtLeast(v: string): boolean;
@@ -142,7 +146,7 @@ export function BackButton({ onClick }: { onClick: () => void }) {
   if (inTelegram) return null;
   return (
     <button type="button" className="dev-back" onClick={() => handler.current()}>
-      ‹ Назад
+      {t('common.back')}
     </button>
   );
 }

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { api, useGroups } from '../api.ts';
+import { rich, t } from '../i18n.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, inTelegram, MainButton, requestWriteAccess } from '../tg.tsx';
-import { ErrorView, Loading, Money, plural, Row, Section } from '../ui.tsx';
+import { ErrorView, Loading, Money, Row, Section } from '../ui.tsx';
 
 export function Home() {
   const { data: groups, error } = useGroups();
@@ -11,8 +12,8 @@ export function Home() {
     <div className="page">
       <header className="hero">
         <div className="hero-emoji">🪙</div>
-        <h1>Копейка</h1>
-        <p className="hint">Общие траты без споров</p>
+        <h1>{t('common.brand')}</h1>
+        <p className="hint">{t('common.tagline')}</p>
       </header>
 
       {error && !groups ? (
@@ -21,27 +22,23 @@ export function Home() {
         <Loading />
       ) : groups.length === 0 ? (
         <div className="empty">
-          <p>Пока нет ни одной группы.</p>
-          <p className="hint">
-            Создайте группу для поездки, дачи или общей квартиры, пригласите друзей и записывайте, кто за что платил.
-          </p>
+          <p>{t('home.emptyTitle')}</p>
+          <p className="hint">{t('home.emptyHint')}</p>
         </div>
       ) : (
-        <Section title="Мои группы">
+        <Section title={t('home.myGroups')}>
           {groups.map((g) => (
             <Row
               key={g.id}
               onClick={() => navigate(`/g/${g.id}`)}
               title={g.name}
-              subtitle={
-                <>
-                  {g.membersCount} {plural(g.membersCount, 'участник', 'участника', 'участников')} · потрачено{' '}
-                  <Money value={g.totalSpent} currency={g.currency} />
-                </>
-              }
+              subtitle={rich('home.groupSubtitle', {
+                members: t('common.members', { count: g.membersCount }),
+                spent: <Money value={g.totalSpent} currency={g.currency} />,
+              })}
               right={
                 g.myBalance === 0 ? (
-                  <span className="hint">в расчёте</span>
+                  <span className="hint">{t('home.settled')}</span>
                 ) : (
                   <Money value={g.myBalance} currency={g.currency} signed />
                 )
@@ -53,7 +50,7 @@ export function Home() {
 
       {groups && <NotifySetting />}
 
-      <MainButton text="Создать группу" onClick={() => navigate('/new')} />
+      <MainButton text={t('home.createGroup')} onClick={() => navigate('/new')} />
     </div>
   );
 }
@@ -71,7 +68,7 @@ function NotifySetting() {
   const toggle = async () => {
     const next = !notify;
     if (next && inTelegram && !(await requestWriteAccess())) {
-      await alertDialog('Без разрешения бот не сможет присылать уведомления.');
+      await alertDialog(t('home.notifyDenied'));
       return;
     }
     setNotify(next);
@@ -79,8 +76,8 @@ function NotifySetting() {
   };
 
   return (
-    <Section footer="Бот пришлёт сообщение, когда в группе появится трата с вашим участием.">
-      <Row title="Уведомления о тратах" onClick={toggle} right={<span className={`switch ${notify ? 'on' : ''}`} />} />
+    <Section footer={t('home.notifyFooter')}>
+      <Row title={t('home.notifyTitle')} onClick={toggle} right={<span className={`switch ${notify ? 'on' : ''}`} />} />
     </Section>
   );
 }

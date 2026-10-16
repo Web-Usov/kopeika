@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CURRENCIES } from '../../../shared/money.ts';
 import { api, setGroup } from '../api.ts';
+import { t } from '../i18n.ts';
 import { askNotifyOnce } from '../notify.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, haptic, MainButton } from '../tg.tsx';
@@ -34,19 +35,19 @@ export function NewGroup() {
   return (
     <div className="page">
       <BackButton onClick={() => navigate('/', { replace: true })} />
-      <h2 className="page-title">Новая группа</h2>
+      <h2 className="page-title">{t('newGroup.title')}</h2>
 
-      <Section title="Название">
+      <Section title={t('newGroup.nameSection')}>
         <input
           className="field"
-          placeholder="Поездка в Грузию"
+          placeholder={t('newGroup.namePlaceholder')}
           value={name}
           maxLength={64}
           onChange={(e) => setName(e.target.value)}
         />
       </Section>
 
-      <Section title="Валюта">
+      <Section title={t('newGroup.currencySection')}>
         <select className="field" value={currency} onChange={(e) => setCurrency(e.target.value)}>
           {CURRENCIES.map((c) => (
             <option key={c} value={c}>
@@ -56,20 +57,17 @@ export function NewGroup() {
         </select>
       </Section>
 
-      <Section
-        title="Участники"
-        footer="Друзья из Telegram смогут присоединиться по ссылке-приглашению и выбрать себя из этого списка. Тех, у кого нет Telegram, просто впишите по имени."
-      >
+      <Section title={t('newGroup.membersSection')} footer={t('newGroup.membersFooter')}>
         <div className="row">
           <span className="row-main">
-            <span className="row-title">Вы</span>
+            <span className="row-title">{t('common.you')}</span>
           </span>
         </div>
         {others.map((n, i) => (
           <div className="row" key={i}>
             <input
               className="field inline"
-              placeholder="Имя участника"
+              placeholder={t('newGroup.memberPlaceholder')}
               value={n}
               maxLength={64}
               // biome-ignore lint/a11y/noAutofocus: фокус на только что добавленном поле участника — так задумано
@@ -80,18 +78,18 @@ export function NewGroup() {
               type="button"
               className="icon-btn"
               onClick={() => setOthers(others.filter((_, j) => j !== i))}
-              aria-label="Убрать"
+              aria-label={t('common.remove')}
             >
               ✕
             </button>
           </div>
         ))}
         <button type="button" className="row clickable link" onClick={() => setOthers([...others, ''])}>
-          + Добавить участника
+          {t('newGroup.addMember')}
         </button>
       </Section>
 
-      <MainButton text="Создать группу" onClick={create} disabled={!name.trim()} loading={saving} />
+      <MainButton text={t('newGroup.create')} onClick={create} disabled={!name.trim()} loading={saving} />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { amountToInput, parseAmount } from '../../../shared/money.ts';
 import { api, type Expense, type GroupDetail, setGroup, useGroup } from '../api.ts';
+import { t } from '../i18n.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, confirmDialog, haptic, MainButton } from '../tg.tsx';
 import { ErrorView, Loading, Section, todayIso } from '../ui.tsx';
@@ -29,14 +30,14 @@ export function TransferForm({
     return (
       <div className="page">
         {back}
-        <ErrorView message="Перевод не найден" />
+        <ErrorView message={t('transfer.notFound')} />
       </div>
     );
   if (g.members.length < 2)
     return (
       <div className="page">
         {back}
-        <ErrorView message="В группе нужен хотя бы ещё один участник" />
+        <ErrorView message={t('transfer.needTwo')} />
       </div>
     );
   return (
@@ -70,7 +71,7 @@ function Editor({ g, transfer, prefill }: { g: GroupDetail; transfer?: Expense; 
   const valid = Boolean(amount && from !== to);
   const label = (id: number) => {
     const m = g.members.find((x) => x.id === id)!;
-    return id === g.meId ? `${m.name} (вы)` : m.name;
+    return id === g.meId ? t('common.youParen', { name: m.name }) : m.name;
   };
 
   const save = async () => {
@@ -78,7 +79,7 @@ function Editor({ g, transfer, prefill }: { g: GroupDetail; transfer?: Expense; 
     setSaving(true);
     const body = {
       kind: 'transfer' as const,
-      title: 'Перевод',
+      title: t('transfer.defaultTitle'),
       amount,
       payerId: from,
       splitMode: 'exact' as const,
@@ -97,7 +98,7 @@ function Editor({ g, transfer, prefill }: { g: GroupDetail; transfer?: Expense; 
   };
 
   const remove = async () => {
-    if (!transfer || !(await confirmDialog('Удалить этот перевод?'))) return;
+    if (!transfer || !(await confirmDialog(t('transfer.confirmDelete')))) return;
     try {
       setGroup(await api.deleteExpense(g.id, transfer.id));
       navigate(`/g/${g.id}?tab=balances`, { replace: true });
@@ -114,23 +115,23 @@ function Editor({ g, transfer, prefill }: { g: GroupDetail; transfer?: Expense; 
 
   return (
     <>
-      <h2 className="page-title">{transfer ? 'Перевод' : 'Записать перевод'}</h2>
-      <p className="hint page-subtitle">Отметьте, что кто-то вернул деньги, и балансы пересчитаются.</p>
+      <h2 className="page-title">{transfer ? t('transfer.titleEdit') : t('transfer.titleNew')}</h2>
+      <p className="hint page-subtitle">{t('transfer.subtitle')}</p>
 
-      <Section title="Кто перевёл">
+      <Section title={t('transfer.from')}>
         <select className="field" value={from} onChange={(e) => setFrom(Number(e.target.value))}>
           {options}
         </select>
       </Section>
 
-      <Section title="Кому">
+      <Section title={t('transfer.to')}>
         <select className="field" value={to} onChange={(e) => setTo(Number(e.target.value))}>
           {options}
         </select>
-        {from === to && <div className="field-error">Выберите разных участников</div>}
+        {from === to && <div className="field-error">{t('transfer.sameMember')}</div>}
       </Section>
 
-      <Section title="Сумма">
+      <Section title={t('transfer.amount')}>
         <div className="amount-field">
           <input
             className="field amount"
@@ -143,7 +144,7 @@ function Editor({ g, transfer, prefill }: { g: GroupDetail; transfer?: Expense; 
         </div>
       </Section>
 
-      <Section title="Когда">
+      <Section title={t('transfer.when')}>
         <input
           className="field"
           type="date"
@@ -155,11 +156,11 @@ function Editor({ g, transfer, prefill }: { g: GroupDetail; transfer?: Expense; 
 
       {transfer && (
         <button type="button" className="danger-btn" onClick={remove}>
-          Удалить перевод
+          {t('transfer.delete')}
         </button>
       )}
 
-      <MainButton text="Сохранить перевод" onClick={save} disabled={!valid} loading={saving} />
+      <MainButton text={t('transfer.save')} onClick={save} disabled={!valid} loading={saving} />
     </>
   );
 }

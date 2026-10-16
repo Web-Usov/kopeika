@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import { App } from './App.tsx';
+import './i18n.ts';
 import { initTelegram, startParam } from './tg.tsx';
 import './styles.css';
 

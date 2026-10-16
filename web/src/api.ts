@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { SplitMode } from '../../shared/money.ts';
-import { authHeader } from './tg.tsx';
+import { lang, t } from './i18n.ts';
+import { authHeader, inTelegram } from './tg.tsx';
 
 export interface Member {
   id: number;
@@ -67,11 +68,17 @@ export class ApiError extends Error {}
 export async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`/api${path}`, {
     method,
-    headers: { Authorization: authHeader(), ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
+    headers: {
+      Authorization: authHeader(),
+      // Dev mode (no Telegram initData): tell the server which language to answer in.
+      ...(inTelegram ? {} : { 'X-Lang': lang }),
+      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+    },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError((data as { error?: string }).error ?? `Ошибка ${res.status}`);
+  if (!res.ok)
+    throw new ApiError((data as { error?: string }).error ?? t('common.errorStatus', { status: res.status }));
   return data as T;
 }
 

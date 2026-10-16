@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { formatMoney } from '../../shared/money.ts';
 import type { Member } from './api.ts';
+import { dateLocale, lang, t } from './i18n.ts';
 
 const palette = ['#e17076', '#7bc862', '#65aadd', '#a695e7', '#ee7aae', '#6ec9cb', '#faa774'];
 
@@ -23,7 +24,7 @@ export function Avatar({ member, size = 36 }: { member: Pick<Member, 'id' | 'nam
 export function Money({ value, currency, signed = false }: { value: number; currency: string; signed?: boolean }) {
   const cls = !signed || value === 0 ? '' : value > 0 ? 'pos' : 'neg';
   const sign = signed && value > 0 ? '+' : signed && value < 0 ? '−' : '';
-  return <span className={`money ${cls}`}>{sign + formatMoney(Math.abs(value), currency)}</span>;
+  return <span className={`money ${cls}`}>{sign + formatMoney(Math.abs(value), currency, lang)}</span>;
 }
 
 export function Section({ title, children, footer }: { title?: ReactNode; children: ReactNode; footer?: ReactNode }) {
@@ -98,7 +99,7 @@ export function Segmented<T extends string>(props: {
 }
 
 export function Loading() {
-  return <div className="center hint">Загрузка…</div>;
+  return <div className="center hint">{t('common.loading')}</div>;
 }
 
 export function ErrorView({ message }: { message: string }) {
@@ -120,21 +121,13 @@ export function formatDay(iso: string): string {
   const y = new Date();
   y.setDate(y.getDate() - 1);
   const yesterday = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
-  if (iso === today) return 'Сегодня';
-  if (iso === yesterday) return 'Вчера';
+  if (iso === today) return t('common.today');
+  if (iso === yesterday) return t('common.yesterday');
   const [yy, mm, dd] = iso.split('-').map(Number);
   const date = new Date(yy, mm - 1, dd);
-  return new Intl.DateTimeFormat('ru-RU', {
+  return new Intl.DateTimeFormat(dateLocale, {
     day: 'numeric',
     month: 'long',
     ...(yy !== new Date().getFullYear() ? { year: 'numeric' } : {}),
   }).format(date);
-}
-
-export function plural(n: number, one: string, few: string, many: string) {
-  const m10 = n % 10;
-  const m100 = n % 100;
-  if (m10 === 1 && m100 !== 11) return one;
-  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
-  return many;
 }

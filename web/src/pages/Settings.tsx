@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api, forgetGroup, type GroupDetail, type Member, setGroup, useGroup } from '../api.ts';
+import { t } from '../i18n.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, confirmDialog, haptic, shareLink } from '../tg.tsx';
 import { Avatar, ErrorView, Loading, Row, Section } from '../ui.tsx';
@@ -57,7 +58,7 @@ function SettingsView({ g }: { g: GroupDetail }) {
   };
 
   const deleteGroup = async () => {
-    if (!(await confirmDialog(`Удалить группу «${g.name}» вместе со всеми тратами? Это нельзя отменить.`))) return;
+    if (!(await confirmDialog(t('settings.confirmDeleteGroup', { name: g.name })))) return;
     try {
       await api.deleteGroup(g.id);
       forgetGroup(g.id);
@@ -69,71 +70,63 @@ function SettingsView({ g }: { g: GroupDetail }) {
 
   return (
     <>
-      <h2 className="page-title">Настройки группы</h2>
+      <h2 className="page-title">{t('settings.title')}</h2>
 
-      <Section title="Название">
+      <Section title={t('settings.nameSection')}>
         <div className="row">
           <input className="field inline" value={name} maxLength={64} onChange={(e) => setName(e.target.value)} />
           {name.trim() && name.trim() !== g.name && (
             <button type="button" className="small-btn" onClick={() => run(() => api.renameGroup(g.id, name.trim()))}>
-              Сохранить
+              {t('common.save')}
             </button>
           )}
         </div>
       </Section>
 
-      <Section
-        title="Приглашение"
-        footer="Отправьте ссылку в чат с друзьями. По ней откроется Копейка, и человек сможет вступить в группу."
-      >
+      <Section title={t('settings.inviteSection')} footer={t('settings.inviteFooter')}>
         {g.inviteLink ? (
           <>
             <div className="row invite-link">{g.inviteLink}</div>
             <div className="row buttons">
               <button type="button" className="small-btn" onClick={copy}>
-                {copied ? 'Скопировано ✓' : 'Скопировать'}
+                {copied ? t('settings.copied') : t('settings.copy')}
               </button>
               <button
                 type="button"
                 className="small-btn primary"
-                onClick={() => shareLink(g.inviteLink!, `Присоединяйся к группе «${g.name}» в Копейке`)}
+                onClick={() => shareLink(g.inviteLink!, t('settings.shareText', { name: g.name }))}
               >
-                Поделиться
+                {t('settings.share')}
               </button>
             </div>
           </>
         ) : (
-          <div className="row hint">
-            Ссылка появится, когда на сервере будут заданы BOT_TOKEN и APP_SHORT_NAME. Код: {g.inviteCode}
-          </div>
+          <div className="row hint">{t('settings.noLink', { code: g.inviteCode })}</div>
         )}
       </Section>
 
-      <Section
-        title={`Участники · ${g.members.length}`}
-        footer="Участника без Telegram можно удалить, если у него нет трат."
-      >
+      <Section title={t('settings.membersSection', { count: g.members.length })} footer={t('settings.membersFooter')}>
         {g.members.map((m) => (
           <MemberRow key={m.id} g={g} m={m} />
         ))}
         <div className="row">
           <input
             className="field inline"
-            placeholder="Имя нового участника"
+            placeholder={t('settings.newMemberPlaceholder')}
             value={newMember}
             maxLength={64}
             onChange={(e) => setNewMember(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addMember()}
           />
           <button type="button" className="small-btn" disabled={!newMember.trim()} onClick={addMember}>
-            Добавить
+            {t('common.add')}
           </button>
         </div>
       </Section>
 
       {g.isOwner && (
         <button type="button" className="danger-btn" onClick={deleteGroup}>
-          Удалить группу
+          {t('settings.deleteGroup')}
         </button>
       )}
     </>
@@ -162,26 +155,27 @@ function MemberRow({ g, m }: { g: GroupDetail; m: Member }) {
           onKeyDown={(e) => e.key === 'Enter' && save()}
         />
         <button type="button" className="small-btn" onClick={save}>
-          Готово
+          {t('common.done')}
         </button>
       </div>
     );
   }
 
   const remove = async () => {
-    if (await confirmDialog(`Удалить участника «${m.name}»?`)) await run(() => api.deleteMember(g.id, m.id));
+    if (await confirmDialog(t('settings.confirmDeleteMember', { name: m.name })))
+      await run(() => api.deleteMember(g.id, m.id));
   };
 
   return (
     <Row
       left={<Avatar member={m} />}
-      title={m.id === g.meId ? `${m.name} (вы)` : m.name}
-      subtitle={m.userId ? (m.username ? `@${m.username}` : 'Telegram') : 'без Telegram'}
+      title={m.id === g.meId ? t('common.youParen', { name: m.name }) : m.name}
+      subtitle={m.userId ? (m.username ? `@${m.username}` : t('settings.telegram')) : t('settings.noTelegram')}
       onClick={() => setEditing(true)}
       right={m.userId === null ? undefined : <span className="hint">✎</span>}
       action={
         m.userId === null ? (
-          <button type="button" className="icon-btn" aria-label="Удалить" onClick={() => void remove()}>
+          <button type="button" className="icon-btn" aria-label={t('common.delete')} onClick={() => void remove()}>
             ✕
           </button>
         ) : undefined
