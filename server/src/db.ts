@@ -164,6 +164,14 @@ const migrations = [
   ALTER TABLE groups ADD COLUMN last_digest_date TEXT;
   ALTER TABLE groups ADD COLUMN last_digest_at TEXT;
   `,
+  // Balances are aggregated in SQL (SUM paid per payer, SUM shares per member): covering indexes make those index-only.
+  // expense_shares_member is a prefix of the new one, so it goes away. Totals per group: (group_id, kind, amount).
+  `
+  CREATE INDEX expenses_payer ON expenses(payer_id, amount);
+  CREATE INDEX expenses_group_kind ON expenses(group_id, kind, amount);
+  DROP INDEX expense_shares_member;
+  CREATE INDEX expense_shares_member_amount ON expense_shares(member_id, amount);
+  `,
   // Placeholder "deleted user" (id 0 never collides with a Telegram id). Account deletion points expenses.created_by,
   // activity.user_id and recurring.created_by of the removed user here, so history stays but is anonymous.
   `INSERT INTO users (id, first_name) VALUES (0, '');`,
