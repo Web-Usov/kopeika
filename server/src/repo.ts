@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import type { SQLInputValue } from 'node:sqlite';
+import { achievementsFromFacts, spanBetween } from '../../shared/achievements.ts';
 import { pickLang } from '../../shared/i18n/index.ts';
 import { type SplitMode, settleUp } from '../../shared/money.ts';
 import type { TelegramUser } from './auth.ts';
@@ -260,6 +261,26 @@ export function loadLedger(groupId: number) {
   }));
 }
 
+/** Achievements over ALL expenses of the group (SQL aggregates), so they do not depend on the loaded page. */
+export function groupAchievementList(group: GroupRow, memberCount: number, balances: Map<number, number>) {
+  const f = one<{ n: number; days: number; cats: number; cur: number; lo: string | null; hi: string | null }>(
+    `SELECT COUNT(*) AS n, COUNT(DISTINCT spent_on) AS days, COUNT(DISTINCT category) AS cats,
+            COUNT(DISTINCT COALESCE(original_currency, ?)) AS cur, MIN(spent_on) AS lo, MAX(spent_on) AS hi
+     FROM expenses WHERE group_id = ? AND kind = 'expense'`,
+    group.currency,
+    group.id,
+  )!;
+  return achievementsFromFacts({
+    membersCount: memberCount,
+    allSettled: [...balances.values()].every((b) => b === 0),
+    expenseCount: f.n,
+    daysCount: f.days,
+    spanDays: f.lo && f.hi ? spanBetween(f.lo, f.hi) : 0,
+    categoriesCount: f.cats,
+    currenciesCount: f.cur,
+  });
+}
+
 /**
  * Group screen payload. `expenses` holds only the newest page (config.expensesPage) unless `all` is set;
  * `expensesTotal` / `hasMoreExpenses` tell the client whether older ones exist. Balances, totals and the
@@ -298,6 +319,7 @@ export function groupDetail(group: GroupRow, me: MemberRow, inviteLink: string |
       balance: balances.get(m.id) ?? 0,
     })),
     expenses,
+    achievements: groupAchievementList(group, members.length, balances),
     expensesTotal,
     hasMoreExpenses: expenses.length < expensesTotal,
     settlements: settleUp(balances),

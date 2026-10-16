@@ -1,8 +1,10 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import type { Achievement } from '../../shared/achievements.ts';
 import type { ActivityEntry } from '../../shared/activity.ts';
-import type { CategoryId } from '../../shared/categories.ts';
+import type { CategoryId, CategoryTotal } from '../../shared/categories.ts';
 import type { SplitMode } from '../../shared/money.ts';
 import type { Period } from '../../shared/recurring.ts';
+import type { GroupSummary as GroupSummaryStats } from '../../shared/summary.ts';
 import { lang, t } from './i18n.ts';
 import { authHeader, inTelegram } from './tg.tsx';
 
@@ -64,7 +66,12 @@ export interface GroupDetail {
   meId: number;
   totalSpent: number;
   members: Member[];
+  /** Only the newest page; older ones come from loadMoreExpenses. Balances and totals cover all of them. */
   expenses: Expense[];
+  expensesTotal: number;
+  hasMoreExpenses: boolean;
+  /** Computed by the server over all expenses. */
+  achievements: Achievement[];
   settlements: { from: number; to: number; amount: number }[];
 }
 
@@ -200,12 +207,50 @@ function useLoader<T>(get: () => T | undefined, load: () => Promise<void>, key: 
   return { data, error };
 }
 
+const olderThan = (a: Expense, b: Expense) => a.spentOn < b.spentOn || (a.spentOn === b.spentOn && a.id < b.id);
+
+/** A fresh first page keeps the older pages the user already loaded (they sit after its last item). */
+function withLoadedTail(fresh: GroupDetail, old: GroupDetail | undefined): GroupDetail {
+  const tail = fresh.expenses.at(-1);
+  if (!old || !tail || !fresh.hasMoreExpenses) return fresh;
+  const keep = old.expenses.filter((e) => olderThan(e, tail));
+  if (keep.length === 0) return fresh;
+  const expenses = [...fresh.expenses, ...keep];
+  return { ...fresh, expenses, hasMoreExpenses: expenses.length < fresh.expensesTotal };
+}
+
 export function useGroup(id: number) {
   return useLoader(
     () => groupCache.get(id),
-    async () => setGroup(await request<GroupDetail>('GET', `/groups/${id}`)),
+    async () => setGroup(withLoadedTail(await request<GroupDetail>('GET', `/groups/${id}`), groupCache.get(id))),
     id,
   );
+}
+
+/** Loads the next page of older expenses into the cached group. */
+export async function loadMoreExpenses(id: number) {
+  const g = groupCache.get(id);
+  const last = g?.expenses.at(-1);
+  if (!g || !last) return;
+  const page = await request<{ items: Expense[] }>('GET', `/groups/${id}/expenses?before=${last.id}`);
+  const cur = groupCache.get(id) ?? g;
+  const have = new Set(cur.expenses.map((e) => e.id));
+  const expenses = [...cur.expenses, ...page.items.filter((e) => !have.has(e.id))];
+  groupCache.set(id, { ...cur, expenses, hasMoreExpenses: expenses.length < cur.expensesTotal });
+  emit();
+}
+
+/** An expense by id: from the loaded page if it is there, otherwise fetched (it may be an old one). */
+export function useExpense(groupId: number, expenseId: number | undefined, loaded: GroupDetail | undefined) {
+  const found = expenseId ? loaded?.expenses.find((e) => e.id === expenseId) : undefined;
+  const [fetched, setFetched] = useState<Expense>();
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (!expenseId || found) return;
+    request<Expense>('GET', `/groups/${groupId}/expenses/${expenseId}`).then(setFetched, () => setFailed(true));
+  }, [groupId, expenseId, found]);
+  const expense = found ?? (fetched?.id === expenseId ? fetched : undefined);
+  return { expense, loading: Boolean(expenseId) && !expense && !failed };
 }
 
 export function useGroups() {
@@ -266,6 +311,8 @@ export const api = {
       'GET',
       `/rates?base=${base}&currency=${currency}&date=${date}`,
     ),
+  summary: (id: number) => request<GroupSummaryStats>('GET', `/groups/${id}/summary`),
+  stats: (id: number) => request<{ group: CategoryTotal[]; mine: CategoryTotal[] }>('GET', `/groups/${id}/stats`),
   activity: (id: number, before?: number) =>
     request<{ items: ActivityEntry[]; nextBefore: number | null }>(
       'GET',

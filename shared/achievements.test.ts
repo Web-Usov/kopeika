@@ -5,10 +5,14 @@ import {
   ACHIEVEMENT_IDS,
   type AchievementId,
   type AchievementInput,
+  achievementFacts,
+  achievementsFromFacts,
   achievementTextKey,
   achievementTitleKey,
   groupAchievements,
   newlyUnlocked,
+  newlyUnlockedIn,
+  spanBetween,
 } from './achievements.ts';
 import { t } from './i18n/index.ts';
 
@@ -102,4 +106,11 @@ test('every achievement has an emoji and texts in both languages', () => {
       assert.ok(t(lang, achievementTextKey(id)).length > 0, `${lang} ${id} text`);
     }
   }
+});
+
+test('facts path equals the list path; newlyUnlockedIn compares lists', () => {
+  const g = group([ex(), ex(), ex()], members(4));
+  assert.deepEqual(achievementsFromFacts(achievementFacts(g)), groupAchievements(g));
+  assert.deepEqual(newlyUnlockedIn(groupAchievements(group([])), groupAchievements(group([ex()]))), ['first']);
+  assert.equal(spanBetween('2025-01-01', '2025-01-30'), 30);
 });

@@ -1,5 +1,5 @@
 import type { AchievementId } from '../../shared/achievements.ts';
-import { newlyUnlocked } from '../../shared/achievements.ts';
+import { newlyUnlockedIn } from '../../shared/achievements.ts';
 import { type SettledKind, settledTransition } from '../../shared/settled.ts';
 import { type GroupDetail, getCachedGroup, setGroup } from './api.ts';
 
@@ -18,7 +18,7 @@ let pending: ({ groupId: number } & Pending) | null = null;
 export function applySavedGroup(after: GroupDetail) {
   const before = getCachedGroup(after.id);
   const kind = settledTransition(before, after);
-  const achievements = before ? newlyUnlocked(before, after) : [];
+  const achievements = before ? newlyUnlockedIn(before.achievements, after.achievements) : [];
   setGroup(after);
   pending = kind || achievements.length ? { groupId: after.id, kind, achievements } : null;
 }

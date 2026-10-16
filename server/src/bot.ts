@@ -1,6 +1,7 @@
 import { Bot, GrammyError, InlineKeyboard, InputFile } from 'grammy';
 import { createT, type Lang, pickLang } from '../../shared/i18n/index.ts';
 import { formatMoney } from '../../shared/money.ts';
+import { checkCommand, checkInline } from './botLimits.ts';
 import {
   type ChatMessage,
   createChatLink,
@@ -112,6 +113,22 @@ async function connectBot(b: Bot) {
     const t = createT(pickLang(ctx.from?.language_code));
     const keyboard = config.appUrl ? new InlineKeyboard().webApp(t('bot.openApp'), config.appUrl) : undefined;
     await ctx.reply(t('bot.startText'), { reply_markup: keyboard });
+  });
+
+  // Flood protection per user: commands and inline queries only; service updates (my_chat_member etc.) pass.
+  b.use(async (ctx, next) => {
+    const from = ctx.from;
+    if (!from) return next();
+    if (ctx.inlineQuery) {
+      if (checkInline(from.id)) return next();
+      await ctx.answerInlineQuery([], { cache_time: 5, is_personal: true }).catch(() => {});
+      return;
+    }
+    const isCommand = ctx.message?.entities?.some((e) => e.type === 'bot_command' && e.offset === 0);
+    if (!isCommand) return next();
+    const verdict = checkCommand(from.id);
+    if (verdict === 'ok') return next();
+    if (verdict === 'notice') await ctx.reply(createT(pickLang(from.language_code))('bot.tooMany')).catch(() => {});
   });
 
   registerChatHandlers(b);

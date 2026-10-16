@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { amountToInput, parseAmount } from '../../../shared/money.ts';
-import { api, type Expense, type GroupDetail, useGroup } from '../api.ts';
+import { api, type Expense, type GroupDetail, useExpense, useGroup } from '../api.ts';
 import { applySavedGroup } from '../celebration.ts';
 import { t } from '../i18n.ts';
 import { navigate } from '../router.ts';
@@ -17,8 +17,9 @@ export function TransferForm({
   prefill: URLSearchParams;
 }) {
   const { data: g, error } = useGroup(groupId);
+  const { expense: found, loading } = useExpense(groupId, expenseId, g);
   const back = <BackButton onClick={() => navigate(`/g/${groupId}?tab=balances`, { replace: true })} />;
-  if (!g)
+  if (!g || loading)
     return (
       <div className="page">
         {back}
@@ -26,7 +27,7 @@ export function TransferForm({
       </div>
     );
 
-  const transfer = expenseId ? g.expenses.find((e) => e.id === expenseId && e.kind === 'transfer') : undefined;
+  const transfer = found?.kind === 'transfer' ? found : undefined;
   if (expenseId && !transfer)
     return (
       <div className="page">
