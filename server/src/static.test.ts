@@ -28,3 +28,14 @@ test('index.html is never cached, hashed assets are immutable', async () => {
   assert.equal(asset.status, 200);
   assert.equal(asset.headers.get('cache-control'), 'public, max-age=31536000, immutable');
 });
+
+test('HTML pages carry a Content-Security-Policy', async () => {
+  const { createApp, CSP } = await import('./app.ts');
+  const app = createApp(tmp);
+  for (const url of ['/', '/privacy', '/groups/42']) {
+    const res = await app.request(url);
+    assert.equal(res.headers.get('content-security-policy'), CSP, url);
+  }
+  assert.match(CSP, /frame-ancestors https:\/\/web\.telegram\.org/);
+  assert.equal((await app.request('/healthz')).headers.get('content-security-policy'), null);
+});
