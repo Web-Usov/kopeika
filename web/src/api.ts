@@ -216,7 +216,15 @@ export function useGroups() {
   );
 }
 
+/** Drops everything cached about the user (after their data was deleted). */
+export function clearCache() {
+  groupCache.clear();
+  groupsList = undefined;
+  emit();
+}
+
 export const api = {
+  deleteMe: () => request<{ ok: true; groupsDeleted: number; groupsLeft: number }>('DELETE', '/me'),
   me: () => request<{ id: number; name: string; notify: boolean }>('GET', '/me'),
   myPaymentInfo: () => request<PaymentInfo>('GET', '/me/payment-info'),
   setMyPaymentInfo: (info: PaymentInfo) => request<PaymentInfo>('PUT', '/me/payment-info', info),

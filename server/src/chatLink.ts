@@ -76,7 +76,8 @@ export function attachChat(link: ChatLinkRow, group: GroupRow, userId: number) {
       link.chat_title,
       group.id,
     );
-    run("UPDATE chat_links SET used_at = datetime('now') WHERE token = ?", link.token);
+    // Spare tokens of the same chat (several /balance calls) die with it: nobody can relink the chat later with them.
+    run("UPDATE chat_links SET used_at = datetime('now') WHERE chat_id = ? AND used_at IS NULL", link.chat_id);
     logActivity(group.id, userId, 'group.chat_link', { name: link.chat_title });
     countEvent('chat.link');
   });

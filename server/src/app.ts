@@ -3,14 +3,27 @@ import path from 'node:path';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
 import { api } from './api.ts';
+import { privacyLang, renderPrivacyHtml } from './privacy.ts';
 import { sha, version } from './version.ts';
 
 /** The whole HTTP app: API plus (if the folder exists) the built Mini App from `staticDir`. */
 export function createApp(staticDir: string) {
   const app = new Hono();
 
+  app.use('*', async (c, next) => {
+    await next();
+    c.header('X-Content-Type-Options', 'nosniff');
+    c.header('Referrer-Policy', 'no-referrer');
+  });
+
   app.get('/healthz', (c) => c.text('ok'));
   app.get('/version', (c) => c.json({ version, sha }));
+  // Public privacy policy (for @BotFather): outside /api, no auth.
+  app.get('/privacy', (c) => {
+    const lang = privacyLang(c.req.query('lang'), c.req.header('accept-language'));
+    c.header('Cache-Control', 'no-cache');
+    return c.html(renderPrivacyHtml(lang));
+  });
   app.route('/api', api);
 
   if (fs.existsSync(staticDir)) {

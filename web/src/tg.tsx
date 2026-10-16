@@ -23,6 +23,7 @@ interface WebApp {
   isVersionAtLeast(v: string): boolean;
   ready(): void;
   expand(): void;
+  close(): void;
   disableVerticalSwipes?(): void;
   MainButton: BottomButton;
   BackButton: { show(): void; hide(): void; onClick(cb: () => void): void; offClick(cb: () => void): void };
@@ -88,6 +89,11 @@ export function alertDialog(message: string): Promise<void> {
 export function requestWriteAccess(): Promise<boolean> {
   if (!atLeast('6.9')) return Promise.resolve(false);
   return new Promise((resolve) => tg!.requestWriteAccess(resolve));
+}
+
+/** Closes the Mini App; outside Telegram there is nothing to close, so the page is left as is. */
+export function closeApp() {
+  if (inTelegram) tg!.close();
 }
 
 export function shareLink(url: string, text: string) {

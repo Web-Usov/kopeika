@@ -176,6 +176,20 @@ export const en: Dict = {
     remind: '{actor} sent a debt reminder: {name}, {amount}',
     chatLink: '{actor} linked the chat “{name}”',
     chatUnlink: '{actor} unlinked the chat “{name}”',
+    deletedUser: 'deleted user',
+  },
+  account: {
+    privacy: 'Privacy policy',
+    deleteData: 'Delete my data',
+    deleteFooter:
+      'Erases your profile and payment details, and deletes groups where you are the only one with Telegram.',
+    confirmFirst:
+      'Delete all your data? Your profile, payment details and settings will be erased. Groups where you are the only member with Telegram will be deleted with their expenses. In other groups you stay as a member without Telegram and appear as “deleted user” in the history.',
+    confirmSecond: 'Really delete? This cannot be undone.',
+    goodbyeTitle: 'Data deleted',
+    goodbyeText:
+      'Your profile and payment details are erased from Kopeika. They disappear from backups within 14 days. Close the app — if you open it again, you will start with an empty account.',
+    goodbyeClose: 'Close',
   },
   payment: {
     mySection: 'My payment details',
@@ -422,6 +436,7 @@ export const en: Dict = {
       export_csv: 'CSV exports',
       inline_query: 'Inline queries',
       bot_start: '/start launches',
+      user_delete: 'Data deletions',
     },
   },
   dev: {

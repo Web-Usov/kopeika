@@ -146,3 +146,16 @@ test('canSeeStats: only an admin in a private chat', () => {
   assert.equal(stats.canSeeStats(undefined, 'private', admins), false);
   assert.equal(stats.canSeeStats(42, 'private', new Set()), false);
 });
+
+test('deleting an account counts user.delete; the placeholder user is not a user', async () => {
+  const before = total('user.delete');
+  await call(9201, 'POST', '/groups', { name: 'Удаляемый', currency: 'RUB' });
+  const { deleteAccount } = await import('./account.ts');
+  const usersBefore = stats.collectStats().users;
+  deleteAccount(9201);
+  assert.equal(total('user.delete') - before, 1);
+  assert.equal(stats.collectStats().users, usersBefore - 1);
+  const active = stats.collectStats().active[30];
+  db.run("UPDATE users SET updated_at = datetime('now') WHERE id = 0");
+  assert.equal(stats.collectStats().active[30], active, 'placeholder row must not count as active');
+});

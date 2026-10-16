@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { api, type GroupSummary, hasPaymentInfo, type PaymentInfo, useGroups } from '../api.ts';
+import { api, clearCache, type GroupSummary, hasPaymentInfo, type PaymentInfo, useGroups } from '../api.ts';
 import { rich, t } from '../i18n.ts';
 import { navigate } from '../router.ts';
-import { alertDialog, inTelegram, MainButton, requestWriteAccess } from '../tg.tsx';
+import { alertDialog, closeApp, confirmDialog, haptic, inTelegram, MainButton, requestWriteAccess } from '../tg.tsx';
 import { ErrorView, Loading, Money, Row, Section } from '../ui.tsx';
 import { PaymentForm } from './PaymentForm.tsx';
 
@@ -17,6 +17,7 @@ function readArchiveOpen() {
 
 export function Home() {
   const { data: groups, error } = useGroups();
+  const [gone, setGone] = useState(false);
 
   const [archiveOpen, setArchiveOpen] = useState(readArchiveOpen);
   const toggleArchive = () => {
@@ -46,6 +47,8 @@ export function Home() {
       }
     />
   );
+
+  if (gone) return <Goodbye />;
 
   return (
     <div className="page">
@@ -84,6 +87,11 @@ export function Home() {
 
       {groups && <NotifySetting />}
 
+      {groups && <DeleteData onDeleted={() => setGone(true)} />}
+
+      <button type="button" className="footer-link" onClick={() => navigate('/privacy')}>
+        {t('account.privacy')}
+      </button>
       <p className="app-version">{t('common.version', { version: __APP_VERSION__ })}</p>
 
       <MainButton text={t('home.createGroup')} onClick={() => navigate('/new')} />
@@ -151,5 +159,46 @@ function MyPaymentInfo() {
         return saved;
       }}
     />
+  );
+}
+
+function DeleteData({ onDeleted }: { onDeleted: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const remove = async () => {
+    if (!(await confirmDialog(t('account.confirmFirst')))) return;
+    if (!(await confirmDialog(t('account.confirmSecond')))) return;
+    setBusy(true);
+    try {
+      await api.deleteMe();
+      clearCache();
+      haptic.success();
+      onDeleted();
+    } catch (e) {
+      await alertDialog((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Section footer={t('account.deleteFooter')}>
+      <button type="button" className="danger-btn" disabled={busy} onClick={() => void remove()}>
+        {t('account.deleteData')}
+      </button>
+    </Section>
+  );
+}
+
+function Goodbye() {
+  return (
+    <div className="page">
+      <div className="empty">
+        <div className="empty-emoji">👋</div>
+        <p>
+          <b>{t('account.goodbyeTitle')}</b>
+        </p>
+        <p className="hint">{t('account.goodbyeText')}</p>
+        {inTelegram && <MainButton text={t('account.goodbyeClose')} onClick={closeApp} />}
+      </div>
+    </div>
   );
 }

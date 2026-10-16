@@ -1,5 +1,6 @@
 // Anonymous usage counters: how many times each kind of action happened per day. No user or group ids anywhere here.
 import { createT, type Key, type Lang } from '../../shared/i18n/index.ts';
+import { DELETED_USER_ID } from './activity.ts';
 import { config } from './config.ts';
 import { all, one, run } from './db.ts';
 import { localDate } from './recurring.ts';
@@ -16,6 +17,7 @@ export const STAT_EVENTS = [
   'export.csv',
   'inline.query',
   'bot.start',
+  'user.delete',
 ] as const;
 export type StatEvent = (typeof STAT_EVENTS)[number];
 
@@ -70,7 +72,8 @@ export function collectStats(now = new Date()): StatsSnapshot {
     // updated_at is UTC and is bumped on every authenticated request and bot interaction (see upsertUser).
     active[days] =
       one<{ n: number }>(
-        'SELECT COUNT(*) AS n FROM users WHERE updated_at >= datetime(?, ?)',
+        'SELECT COUNT(*) AS n FROM users WHERE id != ? AND updated_at >= datetime(?, ?)',
+        DELETED_USER_ID,
         toSqlUtc(now),
         `-${days} days`,
       )?.n ?? 0;
@@ -78,7 +81,7 @@ export function collectStats(now = new Date()): StatsSnapshot {
   return {
     events,
     active,
-    users: one<{ n: number }>('SELECT COUNT(*) AS n FROM users')?.n ?? 0,
+    users: one<{ n: number }>('SELECT COUNT(*) AS n FROM users WHERE id != ?', DELETED_USER_ID)?.n ?? 0,
     groups: one<{ n: number }>('SELECT COUNT(*) AS n FROM groups')?.n ?? 0,
   };
 }

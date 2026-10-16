@@ -1,9 +1,11 @@
 import { Hono } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
 import { DEFAULT_CATEGORY } from '../../shared/categories.ts';
 import { createT, type Lang, pickLang, type TFn } from '../../shared/i18n/index.ts';
 import { CURRENCIES, SplitError } from '../../shared/money.ts';
 import { firstOccurrence } from '../../shared/recurring.ts';
+import { deleteAccount, eraseGroup, leaveGroup } from './account.ts';
 import { expenseSnapshot, listActivity, logActivity } from './activity.ts';
 import { type TelegramUser, validateInitData } from './auth.ts';
 import {
@@ -64,6 +66,9 @@ api.onError((err, c) => {
   return c.json({ error: t('errors.internal') }, 500);
 });
 
+// Request bodies are small JSON; refuse anything bigger before it is read into memory.
+api.use('*', bodyLimit({ maxSize: 256 * 1024, onError: (c) => c.json({ error: 'Payload too large' }, 413) }));
+
 // --- Auth: every /api request carries "Authorization: tma <initData>" ---
 api.use('*', async (c, next) => {
   const header = c.req.header('authorization') ?? '';
@@ -122,6 +127,9 @@ api.put('/me', async (c) => {
   run('UPDATE users SET notify = ? WHERE id = ?', body.notify ? 1 : 0, c.get('user').id);
   return c.json({ ok: true });
 });
+
+// Erases the caller's data (see account.ts). The same Telegram user may start over later: the next request creates a fresh account.
+api.delete('/me', (c) => c.json(deleteAccount(c.get('user').id)));
 
 const paymentInfoBody = z
   .object({
@@ -195,12 +203,7 @@ api.delete('/groups/:id', (c) => {
   const user = c.get('user');
   const { group } = loadGroupFor(c.req.param('id'), user.id);
   if (group.created_by !== user.id) throw fail(403, 'errors.ownerOnlyDelete');
-  tx(() => {
-    run('DELETE FROM expense_shares WHERE expense_id IN (SELECT id FROM expenses WHERE group_id = ?)', group.id);
-    run('DELETE FROM expenses WHERE group_id = ?', group.id);
-    run('DELETE FROM members WHERE group_id = ?', group.id);
-    run('DELETE FROM groups WHERE id = ?', group.id);
-  });
+  tx(() => eraseGroup(group.id));
   return c.json({ ok: true });
 });
 
@@ -244,20 +247,7 @@ api.post('/groups/:id/unarchive', (c) => {
 api.post('/groups/:id/leave', (c) => {
   const user = c.get('user');
   const { group, me } = loadGroupFor(c.req.param('id'), user.id);
-  tx(() => {
-    if (group.created_by === user.id) {
-      const heir = one<{ user_id: number }>(
-        'SELECT user_id FROM members WHERE group_id = ? AND user_id IS NOT NULL AND user_id != ? ORDER BY id LIMIT 1',
-        group.id,
-        user.id,
-      );
-      // The last person with Telegram can only delete the group: otherwise nobody could ever manage it.
-      if (!heir) throw fail(409, 'errors.lastMemberLeave');
-      run('UPDATE groups SET created_by = ? WHERE id = ?', heir.user_id, group.id);
-    }
-    logActivity(group.id, user.id, 'member.leave', { memberId: me.id, name: me.name });
-    run('UPDATE members SET user_id = NULL WHERE id = ?', me.id);
-  });
+  tx(() => leaveGroup(group, me, user.id));
   return c.json({ ok: true });
 });
 
@@ -421,7 +411,9 @@ api.get('/rates', async (c) => {
     })
     .parse(c.req.query());
   if (q.base === q.currency) throw fail(400, 'errors.rate.sameCurrency');
-  if (Number.isNaN(Date.parse(`${q.date}T00:00:00Z`))) throw fail(400, 'errors.invalidData');
+  const parsed = Date.parse(`${q.date}T00:00:00Z`);
+  // Not further than a couple of days ahead: every distinct future date would be a new upstream call and cache entry.
+  if (Number.isNaN(parsed) || parsed > Date.now() + 2 * 86_400_000) throw fail(400, 'errors.invalidData');
   return c.json(await getRate(q.base, q.currency, q.date));
 });
 
@@ -617,7 +609,7 @@ api.get('/groups/:id/activity', (c) => {
       limit: z.coerce.number().int().min(1).max(100).optional(),
     })
     .parse(c.req.query());
-  return c.json(listActivity(group.id, q.before, q.limit));
+  return c.json(listActivity(group.id, q.before, q.limit, createT(c.get('lang'))('activity.deletedUser')));
 });
 
 // --- Debt reminder: the creditor asks the bot to nudge a debtor from the current settlement plan ---
