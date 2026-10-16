@@ -36,6 +36,8 @@ export function buildCsv(g: Detail, lang: Lang): string {
       t('export.amount'),
       t('export.currency'),
       t('export.paidBy'),
+      t('export.originalAmount'),
+      t('export.originalCurrency'),
       ...g.members.map((m) => text(m.name)),
     ],
   ];
@@ -53,6 +55,8 @@ export function buildCsv(g: Detail, lang: Lang): string {
       amt(e.amount),
       g.currency,
       text(nameOf.get(e.payerId) ?? ''),
+      e.originalAmount ? amt(e.originalAmount) : '',
+      e.originalCurrency ?? '',
       ...g.members.map((m) => (byMember.has(m.id) ? amt(byMember.get(m.id) ?? 0) : '')),
     ]);
   }
@@ -63,6 +67,8 @@ export function buildCsv(g: Detail, lang: Lang): string {
     '',
     '',
     g.currency,
+    '',
+    '',
     '',
     ...g.members.map((m) => amt(value(m.id))),
   ];

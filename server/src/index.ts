@@ -3,6 +3,7 @@ import { createApp } from './app.ts';
 import { startBackupSchedule } from './backup.ts';
 import { startBot } from './bot.ts';
 import { config } from './config.ts';
+import { version } from './version.ts';
 
 const app = createApp(config.staticDir);
 

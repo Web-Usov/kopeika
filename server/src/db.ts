@@ -93,6 +93,22 @@ const migrations = [
   );
   CREATE INDEX reminders_pair ON reminders(group_id, from_member, to_member, created_at);
   `,
+  // Foreign-currency expenses: amount and shares stay in the group currency; the original amount, its currency and
+  // the rate (decimal string, group-currency units per 1 original unit) are kept for display and editing.
+  // rates caches daily rates from the source: rub_per_unit is a decimal string, date is the requested day,
+  // source_date the day the source actually had a rate for (weekends and holidays fall back to earlier days).
+  `
+  ALTER TABLE expenses ADD COLUMN original_amount INTEGER;
+  ALTER TABLE expenses ADD COLUMN original_currency TEXT;
+  ALTER TABLE expenses ADD COLUMN rate TEXT;
+  CREATE TABLE rates (
+    date         TEXT NOT NULL,
+    currency     TEXT NOT NULL,
+    rub_per_unit TEXT NOT NULL,
+    source_date  TEXT NOT NULL,
+    PRIMARY KEY (date, currency)
+  );
+  `,
 ];
 
 const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;

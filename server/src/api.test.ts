@@ -718,3 +718,125 @@ test('export: a member gets "bot unavailable" when the bot is not configured; ou
   assert.ok(res.body.error);
   assert.equal((await call(newUser(), 'POST', `/groups/${g.id}/export`)).status, 404);
 });
+
+// --- Foreign-currency expenses ---
+const foreign = (g: Json, over: Json = {}) => {
+  const { amount: _amount, ...rest } = expense(g);
+  return { ...rest, originalAmount: 10000, originalCurrency: 'GEL', rate: '34.5', ...over };
+};
+
+test('foreign expense: amount is computed on the server, balances follow the group currency', async () => {
+  const u = newUser();
+  const g = await createGroup(u, ['Маша']);
+  // the client "amount" is ignored when original_* is present
+  const res = await call(u, 'POST', `/groups/${g.id}/expenses`, foreign(g, { amount: 1 }));
+  assert.equal(res.status, 201);
+  const e = res.body.expenses[0];
+  assert.equal(e.amount, 345000);
+  assert.equal(e.originalAmount, 10000);
+  assert.equal(e.originalCurrency, 'GEL');
+  assert.equal(e.rate, '34.5');
+  assert.deepEqual(
+    e.shares.map((s: Json) => s.amount),
+    [172500, 172500],
+  );
+  assert.deepEqual(balances(res.body), [172500, -172500]);
+  assert.equal(res.body.totalSpent, 345000);
+});
+
+test('foreign expense: comma rate is normalised; plain expense has null original fields', async () => {
+  const u = newUser();
+  const g = await createGroup(u);
+  const r1 = await call(u, 'POST', `/groups/${g.id}/expenses`, foreign(g, { rate: '34,50' }));
+  assert.equal(r1.body.expenses[0].rate, '34.5');
+  const r2 = await call(u, 'POST', `/groups/${g.id}/expenses`, expense(g));
+  const plain = r2.body.expenses.find((e: Json) => e.originalAmount === null);
+  assert.ok(plain);
+  assert.equal(plain.originalCurrency, null);
+  assert.equal(plain.rate, null);
+});
+
+test('foreign expense: validation errors', async () => {
+  const u = newUser();
+  const g = await createGroup(u);
+  const post = (over: Json) => call(u, 'POST', `/groups/${g.id}/expenses`, foreign(g, over));
+  assert.equal((await post({ originalCurrency: 'RUB' })).status, 400); // same as group
+  assert.equal((await post({ originalCurrency: 'XXX' })).status, 400);
+  assert.equal((await post({ rate: '0' })).status, 400);
+  assert.equal((await post({ rate: '-3' })).status, 400);
+  assert.equal((await post({ rate: 'abc' })).status, 400);
+  assert.equal((await post({ rate: '99999999999' })).status, 400);
+  assert.equal((await post({ originalAmount: 0 })).status, 400);
+  assert.equal((await post({ rate: undefined })).status, 400); // partial triple
+  assert.equal((await post({ originalAmount: 1, rate: '0.001' })).status, 400); // rounds to zero
+  assert.equal((await call(u, 'GET', `/groups/${g.id}`)).body.expenses.length, 0);
+  const en = await api.request(`/groups/${g.id}/expenses`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `dev ${u}`, 'X-Lang': 'en' },
+    body: JSON.stringify(foreign(g, { originalCurrency: 'RUB' })),
+  });
+  assert.match(((await en.json()) as Json).error, /differ/);
+});
+
+test('foreign expense: transfers cannot be foreign', async () => {
+  const u = newUser();
+  const g = await createGroup(u, ['Маша']);
+  const res = await call(u, 'POST', `/groups/${g.id}/expenses`, {
+    ...foreign(g),
+    kind: 'transfer',
+    shares: [{ memberId: g.members[1].id, value: 1 }],
+  });
+  assert.equal(res.status, 400);
+});
+
+test('foreign expense: exact shares are entered in the original currency and add up exactly', async () => {
+  const u = newUser();
+  const g = await createGroup(u, ['Маша', 'Петя']);
+  const [a, b, c] = g.members.map((m: Json) => m.id);
+  const body = foreign(g, {
+    splitMode: 'exact',
+    originalAmount: 10000,
+    rate: '34.567',
+    shares: [
+      { memberId: a, value: 3333 },
+      { memberId: b, value: 3333 },
+      { memberId: c, value: 3334 },
+    ],
+  });
+  const res = await call(u, 'POST', `/groups/${g.id}/expenses`, body);
+  assert.equal(res.status, 201);
+  const e = res.body.expenses[0];
+  assert.equal(e.amount, 345670);
+  assert.equal(
+    e.shares.reduce((x: number, s: Json) => x + s.amount, 0),
+    345670,
+  );
+  assert.deepEqual(e.shares.map((s: Json) => s.input).sort(), [3333, 3333, 3334]); // kept for editing
+  const bad = await call(u, 'POST', `/groups/${g.id}/expenses`, {
+    ...body,
+    shares: [{ memberId: a, value: 3333 }],
+  });
+  assert.equal(bad.status, 400); // does not add up to 100.00 GEL
+});
+
+test('foreign expense: PUT can change the rate, switch to the group currency and back', async () => {
+  const u = newUser();
+  const g = await createGroup(u);
+  const created = await call(u, 'POST', `/groups/${g.id}/expenses`, foreign(g));
+  const id = created.body.expenses[0].id;
+  const r1 = await call(u, 'PUT', `/groups/${g.id}/expenses/${id}`, foreign(g, { rate: '30' }));
+  assert.equal(r1.status, 200);
+  assert.equal(r1.body.expenses[0].amount, 300000);
+  const r2 = await call(u, 'PUT', `/groups/${g.id}/expenses/${id}`, expense(g));
+  assert.equal(r2.body.expenses[0].amount, 10000);
+  assert.equal(r2.body.expenses[0].originalAmount, null);
+  assert.equal(r2.body.expenses[0].rate, null);
+  const r3 = await call(
+    u,
+    'PUT',
+    `/groups/${g.id}/expenses/${id}`,
+    foreign(g, { originalCurrency: 'USD', rate: '90' }),
+  );
+  assert.equal(r3.body.expenses[0].originalCurrency, 'USD');
+  assert.equal(r3.body.expenses[0].amount, 900000);
+});

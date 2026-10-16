@@ -254,6 +254,8 @@ export const en: Dict = {
     amount: 'Amount',
     currency: 'Currency',
     paidBy: 'Paid by',
+    originalAmount: 'Original amount',
+    originalCurrency: 'Original currency',
     expense: 'Expense',
     transfer: 'Transfer',
     totalPaid: 'Total paid',
@@ -296,6 +298,14 @@ export const en: Dict = {
     internal: 'Internal server error',
     exportBotUnavailable:
       'The bot can’t message you. Open the chat with the bot, press Start and turn on notifications.',
+    rate: {
+      invalid: 'The rate is not valid',
+      tooSmall: 'The amount is too small for this rate',
+      sameCurrency: 'The currency must differ from the group currency',
+      unknownCurrency: 'Unknown currency',
+      unavailable: 'Rates are unavailable right now — enter the rate manually',
+      notFound: 'No rate for this currency on that date — enter it manually',
+    },
     split: {
       amountPositive: 'The amount must be greater than zero',
       noParticipants: 'Pick at least one member',

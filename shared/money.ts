@@ -17,7 +17,9 @@ type SplitKey =
   | 'errors.split.badParticipantAmount'
   | 'errors.split.sumMismatch'
   | 'errors.split.sharesInteger'
-  | 'errors.split.sharesMissing';
+  | 'errors.split.sharesMissing'
+  | 'errors.rate.invalid'
+  | 'errors.rate.tooSmall';
 
 /** Carries a dictionary key (not a text): the caller translates it into the user's language. */
 export class SplitError extends Error {
@@ -151,3 +153,91 @@ export function formatMoney(minor: number, currency: string, lang: Lang): string
 }
 
 export const CURRENCIES = ['RUB', 'USD', 'EUR', 'GEL', 'TRY', 'KZT', 'AMD', 'BYN', 'UAH', 'THB', 'AED', 'CNY', 'GBP'];
+
+/** Number of minor-unit digits of a currency (2 for everything we support today; JPY-like ones would be 0). */
+export function minorDigits(currency: string): number {
+  return ZERO_DIGIT_CURRENCIES.has(currency) ? 0 : 2;
+}
+const ZERO_DIGIT_CURRENCIES = new Set<string>(['JPY', 'KRW', 'VND']);
+
+// --- Foreign-currency expenses ---
+// A rate is a decimal string ("34.5" = group-currency units per 1 original unit) and is converted with BigInt,
+// so no float ever touches the money: the same string gives the same amount on the server and in the app.
+
+const RATE_RE = /^\d{1,9}(\.\d{1,12})?$/;
+const MIN_RATE = 1e-7;
+const MAX_RATE = 1e7;
+
+interface Fraction {
+  num: bigint;
+  den: bigint;
+}
+
+/** Normalises user input ("34,5", " 0.0295 ") to a canonical decimal string, or null if it is not a sane rate. */
+export function normalizeRate(input: string): string | null {
+  const s = input.replace(/[\s ]/g, '').replace(',', '.');
+  if (!RATE_RE.test(s)) return null;
+  const v = Number(s);
+  if (!(v >= MIN_RATE && v <= MAX_RATE)) return null;
+  const [int, frac = ''] = s.split('.');
+  const f = frac.replace(/0+$/, '');
+  return f ? `${int.replace(/^0+(?=\d)/, '')}.${f}` : int.replace(/^0+(?=\d)/, '');
+}
+
+/** Formats a number as a rate string with ~6 significant digits (for rates fetched from a source). */
+export function formatRate(value: number): string {
+  if (!(value > 0) || !Number.isFinite(value)) return '0';
+  const decimals = Math.min(12, Math.max(0, 5 - Math.floor(Math.log10(value))));
+  return value.toFixed(decimals).replace(/\.?0+$/, '') || '0';
+}
+
+/** Group-currency minor units per one original minor unit, as an exact fraction. */
+function rateFraction(rate: string, originalCurrency: string, groupCurrency: string): Fraction {
+  const r = normalizeRate(rate);
+  if (!r) throw new SplitError('errors.rate.invalid');
+  const [int, frac = ''] = r.split('.');
+  const num = BigInt(int + frac) * 10n ** BigInt(minorDigits(groupCurrency));
+  const den = 10n ** BigInt(frac.length) * 10n ** BigInt(minorDigits(originalCurrency));
+  return { num, den };
+}
+
+const divRound = (a: bigint, b: bigint) => (2n * a + b) / (2n * b); // half up, a >= 0
+
+/** amount (group currency, minor units) = round half up of originalAmount × rate. */
+export function convertAmount(
+  originalAmount: number,
+  rate: string,
+  originalCurrency: string,
+  groupCurrency: string,
+): number {
+  if (!Number.isInteger(originalAmount) || originalAmount <= 0) throw new SplitError('errors.split.amountPositive');
+  const f = rateFraction(rate, originalCurrency, groupCurrency);
+  const v = Number(divRound(BigInt(originalAmount) * f.num, f.den));
+  if (v < 1) throw new SplitError('errors.rate.tooSmall');
+  return v;
+}
+
+/**
+ * Converts exact per-member amounts entered in the original currency into the group currency so that they
+ * sum to exactly convertAmount(sum): everyone is rounded down, leftover units go to the biggest remainders.
+ */
+export function convertExactShares(
+  inputs: SplitInput[],
+  rate: string,
+  originalCurrency: string,
+  groupCurrency: string,
+): SplitInput[] {
+  const f = rateFraction(rate, originalCurrency, groupCurrency);
+  const total = inputs.reduce((a, i) => a + i.value, 0);
+  const target = convertAmount(total, rate, originalCurrency, groupCurrency);
+  const parts = inputs.map((i, idx) => {
+    const n = BigInt(i.value) * f.num;
+    return { i, idx, base: n / f.den, rem: n % f.den };
+  });
+  let leftover = target - parts.reduce((a, p) => a + Number(p.base), 0);
+  const order = parts
+    .filter((p) => p.rem > 0n)
+    .sort((a, b) => (a.rem === b.rem ? a.idx - b.idx : a.rem > b.rem ? -1 : 1));
+  for (let k = 0; leftover > 0 && order.length > 0; k = (k + 1) % order.length, leftover--) order[k].base += 1n;
+  return parts.map((p) => ({ memberId: p.i.memberId, value: Number(p.base) }));
+}
