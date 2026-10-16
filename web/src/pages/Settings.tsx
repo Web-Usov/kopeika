@@ -112,6 +112,10 @@ function SettingsView({ g }: { g: GroupDetail }) {
     }
   };
 
+  const rotateInvite = async () => {
+    if (await confirmDialog(t('settings.confirmRotateInvite'))) await run(() => api.rotateInvite(g.id));
+  };
+
   const leaveGroup = async () => {
     if (!(await confirmDialog(t('settings.confirmLeave', { name: g.name })))) return;
     try {
@@ -159,6 +163,7 @@ function SettingsView({ g }: { g: GroupDetail }) {
           ) : (
             <div className="row hint">{t('settings.noLink', { code: g.inviteCode })}</div>
           )}
+          {g.isOwner && <Row title={t('settings.rotateInvite')} onClick={() => void rotateInvite()} />}
         </Section>
       )}
 
@@ -281,6 +286,11 @@ function MemberRow({ g, m }: { g: GroupDetail; m: Member }) {
       await run(() => api.deleteMember(g.id, m.id));
   };
 
+  const kick = async () => {
+    if (await confirmDialog(t('settings.confirmRemoveMember', { name: m.name })))
+      await run(() => api.removeMember(g.id, m.id));
+  };
+
   return (
     <Row
       left={<Avatar member={m} />}
@@ -292,6 +302,10 @@ function MemberRow({ g, m }: { g: GroupDetail; m: Member }) {
         m.userId === null ? (
           <button type="button" className="icon-btn" aria-label={t('common.delete')} onClick={() => void remove()}>
             ✕
+          </button>
+        ) : g.isOwner && !g.isDemo && m.id !== g.meId ? (
+          <button type="button" className="small-btn" onClick={() => void kick()}>
+            {t('settings.removeMember')}
           </button>
         ) : undefined
       }

@@ -242,6 +242,9 @@ export const api = {
   archiveGroup: (id: number) => request<GroupDetail>('POST', `/groups/${id}/archive`),
   unarchiveGroup: (id: number) => request<GroupDetail>('POST', `/groups/${id}/unarchive`),
   exportGroup: (id: number) => request<{ ok: true }>('POST', `/groups/${id}/export`),
+  rotateInvite: (id: number) => request<GroupDetail>('POST', `/groups/${id}/invite/rotate`),
+  removeMember: (id: number, memberId: number) =>
+    request<GroupDetail>('POST', `/groups/${id}/members/${memberId}/remove`),
   leaveGroup: (id: number) => request('POST', `/groups/${id}/leave`),
   addMember: (id: number, name: string) => request<GroupDetail>('POST', `/groups/${id}/members`, { name }),
   renameMember: (id: number, memberId: number, name: string) =>

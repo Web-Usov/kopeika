@@ -15,6 +15,7 @@ import {
   notifyChatLinked,
   notifyExpense,
   notifyExpenseChange,
+  notifyMemberRemoved,
   notifyRemind,
   sendExportFile,
 } from './bot.ts';
@@ -261,6 +262,20 @@ api.post('/groups/:id/leave', (c) => {
   return c.json({ ok: true });
 });
 
+// Owner only: the old link stops working (preview and join answer 404).
+api.post('/groups/:id/invite/rotate', (c) => {
+  const user = c.get('user');
+  const { group, me } = loadGroupFor(c.req.param('id'), user.id);
+  if (group.created_by !== user.id) throw fail(403, 'errors.ownerOnlyManage');
+  if (group.is_demo) throw fail(409, 'errors.demoNotAllowed');
+  const code = newInviteCode();
+  tx(() => {
+    run('UPDATE groups SET invite_code = ? WHERE id = ?', code, group.id);
+    logActivity(group.id, user.id, 'group.invite_rotate', {});
+  });
+  return c.json(detail({ ...group, invite_code: code }, me));
+});
+
 // --- Members ---
 api.post('/groups/:id/members', async (c) => {
   const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
@@ -297,6 +312,26 @@ api.patch('/groups/:id/members/:memberId', async (c) => {
       logActivity(group.id, actor, 'member.payment_info', { memberId, name: body.name ?? member.name });
     }
   });
+  return c.json(detail(group, me));
+});
+
+// Owner only. Same effect as the person leaving: they become a name-only member, history stays.
+api.post('/groups/:id/members/:memberId/remove', (c) => {
+  const user = c.get('user');
+  const { group, me } = loadGroupFor(c.req.param('id'), user.id);
+  if (group.created_by !== user.id) throw fail(403, 'errors.ownerOnlyManage');
+  const memberId = idParam(c.req.param('memberId'));
+  const member = one<MemberRow>('SELECT * FROM members WHERE id = ? AND group_id = ?', memberId, group.id);
+  if (!member) throw fail(404, 'errors.memberNotFound');
+  if (member.user_id === null) throw fail(409, 'errors.removeNoTelegram');
+  if (member.user_id === user.id) throw fail(409, 'errors.removeSelf');
+  const removedUserId = member.user_id;
+  tx(() => {
+    run('DELETE FROM reminders WHERE from_member = ? OR to_member = ?', member.id, member.id);
+    logActivity(group.id, user.id, 'member.remove', { memberId: member.id, name: member.name });
+    run('UPDATE members SET user_id = NULL WHERE id = ?', member.id);
+  });
+  notifyMemberRemoved(group, removedUserId);
   return c.json(detail(group, me));
 });
 
