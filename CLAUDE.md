@@ -28,6 +28,7 @@ npm run typecheck    # tsc для server и web
 npm run check        # Biome (линт + формат) + typecheck + test — то же, что гоняет CI
 npm run format       # Biome: автоформатирование
 npm run build        # web/dist + server/dist/index.js
+npm run e2e          # Playwright (Chromium): сам собирает, поднимает сервер с DEV_AUTH и гоняет основной сценарий
 npm run dev:server   # API :3000 (читает ../.env)
 npm run dev:web      # Vite :5173, проксирует /api
 ```

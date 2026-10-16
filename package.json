@@ -10,18 +10,20 @@
     "dev:server": "npm run dev -w server",
     "dev:web": "npm run dev -w web",
     "build": "npm run build -w web && npm run build -w server",
-    "typecheck": "npm run typecheck -w server && npm run typecheck -w web",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w web && tsc -p e2e",
     "test": "tsx --test shared/*.test.ts server/src/*.test.ts",
     "lint": "biome lint .",
     "format": "biome format --write .",
     "check": "biome check . && npm run typecheck && npm test",
-    "prepare": "simple-git-hooks"
+    "prepare": "simple-git-hooks",
+    "e2e": "playwright test"
   },
   "simple-git-hooks": {
     "pre-push": "npm run check"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
+    "@playwright/test": "^1.64.1",
     "@types/node": "^22.19.0",
     "simple-git-hooks": "^2.14.0",
     "tsx": "^4.23.15",
