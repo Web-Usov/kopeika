@@ -5,6 +5,13 @@ import { computeShares, formatMoney, SplitError } from './money.ts';
 
 const nbsp = (s: string) => s.replace(/\s/g, ' ');
 
+test('bot descriptions fit Telegram limits (512 / 120 characters)', () => {
+  for (const lang of ['ru', 'en'] as const) {
+    assert.ok(t(lang, 'bot.description').length <= 512, `${lang} description`);
+    assert.ok(t(lang, 'bot.shortDescription').length <= 120, `${lang} short description`);
+  }
+});
+
 test('ru and en have identical key sets', () => {
   assert.deepEqual(flatKeys(dictionaries.en).sort(), flatKeys(dictionaries.ru).sort());
 });

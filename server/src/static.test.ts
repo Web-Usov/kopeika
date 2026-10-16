@@ -32,7 +32,7 @@ test('index.html is never cached, hashed assets are immutable', async () => {
 test('HTML pages carry a Content-Security-Policy', async () => {
   const { createApp, CSP } = await import('./app.ts');
   const app = createApp(tmp);
-  for (const url of ['/', '/privacy', '/groups/42']) {
+  for (const url of ['/', '/privacy', '/terms', '/groups/42']) {
     const res = await app.request(url);
     assert.equal(res.headers.get('content-security-policy'), CSP, url);
   }

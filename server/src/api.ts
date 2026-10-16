@@ -98,8 +98,10 @@ api.use('*', async (c, next) => {
     user = validateInitData(value, config.botToken, config.initDataMaxAgeSec)?.user;
   } else if (scheme === 'dev' && config.devAuth) {
     const id = Number(value);
+    // X-Dev-Name (dev only, URL-encoded) gives the user a nice name, e.g. for the store screenshots.
+    const devName = decodeURIComponent(c.req.header('x-dev-name') ?? '').slice(0, 64);
     if (Number.isInteger(id) && id > 0)
-      user = { id, first_name: createT(pickLang(devLang))('dev.userName', { id }), language_code: devLang };
+      user = { id, first_name: devName || createT(pickLang(devLang))('dev.userName', { id }), language_code: devLang };
   }
   if (!user) throw fail(401, 'errors.unauthorized');
   upsertUser(user);

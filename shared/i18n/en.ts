@@ -212,6 +212,7 @@ export const en: Dict = {
   },
   account: {
     privacy: 'Privacy policy',
+    terms: 'Terms of service',
     deleteData: 'Delete my data',
     deleteFooter:
       'Erases your profile and payment details, and deletes groups where you are the only one with Telegram.',
@@ -366,8 +367,13 @@ export const en: Dict = {
   },
   bot: {
     description:
-      'Kopeika helps you split shared expenses with friends: on a trip, at a cabin or in a shared flat. Create a group, invite your friends and note down who paid for what.',
-    shortDescription: 'Shared expenses, no arguments',
+      'Split shared expenses without arguments or spreadsheets: on a trip, at a cabin, in a shared flat or with a group of friends.\n\n' +
+      '• Note who paid for what: split equally, by shares or exact amounts\n' +
+      '• See at once who owes whom, and the fewest transfers to settle up\n' +
+      '• Friends join by a link, no sign-up needed\n' +
+      '• The bot reminds about debts and posts new expenses to your chat\n\n' +
+      'Free. The app never touches your money: it only does the math.',
+    shortDescription: 'Shared expenses with friends: who owes whom, no arguments',
     startText:
       'Hi! Kopeika helps you split shared expenses with friends: on a trip, at a cabin or in a shared flat.\n\n' +
       'Create a group, invite your friends with a link and note down who paid for what. ' +

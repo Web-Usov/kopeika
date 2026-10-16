@@ -9,6 +9,7 @@ import { NewGroup } from './pages/NewGroup.tsx';
 import { Privacy } from './pages/Privacy.tsx';
 import { Settings } from './pages/Settings.tsx';
 import { Summary } from './pages/Summary.tsx';
+import { Terms } from './pages/Terms.tsx';
 import { TransferForm } from './pages/TransferForm.tsx';
 import { match, useLocation } from './router.ts';
 import { ErrorView } from './ui.tsx';
@@ -22,6 +23,7 @@ type Query = URLSearchParams;
 const routes: [pattern: string, render: (p: Params, query: Query) => ReactElement][] = [
   ['/', () => <Home />],
   ['/privacy', () => <Privacy />],
+  ['/terms', () => <Terms />],
   ['/new', (_p, query) => <NewGroup linkToken={query.get('link')} />],
   ['/link/:token', (p) => <Link key={p.token} token={p.token} />],
   ['/join/:code', (p) => <Join key={p.code} code={p.code} />],
