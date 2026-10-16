@@ -75,7 +75,7 @@ function SettingsView({ g }: { g: GroupDetail }) {
         <div className="row">
           <input className="field inline" value={name} maxLength={64} onChange={(e) => setName(e.target.value)} />
           {name.trim() && name.trim() !== g.name && (
-            <button className="small-btn" onClick={() => run(() => api.renameGroup(g.id, name.trim()))}>
+            <button type="button" className="small-btn" onClick={() => run(() => api.renameGroup(g.id, name.trim()))}>
               Сохранить
             </button>
           )}
@@ -90,10 +90,11 @@ function SettingsView({ g }: { g: GroupDetail }) {
           <>
             <div className="row invite-link">{g.inviteLink}</div>
             <div className="row buttons">
-              <button className="small-btn" onClick={copy}>
+              <button type="button" className="small-btn" onClick={copy}>
                 {copied ? 'Скопировано ✓' : 'Скопировать'}
               </button>
               <button
+                type="button"
                 className="small-btn primary"
                 onClick={() => shareLink(g.inviteLink!, `Присоединяйся к группе «${g.name}» в Копейке`)}
               >
@@ -124,14 +125,14 @@ function SettingsView({ g }: { g: GroupDetail }) {
             onChange={(e) => setNewMember(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addMember()}
           />
-          <button className="small-btn" disabled={!newMember.trim()} onClick={addMember}>
+          <button type="button" className="small-btn" disabled={!newMember.trim()} onClick={addMember}>
             Добавить
           </button>
         </div>
       </Section>
 
       {g.isOwner && (
-        <button className="danger-btn" onClick={deleteGroup}>
+        <button type="button" className="danger-btn" onClick={deleteGroup}>
           Удалить группу
         </button>
       )}
@@ -155,11 +156,12 @@ function MemberRow({ g, m }: { g: GroupDetail; m: Member }) {
           className="field inline"
           value={name}
           maxLength={64}
+          // biome-ignore lint/a11y/noAutofocus: поле появляется по нажатию «изменить» — фокус нужен сразу
           autoFocus
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && save()}
         />
-        <button className="small-btn" onClick={save}>
+        <button type="button" className="small-btn" onClick={save}>
           Готово
         </button>
       </div>
@@ -176,22 +178,13 @@ function MemberRow({ g, m }: { g: GroupDetail; m: Member }) {
       title={m.id === g.meId ? `${m.name} (вы)` : m.name}
       subtitle={m.userId ? (m.username ? `@${m.username}` : 'Telegram') : 'без Telegram'}
       onClick={() => setEditing(true)}
-      right={
+      right={m.userId === null ? undefined : <span className="hint">✎</span>}
+      action={
         m.userId === null ? (
-          <span
-            className="icon-btn"
-            role="button"
-            aria-label="Удалить"
-            onClick={(e) => {
-              e.stopPropagation();
-              void remove();
-            }}
-          >
+          <button type="button" className="icon-btn" aria-label="Удалить" onClick={() => void remove()}>
             ✕
-          </span>
-        ) : (
-          <span className="hint">✎</span>
-        )
+          </button>
+        ) : undefined
       }
     />
   );

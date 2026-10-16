@@ -41,8 +41,12 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
           )}
         </div>
         <div className="header-actions">
-          <button onClick={() => invite(g)}>👋 Пригласить</button>
-          <button onClick={() => navigate(`/g/${g.id}/settings`)}>⚙️ Группа</button>
+          <button type="button" onClick={() => invite(g)}>
+            👋 Пригласить
+          </button>
+          <button type="button" onClick={() => navigate(`/g/${g.id}/settings`)}>
+            ⚙️ Группа
+          </button>
         </div>
       </header>
 
@@ -185,6 +189,7 @@ function BalancesTab({ g }: { g: GroupDetail }) {
               subtitle={<Money value={s.amount} currency={g.currency} />}
               right={
                 <button
+                  type="button"
                   className="small-btn"
                   onClick={() => navigate(`/g/${g.id}/transfer/new?from=${s.from}&to=${s.to}&amount=${s.amount}`)}
                 >
@@ -196,7 +201,7 @@ function BalancesTab({ g }: { g: GroupDetail }) {
         )}
       </Section>
 
-      <button className="text-btn" onClick={() => navigate(`/g/${g.id}/transfer/new`)}>
+      <button type="button" className="text-btn" onClick={() => navigate(`/g/${g.id}/transfer/new`)}>
         Записать перевод вручную
       </button>
     </>

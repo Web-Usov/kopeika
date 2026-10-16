@@ -166,6 +166,7 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
             На кого делим
             {mode === 'equal' && (
               <button
+                type="button"
                 className="text-btn small"
                 onClick={() =>
                   setParts((p) => Object.fromEntries(g.members.map((m) => [m.id, { ...p[m.id], on: !allOn }])))
@@ -238,13 +239,16 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
                 right={
                   <span className="stepper">
                     <button
+                      type="button"
                       onClick={() => update(m.id, { weight: Math.max(0, p.weight - 1) })}
                       disabled={p.weight === 0}
                     >
                       −
                     </button>
                     <span>{p.weight}</span>
-                    <button onClick={() => update(m.id, { weight: Math.min(99, p.weight + 1) })}>+</button>
+                    <button type="button" onClick={() => update(m.id, { weight: Math.min(99, p.weight + 1) })}>
+                      +
+                    </button>
                   </span>
                 }
               />
@@ -270,7 +274,7 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
       </Section>
 
       {expense && (
-        <button className="danger-btn" onClick={remove}>
+        <button type="button" className="danger-btn" onClick={remove}>
           Удалить трату
         </button>
       )}

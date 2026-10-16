@@ -72,10 +72,12 @@ export function NewGroup() {
               placeholder="Имя участника"
               value={n}
               maxLength={64}
+              // biome-ignore lint/a11y/noAutofocus: фокус на только что добавленном поле участника — так задумано
               autoFocus={i === others.length - 1}
               onChange={(e) => setOthers(others.map((x, j) => (j === i ? e.target.value : x)))}
             />
             <button
+              type="button"
               className="icon-btn"
               onClick={() => setOthers(others.filter((_, j) => j !== i))}
               aria-label="Убрать"
@@ -84,7 +86,7 @@ export function NewGroup() {
             </button>
           </div>
         ))}
-        <button className="row clickable link" onClick={() => setOthers([...others, ''])}>
+        <button type="button" className="row clickable link" onClick={() => setOthers([...others, ''])}>
           + Добавить участника
         </button>
       </Section>

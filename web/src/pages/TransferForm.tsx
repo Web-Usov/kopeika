@@ -154,7 +154,7 @@ function Editor({ g, transfer, prefill }: { g: GroupDetail; transfer?: Expense; 
       </Section>
 
       {transfer && (
-        <button className="danger-btn" onClick={remove}>
+        <button type="button" className="danger-btn" onClick={remove}>
           Удалить перевод
         </button>
       )}
