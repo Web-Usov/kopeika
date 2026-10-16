@@ -166,6 +166,7 @@ export const api = {
   deleteGroup: (id: number) => request('DELETE', `/groups/${id}`),
   archiveGroup: (id: number) => request<GroupDetail>('POST', `/groups/${id}/archive`),
   unarchiveGroup: (id: number) => request<GroupDetail>('POST', `/groups/${id}/unarchive`),
+  exportGroup: (id: number) => request<{ ok: true }>('POST', `/groups/${id}/export`),
   leaveGroup: (id: number) => request('POST', `/groups/${id}/leave`),
   addMember: (id: number, name: string) => request<GroupDetail>('POST', `/groups/${id}/members`, { name }),
   renameMember: (id: number, memberId: number, name: string) =>

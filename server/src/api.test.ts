@@ -625,3 +625,12 @@ test('leaving and archiving are written to the group history', async () => {
   assert.deepEqual(actions.slice(0, 3), ['member.leave', 'group.unarchive', 'group.archive']);
   assert.ok(res.body.items[0].actor.name);
 });
+
+test('export: a member gets "bot unavailable" when the bot is not configured; outsiders get 404', async () => {
+  const u = newUser();
+  const g = await createGroup(u);
+  const res = await call(u, 'POST', `/groups/${g.id}/export`);
+  assert.equal(res.status, 409);
+  assert.ok(res.body.error);
+  assert.equal((await call(newUser(), 'POST', `/groups/${g.id}/export`)).status, 404);
+});

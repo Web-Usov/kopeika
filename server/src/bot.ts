@@ -1,4 +1,4 @@
-import { Bot, GrammyError, InlineKeyboard } from 'grammy';
+import { Bot, GrammyError, InlineKeyboard, InputFile } from 'grammy';
 import { createT, type Lang, pickLang } from '../../shared/i18n/index.ts';
 import { formatMoney } from '../../shared/money.ts';
 import { config } from './config.ts';
@@ -81,6 +81,21 @@ async function send(userId: number, text: string, group: GroupRow, lang: Lang) {
     // 403: user blocked the bot or never started it. Stop trying until they allow it again.
     if (e instanceof GrammyError && e.error_code === 403) run('UPDATE users SET notify = 0 WHERE id = ?', userId);
     else console.warn('sendMessage failed', e);
+  }
+}
+
+/** Sends a CSV file to the user's private chat. Returns false when the bot can't write to them (not configured, blocked, never started). */
+export async function sendExportFile(userId: number, csv: string, fileName: string, caption: string) {
+  if (!bot) return false;
+  try {
+    await bot.api.sendDocument(userId, new InputFile(Buffer.from(csv, 'utf8'), fileName), { caption });
+    return true;
+  } catch (e) {
+    if (e instanceof GrammyError && e.error_code === 403) {
+      run('UPDATE users SET notify = 0 WHERE id = ?', userId);
+      return false;
+    }
+    throw e;
   }
 }
 

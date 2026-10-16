@@ -5,9 +5,10 @@ import { createT, type Key, type Lang, type Params, pickLang, type TFn } from '.
 import { CURRENCIES, computeShares, SplitError } from '../../shared/money.ts';
 import { expenseSnapshot, listActivity, logActivity } from './activity.ts';
 import { type TelegramUser, validateInitData } from './auth.ts';
-import { appLink, loadExpenseSnap, notifyExpense, notifyExpenseChange } from './bot.ts';
+import { appLink, loadExpenseSnap, notifyExpense, notifyExpenseChange, sendExportFile } from './bot.ts';
 import { config } from './config.ts';
 import { all, one, run, tx } from './db.ts';
+import { buildCsv, exportFileName } from './export.ts';
 import { deserialize, PaymentInfoError, parsePaymentInfo, serialize } from './paymentInfo.ts';
 import { createRateLimiter } from './rateLimit.ts';
 import {
@@ -186,6 +187,23 @@ api.delete('/groups/:id', (c) => {
     run('DELETE FROM members WHERE group_id = ?', group.id);
     run('DELETE FROM groups WHERE id = ?', group.id);
   });
+  return c.json({ ok: true });
+});
+
+// Not a data change, so it is not written to the activity log.
+api.post('/groups/:id/export', async (c) => {
+  const user = c.get('user');
+  const lang = c.get('lang');
+  const { group, me } = loadGroupFor(c.req.param('id'), user.id);
+  const d = detail(group, me);
+  const t = createT(lang);
+  const sent = await sendExportFile(
+    user.id,
+    buildCsv(d, lang),
+    exportFileName(group.name),
+    t('export.caption', { name: group.name, count: d.expenses.length }),
+  );
+  if (!sent) throw fail(409, 'errors.exportBotUnavailable');
   return c.json({ ok: true });
 });
 

@@ -167,6 +167,12 @@ export const en: Dict = {
     deleteGroup: 'Delete group',
     confirmDeleteGroup: 'Delete the group “{name}” with all its expenses? This can’t be undone.',
     confirmDeleteMember: 'Remove the member “{name}”?',
+    exportSection: 'Export',
+    exportCsv: 'Export to CSV',
+    exporting: 'Preparing the file…',
+    exportFooter:
+      'The bot will send a spreadsheet with all expenses to your private chat. Opens in Excel and Google Sheets.',
+    exportSent: 'The file was sent to your chat with the bot',
     telegram: 'Telegram',
     noTelegram: 'no Telegram',
   },
@@ -234,6 +240,21 @@ export const en: Dict = {
     changePayer: 'paid by {from} → {to}',
     shareRemoved: 'You were removed from this expense',
   },
+  export: {
+    date: 'Date',
+    title: 'Title',
+    type: 'Type',
+    category: 'Category',
+    amount: 'Amount',
+    currency: 'Currency',
+    paidBy: 'Paid by',
+    expense: 'Expense',
+    transfer: 'Transfer',
+    totalPaid: 'Total paid',
+    totalShare: 'Total share',
+    totalBalance: 'Balance',
+    caption: 'Expenses of “{name}”: {count} entries',
+  },
   dev: {
     userName: 'Tester {id}',
   },
@@ -264,6 +285,8 @@ export const en: Dict = {
     expenseNotFound: 'Expense not found',
     invalidData: 'Invalid data',
     internal: 'Internal server error',
+    exportBotUnavailable:
+      'The bot can’t message you. Open the chat with the bot, press Start and turn on notifications.',
     split: {
       amountPositive: 'The amount must be greater than zero',
       noParticipants: 'Pick at least one member',
