@@ -2,7 +2,8 @@ import { Bot, GrammyError, InlineKeyboard } from 'grammy';
 import { createT, type Lang, pickLang } from '../../shared/i18n/index.ts';
 import { formatMoney } from '../../shared/money.ts';
 import { config } from './config.ts';
-import { all, run } from './db.ts';
+import { all, one, run } from './db.ts';
+import { buildChangeMessage, changeAudience, type ExpenseSnap } from './notify.ts';
 import { type ExpenseRow, type GroupRow, upsertUser } from './repo.ts';
 
 export const bot = config.botToken ? new Bot(config.botToken) : null;
@@ -113,5 +114,66 @@ export function notifyExpense(group: GroupRow, expense: ExpenseRow, authorUserId
       if (r.share) text += `\n${t('bot.yourShare', { amount: money(r.share) })}`;
     }
     void send(r.user_id, text, group, lang);
+  }
+}
+
+/** Reads an expense with its shares for change notifications. */
+export function loadExpenseSnap(expenseId: number): ExpenseSnap | null {
+  const e = one<ExpenseRow>('SELECT * FROM expenses WHERE id = ?', expenseId);
+  if (!e) return null;
+  const shares = all<{ member_id: number; amount: number }>(
+    'SELECT member_id, amount FROM expense_shares WHERE expense_id = ?',
+    expenseId,
+  );
+  return {
+    kind: e.kind,
+    title: e.title,
+    amount: e.amount,
+    payerId: e.payer_id,
+    spentOn: e.spent_on,
+    shares: shares.map((s) => ({ memberId: s.member_id, amount: s.amount })),
+  };
+}
+
+/** Tells participants of the old and new version (except the author) about an edit or deletion. Fire-and-forget. */
+export function notifyExpenseChange(
+  group: GroupRow,
+  before: ExpenseSnap,
+  after: ExpenseSnap | null,
+  authorUserId: number,
+  authorName: string,
+) {
+  if (!bot) return;
+  try {
+    const memberNames = new Map(
+      all<{ id: number; name: string }>('SELECT id, name FROM members WHERE group_id = ?', group.id).map((m) => [
+        m.id,
+        m.name,
+      ]),
+    );
+    const audience = new Set(changeAudience(before, after));
+    const recipients = all<{ user_id: number; member_id: number; lang: string | null }>(
+      `SELECT m.user_id, m.id AS member_id, u.lang
+       FROM members m JOIN users u ON u.id = m.user_id AND u.notify = 1
+       WHERE m.group_id = ? AND m.user_id != ?`,
+      group.id,
+      authorUserId,
+    ).filter((r) => audience.has(r.member_id));
+    for (const r of recipients) {
+      const lang = pickLang(r.lang);
+      const text = buildChangeMessage({
+        before,
+        after,
+        recipientMemberId: r.member_id,
+        lang,
+        currency: group.currency,
+        groupName: group.name,
+        authorName,
+        memberNames,
+      });
+      if (text) void send(r.user_id, text, group, lang);
+    }
+  } catch (e) {
+    console.warn('notifyExpenseChange failed', e);
   }
 }

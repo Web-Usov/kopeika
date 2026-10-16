@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { createT, type Key, type Lang, type Params, pickLang, type TFn } from '../../shared/i18n/index.ts';
 import { CURRENCIES, computeShares, SplitError } from '../../shared/money.ts';
 import { type TelegramUser, validateInitData } from './auth.ts';
-import { appLink, notifyExpense } from './bot.ts';
+import { appLink, loadExpenseSnap, notifyExpense, notifyExpenseChange } from './bot.ts';
 import { config } from './config.ts';
 import { all, one, run, tx } from './db.ts';
 import { createRateLimiter } from './rateLimit.ts';
@@ -309,6 +309,7 @@ api.put('/groups/:id/expenses/:expenseId', async (c) => {
   const body = expenseBody.parse(await c.req.json());
   body.kind = existing.kind;
   const computed = validateExpense(group.id, body, c.get('lang'));
+  const before = loadExpenseSnap(expenseId);
   tx(() => {
     run(
       `UPDATE expenses SET title = ?, amount = ?, payer_id = ?, split_mode = ?, spent_on = ?, updated_at = datetime('now')
@@ -322,12 +323,19 @@ api.put('/groups/:id/expenses/:expenseId', async (c) => {
     );
     saveShares(expenseId, body, computed);
   });
+  const after = loadExpenseSnap(expenseId);
+  if (before && after) notifyExpenseChange(group, before, after, c.get('user').id, me.name);
   return c.json(detail(group, me));
 });
 
 api.delete('/groups/:id/expenses/:expenseId', (c) => {
   const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
-  const res = run('DELETE FROM expenses WHERE id = ? AND group_id = ?', idParam(c.req.param('expenseId')), group.id);
+  const expenseId = idParam(c.req.param('expenseId'));
+  const before = one<{ id: number }>('SELECT id FROM expenses WHERE id = ? AND group_id = ?', expenseId, group.id)
+    ? loadExpenseSnap(expenseId)
+    : null;
+  const res = run('DELETE FROM expenses WHERE id = ? AND group_id = ?', expenseId, group.id);
   if (res.changes === 0) throw fail(404, 'errors.expenseNotFound');
+  if (before) notifyExpenseChange(group, before, null, c.get('user').id, me.name);
   return c.json(detail(group, me));
 });
