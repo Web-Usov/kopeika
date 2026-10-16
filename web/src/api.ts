@@ -138,6 +138,8 @@ export function setGroup(g: GroupDetail) {
   emit();
 }
 
+export const getCachedGroup = (id: number) => groupCache.get(id);
+
 export function forgetGroup(id: number) {
   groupCache.delete(id);
   groupsList = undefined;

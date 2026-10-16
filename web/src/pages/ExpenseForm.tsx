@@ -18,7 +18,8 @@ import {
   type SplitInput,
   type SplitMode,
 } from '../../../shared/money.ts';
-import { api, type Expense, type GroupDetail, setGroup, useGroup } from '../api.ts';
+import { api, type Expense, type GroupDetail, useGroup } from '../api.ts';
+import { applySavedGroup } from '../celebration.ts';
 import { dateLocale, errorText, lang, rich, t } from '../i18n.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, confirmDialog, haptic, MainButton } from '../tg.tsx';
@@ -196,7 +197,7 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
       shares: inputs,
     };
     try {
-      setGroup(expense ? await api.updateExpense(g.id, expense.id, body) : await api.addExpense(g.id, body));
+      applySavedGroup(expense ? await api.updateExpense(g.id, expense.id, body) : await api.addExpense(g.id, body));
       haptic.success();
       navigate(`/g/${g.id}`, { replace: true });
     } catch (e) {
@@ -209,7 +210,7 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
   const remove = async () => {
     if (!expense || !(await confirmDialog(t('expense.confirmDelete', { title: expense.title })))) return;
     try {
-      setGroup(await api.deleteExpense(g.id, expense.id));
+      applySavedGroup(await api.deleteExpense(g.id, expense.id));
       navigate(`/g/${g.id}`, { replace: true });
     } catch (e) {
       await alertDialog((e as Error).message);
