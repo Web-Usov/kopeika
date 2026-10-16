@@ -157,6 +157,13 @@ const migrations = [
   CREATE INDEX recurring_group ON recurring(group_id);
   CREATE INDEX recurring_due ON recurring(active, next_date);
   `,
+  // What the bot posts to the linked chat: 'off' | 'each' (every expense) | 'daily' (digest). last_digest_date is the
+  // server-local day of the last daily digest (one per day); last_digest_at (UTC) is the start of the next digest window.
+  `
+  ALTER TABLE groups ADD COLUMN chat_feed TEXT NOT NULL DEFAULT 'each';
+  ALTER TABLE groups ADD COLUMN last_digest_date TEXT;
+  ALTER TABLE groups ADD COLUMN last_digest_at TEXT;
+  `,
 ];
 
 const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
