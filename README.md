@@ -26,6 +26,8 @@ npm run dev:web          # Mini App на :5173 (проксирует /api на :
 
 В обычном браузере открывай `http://localhost:5173/?dev=1`, второй пользователь — `?dev=2`, приглашение — `?dev=2&startapp=<код>`.
 
+Git-хук pre-push ставится сам при `npm install` и гоняет `npm run check` перед каждым пушем. В крайнем случае обойти можно через `git push --no-verify`.
+
 Чтобы проверить внутри Telegram, нужен HTTPS: например `cloudflared tunnel --url http://localhost:5173` и временно указать этот адрес в @BotFather (лучше на отдельном тестовом боте).
 
 ```bash
