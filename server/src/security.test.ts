@@ -66,6 +66,8 @@ test('every group route answers a non-member with 404 and changes nothing', asyn
     ['POST', `/groups/${g.id}/members`, { name: 'Чужой' }],
     ['PATCH', `/groups/${g.id}/members/${mid}`, { name: 'Взлом' }],
     ['DELETE', `/groups/${g.id}/members/${mid}`],
+    ['POST', `/groups/${g.id}/invite/rotate`],
+    ['POST', `/groups/${g.id}/members/${mid}/remove`],
     ['PUT', `/groups/${g.id}/chat/feed`, { feed: 'off' }],
     ['POST', `/groups/${g.id}/chat/unlink`],
     ['POST', `/groups/${g.id}/expenses`, exp(g)],
@@ -261,4 +263,56 @@ test('responses carry nosniff and no-referrer headers', async () => {
   const res = await createApp('/nonexistent').request('/healthz');
   assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
   assert.equal(res.headers.get('referrer-policy'), 'no-referrer');
+});
+
+test('owner rotates the invite code: old link dies, new one works, non-owner gets 403', async () => {
+  const owner = nextUser++;
+  const guest = nextUser++;
+  const g = await group(owner);
+  const old = g.inviteCode;
+  assert.equal((await call(guest, 'POST', `/groups/${g.id}/invite/rotate`)).status, 404);
+  await call(guest, 'POST', `/invite/${old}/join`, {});
+  assert.equal((await call(guest, 'POST', `/groups/${g.id}/invite/rotate`)).status, 403);
+  assert.equal((await call(owner, 'GET', `/groups/${g.id}`)).body.inviteCode, old);
+
+  const res = await call(owner, 'POST', `/groups/${g.id}/invite/rotate`);
+  assert.equal(res.status, 200);
+  assert.notEqual(res.body.inviteCode, old);
+  assert.equal((await call(guest, 'GET', `/invite/${old}`)).status, 404);
+  assert.equal((await call(nextUser++, 'POST', `/invite/${old}/join`, {})).status, 404);
+  const fresh = await call(nextUser++, 'POST', `/invite/${res.body.inviteCode}/join`, {});
+  assert.equal(fresh.status, 200);
+
+  const log = (await call(owner, 'GET', `/groups/${g.id}/activity`)).body;
+  assert.ok(log.items.some((i: Json) => i.action === 'group.invite_rotate'));
+});
+
+test('owner removes a Telegram member: they lose access, history stays, only the owner may', async () => {
+  const owner = nextUser++;
+  const guest = nextUser++;
+  const g = await group(owner, ['Маша']);
+  await call(guest, 'POST', `/invite/${g.inviteCode}/join`, {});
+  const full = (await call(owner, 'GET', `/groups/${g.id}`)).body;
+  const guestMember = full.members.find((m: Json) => m.userId === guest);
+  const ownerMember = full.members.find((m: Json) => m.userId === owner);
+  const masha = full.members.find((m: Json) => m.name === 'Маша');
+  await call(guest, 'POST', `/groups/${g.id}/expenses`, exp(full, { payerId: guestMember.id }));
+  const url = (id: number) => `/groups/${g.id}/members/${id}/remove`;
+
+  assert.equal((await call(guest, 'POST', url(guestMember.id))).status, 403);
+  assert.equal((await call(guest, 'POST', url(ownerMember.id))).status, 403);
+  assert.equal((await call(owner, 'POST', url(ownerMember.id))).status, 409);
+  assert.equal((await call(owner, 'POST', url(masha.id))).status, 409);
+  assert.equal((await call(owner, 'POST', url(999_999))).status, 404);
+
+  const ok = await call(owner, 'POST', url(guestMember.id));
+  assert.equal(ok.status, 200);
+  const after = ok.body.members.find((m: Json) => m.id === guestMember.id);
+  assert.equal(after.userId, null);
+  assert.equal(ok.body.expenses.length, 1);
+  assert.equal((await call(guest, 'GET', `/groups/${g.id}`)).status, 404);
+
+  const log = (await call(owner, 'GET', `/groups/${g.id}/activity`)).body;
+  assert.equal(log.items[0].action, 'member.remove');
+  assert.equal(log.items[0].payload.name, guestMember.name);
 });

@@ -510,6 +510,16 @@ export function notifyExpenseChange(
   }
 }
 
+/** Tells a removed member, in their language. No "open group" button: they have no access any more. Fire-and-forget. */
+export function notifyMemberRemoved(group: GroupRow, userId: number) {
+  if (!bot || !botReady) return;
+  const lang = pickLang(one<{ lang: string | null }>('SELECT lang FROM users WHERE id = ?', userId)?.lang);
+  const text = createT(lang)('bot.removed', { group: group.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') });
+  void bot.api
+    .sendMessage(userId, text, { parse_mode: 'HTML' })
+    .catch((e) => console.warn('notifyMemberRemoved failed', e));
+}
+
 /** Sends a debt reminder to the debtor's DM in their language. Fire-and-forget. */
 export function notifyRemind(
   group: GroupRow,
