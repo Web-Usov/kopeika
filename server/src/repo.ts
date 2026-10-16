@@ -1,7 +1,9 @@
 import crypto from 'node:crypto';
+import type { SQLInputValue } from 'node:sqlite';
 import { pickLang } from '../../shared/i18n/index.ts';
 import { type SplitMode, settleUp } from '../../shared/money.ts';
 import type { TelegramUser } from './auth.ts';
+import { config } from './config.ts';
 import { all, one, run } from './db.ts';
 import { deserialize } from './paymentInfo.ts';
 
@@ -146,25 +148,129 @@ function loadMembers(groupId: number) {
   );
 }
 
-export function groupDetail(group: GroupRow, me: MemberRow, inviteLink: string | null) {
+type ExpenseDto = ReturnType<typeof expenseDto>;
+
+function expenseDto(e: ExpenseRow, shares: ShareRow[]) {
+  return {
+    id: e.id,
+    kind: e.kind,
+    title: e.title,
+    amount: e.amount,
+    originalAmount: e.original_amount,
+    originalCurrency: e.original_currency,
+    rate: e.rate,
+    payerId: e.payer_id,
+    splitMode: e.split_mode,
+    spentOn: e.spent_on,
+    category: e.kind === 'expense' ? e.category : null,
+    createdAt: e.created_at,
+    shares: shares.map((s) => ({ memberId: s.member_id, input: s.input, amount: s.amount })),
+  };
+}
+
+function withShares(rows: ExpenseRow[]): ExpenseDto[] {
+  if (rows.length === 0) return [];
+  const byExpense = new Map<number, ShareRow[]>();
+  // Ids are our own integers; chunked so a "load everything" call stays under SQLite's variable limit.
+  for (let i = 0; i < rows.length; i += 500) {
+    const ids = rows.slice(i, i + 500).map((e) => e.id);
+    const shares = all<ShareRow>(
+      `SELECT * FROM expense_shares WHERE expense_id IN (${ids.map(() => '?').join(',')}) ORDER BY rowid`,
+      ...ids,
+    );
+    for (const s of shares) {
+      const list = byExpense.get(s.expense_id);
+      if (list) list.push(s);
+      else byExpense.set(s.expense_id, [s]);
+    }
+  }
+  return rows.map((e) => expenseDto(e, byExpense.get(e.id) ?? []));
+}
+
+export function countExpenses(groupId: number): number {
+  return one<{ n: number }>('SELECT COUNT(*) AS n FROM expenses WHERE group_id = ?', groupId)!.n;
+}
+
+/**
+ * Expenses newest first (by date, then id). `before` is the id of the last expense the caller already has:
+ * only strictly older ones follow it. Without `limit` everything is returned.
+ * Returns null when `before` is not an expense of this group (e.g. it was deleted meanwhile).
+ */
+export function listExpenses(groupId: number, opts: { before?: number; limit?: number } = {}): ExpenseDto[] | null {
+  const params: SQLInputValue[] = [groupId];
+  let cursor = '';
+  if (opts.before !== undefined) {
+    const at = one<{ spent_on: string }>(
+      'SELECT spent_on FROM expenses WHERE id = ? AND group_id = ?',
+      opts.before,
+      groupId,
+    );
+    if (!at) return null;
+    cursor = 'AND (spent_on < ? OR (spent_on = ? AND id < ?))';
+    params.push(at.spent_on, at.spent_on, opts.before);
+  }
+  const limit = opts.limit === undefined ? '' : `LIMIT ${Math.trunc(opts.limit)}`;
+  return withShares(
+    all<ExpenseRow>(
+      `SELECT * FROM expenses WHERE group_id = ? ${cursor} ORDER BY spent_on DESC, id DESC ${limit}`,
+      ...params,
+    ),
+  );
+}
+
+/** One page of older expenses plus a flag whether more remain; null when the cursor is gone. */
+export function expensesPage(groupId: number, opts: { before?: number; limit: number }) {
+  const rows = listExpenses(groupId, { before: opts.before, limit: opts.limit + 1 });
+  if (rows === null) return null;
+  return { items: rows.slice(0, opts.limit), hasMore: rows.length > opts.limit };
+}
+
+export function getExpense(groupId: number, expenseId: number): ExpenseDto | null {
+  const row = one<ExpenseRow>('SELECT * FROM expenses WHERE id = ? AND group_id = ?', expenseId, groupId);
+  return row ? withShares([row])[0] : null;
+}
+
+/**
+ * Compact view of the whole ledger for server-side aggregates (summary, category stats): no titles,
+ * so it stays small even for a group at the expense quota.
+ */
+export function loadLedger(groupId: number) {
+  const rows = all<Pick<ExpenseRow, 'id' | 'kind' | 'amount' | 'payer_id' | 'spent_on' | 'category'>>(
+    'SELECT id, kind, amount, payer_id, spent_on, category FROM expenses WHERE group_id = ? ORDER BY spent_on DESC, id DESC',
+    groupId,
+  );
+  const shares = new Map<number, { memberId: number; amount: number }[]>();
+  for (const s of all<ShareRow>(
+    'SELECT s.* FROM expense_shares s JOIN expenses e ON e.id = s.expense_id WHERE e.group_id = ?',
+    groupId,
+  )) {
+    const list = shares.get(s.expense_id);
+    const item = { memberId: s.member_id, amount: s.amount };
+    if (list) list.push(item);
+    else shares.set(s.expense_id, [item]);
+  }
+  return rows.map((e) => ({
+    id: e.id,
+    kind: e.kind,
+    amount: e.amount,
+    payerId: e.payer_id,
+    spentOn: e.spent_on,
+    category: e.kind === 'expense' ? e.category : null,
+    shares: shares.get(e.id) ?? [],
+  }));
+}
+
+/**
+ * Group screen payload. `expenses` holds only the newest page (config.expensesPage) unless `all` is set;
+ * `expensesTotal` / `hasMoreExpenses` tell the client whether older ones exist. Balances, totals and the
+ * settlement plan are always computed in SQL over every expense, never from the page.
+ */
+export function groupDetail(group: GroupRow, me: MemberRow, inviteLink: string | null, opts: { all?: boolean } = {}) {
   const members = loadMembers(group.id);
   const balances = groupBalances(group.id);
-  const expenses = all<ExpenseRow>(
-    'SELECT * FROM expenses WHERE group_id = ? ORDER BY spent_on DESC, id DESC',
-    group.id,
-  );
-  const shares = all<ShareRow>(
-    'SELECT s.* FROM expense_shares s JOIN expenses e ON e.id = s.expense_id WHERE e.group_id = ?',
-    group.id,
-  );
-  const sharesByExpense = new Map<number, ShareRow[]>();
-  let totalSpent = 0;
-  for (const e of expenses) if (e.kind === 'expense') totalSpent += e.amount;
-  for (const s of shares) {
-    const list = sharesByExpense.get(s.expense_id);
-    if (list) list.push(s);
-    else sharesByExpense.set(s.expense_id, [s]);
-  }
+  const expensesTotal = countExpenses(group.id);
+  const expenses = listExpenses(group.id, opts.all ? {} : { limit: config.expensesPage }) ?? [];
+  const totalSpent = totalsSpent('group_id = ?', group.id).get(group.id) ?? 0;
   return {
     id: group.id,
     name: group.name,
@@ -191,25 +297,9 @@ export function groupDetail(group: GroupRow, me: MemberRow, inviteLink: string |
       canNotify: m.user_id !== null && m.user_notify === 1,
       balance: balances.get(m.id) ?? 0,
     })),
-    expenses: expenses.map((e) => ({
-      id: e.id,
-      kind: e.kind,
-      title: e.title,
-      amount: e.amount,
-      originalAmount: e.original_amount,
-      originalCurrency: e.original_currency,
-      rate: e.rate,
-      payerId: e.payer_id,
-      splitMode: e.split_mode,
-      spentOn: e.spent_on,
-      category: e.kind === 'expense' ? e.category : null,
-      createdAt: e.created_at,
-      shares: (sharesByExpense.get(e.id) ?? []).map((s) => ({
-        memberId: s.member_id,
-        input: s.input,
-        amount: s.amount,
-      })),
-    })),
+    expenses,
+    expensesTotal,
+    hasMoreExpenses: expenses.length < expensesTotal,
     settlements: settleUp(balances),
   };
 }

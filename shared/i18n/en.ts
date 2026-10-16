@@ -88,6 +88,7 @@ export const en: Dict = {
     addExpense: 'Add expense',
     inviteText: 'Join the group “{name}” in Kopeika — let’s split our shared expenses together',
     noExpenses: 'No expenses yet',
+    showMore: 'Show more',
     noExpensesHint: 'Tap “Add expense” below when someone pays for something.',
     soloTitle: "It's just you here so far",
     soloHint: 'Invite your friends with a link — they pick themselves from the list and see the shared expenses.',
@@ -379,6 +380,7 @@ export const en: Dict = {
     chatJoinButton: 'Join the group',
     chatUnlinked: 'The chat is unlinked from the group',
     chatNotLinked: "This chat isn't linked to any group",
+    tooMany: 'Too fast, please wait a minute.',
     chatAdminOnly: 'Only chat admins can unlink the chat',
     chatSplit: 'Split {count} ways',
     chatTransfer: '{author} recorded a transfer: {from} → {to}, {amount}',
@@ -518,6 +520,13 @@ export const en: Dict = {
     internal: 'Internal server error',
     exportBotUnavailable:
       'The bot can’t message you. Open the chat with the bot, press Start and turn on notifications.',
+    quota: {
+      groups: 'Too many groups: {max} at most. Delete the ones you don’t need.',
+      members: 'This group already has the maximum of {max} members',
+      expenses: 'This group already has the maximum of {max} expenses. Start a new group.',
+      recurring: 'Too many recurring expenses: {max} at most',
+    },
+    exportTooOften: 'You can export once a minute. Please try again shortly.',
     rate: {
       invalid: 'The rate is not valid',
       tooSmall: 'The amount is too small for this rate',

@@ -80,4 +80,20 @@ export const config = {
   /** Max API requests per user per minute. */
   rateLimitPerMin: parseNumber('RATE_LIMIT_PER_MIN', env.RATE_LIMIT_PER_MIN, { default: 120, max: 1_000_000 }),
   ratesLimitPerMin: parseNumber('RATES_LIMIT_PER_MIN', env.RATES_LIMIT_PER_MIN, { default: 20, max: 1_000_000 }),
+  /** Quotas, so one account cannot grow the database without bound. */
+  maxGroupsPerUser: parseNumber('MAX_GROUPS_PER_USER', env.MAX_GROUPS_PER_USER, { default: 100, max: 1_000_000 }),
+  maxMembersPerGroup: parseNumber('MAX_MEMBERS_PER_GROUP', env.MAX_MEMBERS_PER_GROUP, { default: 100, max: 1_000_000 }),
+  maxExpensesPerGroup: parseNumber('MAX_EXPENSES_PER_GROUP', env.MAX_EXPENSES_PER_GROUP, {
+    default: 10_000,
+    max: 100_000_000,
+  }),
+  maxRecurringPerGroup: parseNumber('MAX_RECURRING_PER_GROUP', env.MAX_RECURRING_PER_GROUP, {
+    default: 50,
+    max: 1_000_000,
+  }),
+  /** How many of the latest expenses a group detail carries; older ones are fetched page by page. */
+  expensesPage: parseNumber('EXPENSES_PAGE', env.EXPENSES_PAGE, { default: 200, max: 1000 }),
+  /** Bot: commands and inline queries per user per minute. */
+  botCommandsPerMin: parseNumber('BOT_COMMANDS_PER_MIN', env.BOT_COMMANDS_PER_MIN, { default: 20, max: 1_000_000 }),
+  botInlinePerMin: parseNumber('BOT_INLINE_PER_MIN', env.BOT_INLINE_PER_MIN, { default: 30, max: 1_000_000 }),
 };
