@@ -6,6 +6,7 @@ import { type TelegramUser, validateInitData } from './auth.ts';
 import { appLink, notifyExpense } from './bot.ts';
 import { config } from './config.ts';
 import { all, one, run, tx } from './db.ts';
+import { createRateLimiter } from './rateLimit.ts';
 import {
   displayName,
   type ExpenseRow,
@@ -23,7 +24,7 @@ type Env = { Variables: { user: TelegramUser } };
 
 export const api = new Hono<Env>();
 
-const fail = (status: 400 | 401 | 403 | 404 | 409, message: string) => new HTTPException(status, { message });
+const fail = (status: 400 | 401 | 403 | 404 | 409 | 429, message: string) => new HTTPException(status, { message });
 
 api.onError((err, c) => {
   if (err instanceof HTTPException) return c.json({ error: err.message }, err.status);
@@ -47,6 +48,13 @@ api.use('*', async (c, next) => {
   if (!user) throw fail(401, 'Откройте приложение из Telegram');
   upsertUser(user);
   c.set('user', user);
+  await next();
+});
+
+// --- Rate limit: per Telegram user, sliding one-minute window ---
+export const rateLimiter = createRateLimiter({ limit: config.rateLimitPerMin });
+api.use('*', async (c, next) => {
+  if (!rateLimiter.allow(c.get('user').id)) throw fail(429, 'Слишком много запросов, попробуйте через минуту');
   await next();
 });
 
