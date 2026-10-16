@@ -109,6 +109,31 @@ const migrations = [
     PRIMARY KEY (date, currency)
   );
   `,
+  // Recurring expenses: a template that the scheduler turns into a regular expense on schedule.
+  // shares is JSON [{memberId, value}] as in the expense form; day is the day of month (1-31) for "monthly"
+  // and the ISO weekday (1-7) for "weekly"; next_date (YYYY-MM-DD) is the next occurrence not yet created.
+  // Group currency only. The scheduler moves next_date forward in the same transaction that creates the expense.
+  `
+  CREATE TABLE recurring (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id    INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    created_by  INTEGER NOT NULL REFERENCES users(id),
+    title       TEXT NOT NULL,
+    category    TEXT NOT NULL DEFAULT 'other',
+    amount      INTEGER NOT NULL CHECK (amount > 0),
+    payer_id    INTEGER NOT NULL,
+    split_mode  TEXT NOT NULL CHECK (split_mode IN ('equal', 'shares', 'exact')),
+    shares      TEXT NOT NULL,
+    period      TEXT NOT NULL CHECK (period IN ('monthly', 'weekly')),
+    day         INTEGER NOT NULL,
+    start_date  TEXT NOT NULL,
+    next_date   TEXT NOT NULL,
+    active      INTEGER NOT NULL DEFAULT 1,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX recurring_group ON recurring(group_id);
+  CREATE INDEX recurring_due ON recurring(active, next_date);
+  `,
 ];
 
 const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;

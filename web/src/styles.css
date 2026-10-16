@@ -723,3 +723,8 @@ select.field {
 .small-btn:disabled {
   opacity: 0.5;
 }
+
+/* Подзаголовок, который может переноситься (например, расписание регулярной траты). */
+.row.wrap .row-subtitle {
+  white-space: normal;
+}

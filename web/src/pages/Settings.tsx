@@ -1,9 +1,10 @@
-import { useState } from 'react';
-import { api, forgetGroup, type GroupDetail, type Member, setGroup, useGroup } from '../api.ts';
+import { useEffect, useState } from 'react';
+import { api, forgetGroup, type GroupDetail, type Member, type Recurring, setGroup, useGroup } from '../api.ts';
 import { t } from '../i18n.ts';
+import { scheduleText, shortDate } from '../recurring.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, confirmDialog, haptic, shareLink } from '../tg.tsx';
-import { Avatar, ErrorView, Loading, Row, Section } from '../ui.tsx';
+import { Avatar, ErrorView, Loading, Money, Row, Section } from '../ui.tsx';
 import { PaymentForm } from './PaymentForm.tsx';
 
 export function Settings({ id }: { id: number }) {
@@ -158,6 +159,8 @@ function SettingsView({ g }: { g: GroupDetail }) {
         </div>
       </Section>
 
+      <RecurringSection g={g} />
+
       <Section title={t('settings.exportSection')} footer={t('settings.exportFooter')}>
         <Row
           title={exporting ? t('settings.exporting') : t('settings.exportCsv')}
@@ -243,5 +246,67 @@ function MemberRow({ g, m }: { g: GroupDetail; m: Member }) {
         ) : undefined
       }
     />
+  );
+}
+
+function RecurringSection({ g }: { g: GroupDetail }) {
+  const [items, setItems] = useState<Recurring[]>();
+  useEffect(() => {
+    api
+      .recurring(g.id)
+      .then(setItems)
+      .catch(() => setItems([]));
+  }, [g.id]);
+  if (!items) return null;
+
+  const toggle = async (r: Recurring) => {
+    try {
+      const updated = await api.setRecurringActive(g.id, r.id, !r.active);
+      setItems((list) => list?.map((x) => (x.id === r.id ? updated : x)));
+      haptic.success();
+    } catch (e) {
+      haptic.error();
+      await alertDialog((e as Error).message);
+    }
+  };
+
+  const remove = async (r: Recurring) => {
+    if (!(await confirmDialog(t('recurring.confirmDelete', { title: r.title })))) return;
+    try {
+      await api.deleteRecurring(g.id, r.id);
+      setItems((list) => list?.filter((x) => x.id !== r.id));
+    } catch (e) {
+      await alertDialog((e as Error).message);
+    }
+  };
+
+  return (
+    <Section title={t('recurring.section')} footer={t('recurring.footer')}>
+      {items.length === 0 && <div className="row hint">{t('recurring.empty')}</div>}
+      {items.map((r) => (
+        <Row
+          key={r.id}
+          className="wrap"
+          title={r.title}
+          subtitle={
+            <>
+              <Money value={r.amount} currency={g.currency} /> · {scheduleText(r.period, r.day)}
+              <br />
+              {r.active ? t('recurring.next', { date: shortDate(r.nextDate) }) : t('recurring.paused')}
+            </>
+          }
+          right={
+            <>
+              <button type="button" className="small-btn" onClick={() => void toggle(r)}>
+                {r.active ? t('recurring.pause') : t('recurring.resume')}
+              </button>
+              <button type="button" className="icon-btn" aria-label={t('common.delete')} onClick={() => void remove(r)}>
+                ✕
+              </button>
+            </>
+          }
+        />
+      ))}
+    </Section>
   );
 }

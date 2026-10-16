@@ -18,8 +18,10 @@ import {
   type SplitInput,
   type SplitMode,
 } from '../../../shared/money.ts';
+import { addDays, isoWeekday, nextOccurrence, type Period } from '../../../shared/recurring.ts';
 import { api, type Expense, type GroupDetail, setGroup, useGroup } from '../api.ts';
 import { dateLocale, errorText, lang, rich, t } from '../i18n.ts';
+import { scheduleText, shortDate } from '../recurring.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, confirmDialog, haptic, MainButton } from '../tg.tsx';
 import { Avatar, ErrorView, Loading, Money, Row, Section, Segmented, todayIso } from '../ui.tsx';
@@ -102,6 +104,8 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
   // Until the user picks a category by hand, it follows the title; an existing expense keeps its own.
   const [categoryPicked, setCategoryPicked] = useState(Boolean(expense));
   const [saving, setSaving] = useState(false);
+  // New expenses only: also create a recurring template (same day of month / weekday as the expense date).
+  const [repeat, setRepeat] = useState<Period | 'none'>('none');
 
   const chipsRef = useRef<HTMLDivElement>(null);
   // Keep the selected chip visible in the scrollable row. A new expense starts at the beginning of the row.
@@ -197,6 +201,25 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
     };
     try {
       setGroup(expense ? await api.updateExpense(g.id, expense.id, body) : await api.addExpense(g.id, body));
+      if (!expense && repeat !== 'none' && !foreign) {
+        try {
+          // The expense above is the first one; the template takes over from tomorrow.
+          await api.addRecurring(g.id, {
+            title: body.title,
+            amount: body.amount,
+            payerId,
+            splitMode: mode,
+            category,
+            shares: inputs,
+            period: repeat,
+            day: repeatDay,
+            startDate: addDays(todayIso(), 1),
+          });
+        } catch (e) {
+          haptic.error();
+          await alertDialog((e as Error).message);
+        }
+      }
       haptic.success();
       navigate(`/g/${g.id}`, { replace: true });
     } catch (e) {
@@ -215,6 +238,9 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
       await alertDialog((e as Error).message);
     }
   };
+
+  const repeatDay = repeat === 'weekly' ? isoWeekday(spentOn) : Number(spentOn.slice(8, 10));
+  const repeatNext = repeat === 'none' ? null : nextOccurrence(repeat, repeatDay, todayIso());
 
   const allOn = g.members.every((m) => parts[m.id].on);
 
@@ -447,6 +473,34 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
           );
         })}
       </Section>
+
+      {!expense && (
+        <Section
+          title={t('recurring.repeat')}
+          footer={
+            foreign
+              ? t('recurring.foreignHint')
+              : repeatNext
+                ? `${t('recurring.hint', { date: shortDate(repeatNext) })}${repeat === 'monthly' && repeatDay >= 29 ? ` ${t('recurring.shortMonthHint')}` : ''}`
+                : undefined
+          }
+        >
+          <Segmented<Period | 'none'>
+            value={foreign ? 'none' : repeat}
+            onChange={(r) => {
+              if (foreign) return;
+              haptic.tap();
+              setRepeat(r);
+            }}
+            options={[
+              { value: 'none', label: t('recurring.none') },
+              { value: 'monthly', label: t('recurring.monthly') },
+              { value: 'weekly', label: t('recurring.weekly') },
+            ]}
+          />
+          {!foreign && repeat !== 'none' && <div className="row hint">{scheduleText(repeat, repeatDay)}</div>}
+        </Section>
+      )}
 
       {expense && (
         <button type="button" className="danger-btn" onClick={remove}>
