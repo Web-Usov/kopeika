@@ -212,3 +212,51 @@ test('rate limit: requests over the limit get 429, other users are unaffected', 
     rateLimiter.setLimit(120);
   }
 });
+
+test('API errors are in the request language: Russian by default, English with X-Lang', async () => {
+  const u = newUser();
+  const g = await createGroup(u, ['Маша']);
+  const bad = expense(g, {
+    splitMode: 'exact',
+    shares: [
+      { memberId: g.members[0].id, value: 3000 },
+      { memberId: g.members[1].id, value: 3000 },
+    ],
+  });
+  const post = async (lang?: string) => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', Authorization: `dev ${u}` };
+    if (lang) headers['X-Lang'] = lang;
+    const res = await api.request(`/groups/${g.id}/expenses`, { method: 'POST', headers, body: JSON.stringify(bad) });
+    return { status: res.status, body: (await res.json()) as Json };
+  };
+  const ru = await post();
+  assert.equal(ru.status, 400);
+  assert.equal(ru.body.error, 'Сумма долей не совпадает с общей суммой');
+  const en = await post('en');
+  assert.equal(en.status, 400);
+  assert.equal(en.body.error, "The amounts don't add up to the total");
+  assert.equal((await post('ru')).body.error, ru.body.error);
+
+  // Other errors too: a missing group, invalid body.
+  const headers = { Authorization: `dev ${u}`, 'X-Lang': 'en' };
+  const missing = await api.request('/groups/999999', { headers });
+  assert.equal(((await missing.json()) as Json).error, 'Group not found');
+  const invalid = await api.request('/groups', {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  assert.equal(((await invalid.json()) as Json).error, 'Invalid data');
+});
+
+test('the user language is stored on every request and used by the bot', async () => {
+  const { one } = await import('./db.ts');
+  const u = newUser();
+  await api.request('/me', { headers: { Authorization: `dev ${u}`, 'X-Lang': 'en' } });
+  assert.equal(one<{ lang: string }>('SELECT lang FROM users WHERE id = ?', u)?.lang, 'en');
+  await api.request('/me', { headers: { Authorization: `dev ${u}`, 'X-Lang': 'ru' } });
+  assert.equal(one<{ lang: string }>('SELECT lang FROM users WHERE id = ?', u)?.lang, 'ru');
+  // No language info: the stored value stays.
+  await api.request('/me', { headers: { Authorization: `dev ${u}` } });
+  assert.equal(one<{ lang: string }>('SELECT lang FROM users WHERE id = ?', u)?.lang, 'ru');
+});

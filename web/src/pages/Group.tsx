@@ -1,4 +1,5 @@
 import { type Expense, type GroupDetail, useGroup } from '../api.ts';
+import { rich, t } from '../i18n.ts';
 import { navigate } from '../router.ts';
 import { BackButton, haptic, MainButton, shareLink } from '../tg.tsx';
 import { Avatar, ErrorView, formatDay, Loading, Money, Row, Section, Segmented } from '../ui.tsx';
@@ -25,27 +26,21 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
       <header className="group-header">
         <h2>{g.name}</h2>
         <div className="hint">
-          Всего потрачено <Money value={g.totalSpent} currency={g.currency} />
+          {rich('group.totalSpent', { amount: <Money value={g.totalSpent} currency={g.currency} /> })}
         </div>
         <div className={`my-balance ${me.balance > 0 ? 'pos' : me.balance < 0 ? 'neg' : ''}`}>
-          {me.balance === 0 ? (
-            'Вы в расчёте'
-          ) : me.balance > 0 ? (
-            <>
-              Вам должны <Money value={me.balance} currency={g.currency} />
-            </>
-          ) : (
-            <>
-              Вы должны <Money value={-me.balance} currency={g.currency} />
-            </>
-          )}
+          {me.balance === 0
+            ? t('group.settled')
+            : me.balance > 0
+              ? rich('group.owedToYou', { amount: <Money value={me.balance} currency={g.currency} /> })
+              : rich('group.youOwe', { amount: <Money value={-me.balance} currency={g.currency} /> })}
         </div>
         <div className="header-actions">
           <button type="button" onClick={() => invite(g)}>
-            👋 Пригласить
+            {t('group.invite')}
           </button>
           <button type="button" onClick={() => navigate(`/g/${g.id}/settings`)}>
-            ⚙️ Группа
+            {t('group.settings')}
           </button>
         </div>
       </header>
@@ -53,8 +48,8 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
       <Segmented<Tab>
         value={tab}
         options={[
-          { value: 'expenses', label: 'Траты' },
-          { value: 'balances', label: 'Балансы' },
+          { value: 'expenses', label: t('group.tabExpenses') },
+          { value: 'balances', label: t('group.tabBalances') },
         ]}
         onChange={(t) => {
           haptic.tap();
@@ -64,7 +59,7 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
 
       {tab === 'expenses' ? <ExpensesTab g={g} /> : <BalancesTab g={g} />}
 
-      <MainButton text="Добавить трату" onClick={() => navigate(`/g/${g.id}/expense/new`)} />
+      <MainButton text={t('group.addExpense')} onClick={() => navigate(`/g/${g.id}/expense/new`)} />
     </div>
   );
 }
@@ -75,7 +70,7 @@ function invite(g: GroupDetail) {
     navigate(`/g/${g.id}/settings`);
     return;
   }
-  shareLink(link, `Присоединяйся к группе «${g.name}» в Копейке — будем вместе считать общие траты`);
+  shareLink(link, t('group.inviteText', { name: g.name }));
 }
 
 function ExpensesTab({ g }: { g: GroupDetail }) {
@@ -83,14 +78,15 @@ function ExpensesTab({ g }: { g: GroupDetail }) {
     return (
       <div className="empty">
         <div className="empty-emoji">🧾</div>
-        <p>Трат пока нет</p>
-        <p className="hint">Нажмите «Добавить трату», когда кто-то за что-то заплатит.</p>
+        <p>{t('group.noExpenses')}</p>
+        <p className="hint">{t('group.noExpensesHint')}</p>
       </div>
     );
   }
   const byDay = new Map<string, Expense[]>();
   for (const e of g.expenses) byDay.set(e.spentOn, [...(byDay.get(e.spentOn) ?? []), e]);
-  const name = (id: number) => (id === g.meId ? 'Вы' : (g.members.find((m) => m.id === id)?.name ?? '?'));
+  const name = (id: number) =>
+    id === g.meId ? t('common.you') : (g.members.find((m) => m.id === id)?.name ?? t('common.unknownMember'));
 
   return (
     <>
@@ -105,7 +101,7 @@ function ExpensesTab({ g }: { g: GroupDetail }) {
                   onClick={() => navigate(`/g/${g.id}/transfer/${e.id}`)}
                   left={<span className="expense-icon">💸</span>}
                   title={`${name(e.payerId)} → ${name(to)}`}
-                  subtitle="Перевод"
+                  subtitle={t('group.transfer')}
                   right={<Money value={e.amount} currency={g.currency} />}
                 />
               );
@@ -118,18 +114,14 @@ function ExpensesTab({ g }: { g: GroupDetail }) {
                 onClick={() => navigate(`/g/${g.id}/expense/${e.id}`)}
                 left={<span className="expense-icon">🧾</span>}
                 title={e.title}
-                subtitle={`${paidByMe ? 'Вы платили' : `Платил(а) ${name(e.payerId)}`}`}
+                subtitle={paidByMe ? t('group.paidByMe') : t('group.paidBy', { name: name(e.payerId) })}
                 right={
                   <span className="stack-right">
                     <Money value={e.amount} currency={g.currency} />
                     <span className="hint small">
-                      {myShare ? (
-                        <>
-                          ваша доля <Money value={myShare} currency={g.currency} />
-                        </>
-                      ) : (
-                        'вы не участвуете'
-                      )}
+                      {myShare
+                        ? rich('group.myShare', { amount: <Money value={myShare} currency={g.currency} /> })
+                        : t('group.notInvolved')}
                     </span>
                   </span>
                 }
@@ -144,17 +136,17 @@ function ExpensesTab({ g }: { g: GroupDetail }) {
 
 function BalancesTab({ g }: { g: GroupDetail }) {
   const member = (id: number) => g.members.find((m) => m.id === id)!;
-  const label = (id: number) => (id === g.meId ? 'Вы' : member(id).name);
+  const label = (id: number) => (id === g.meId ? t('common.you') : member(id).name);
   const maxAbs = Math.max(1, ...g.members.map((m) => Math.abs(m.balance)));
 
   return (
     <>
-      <Section title="Балансы" footer="Плюс — группа должна участнику, минус — участник должен группе.">
+      <Section title={t('group.balancesTitle')} footer={t('group.balancesFooter')}>
         {g.members.map((m) => (
           <Row
             key={m.id}
             left={<Avatar member={m} />}
-            title={m.id === g.meId ? `${m.name} (вы)` : m.name}
+            title={m.id === g.meId ? t('common.youParen', { name: m.name }) : m.name}
             subtitle={
               <span className="bar">
                 <span
@@ -174,9 +166,9 @@ function BalancesTab({ g }: { g: GroupDetail }) {
         ))}
       </Section>
 
-      <Section title="Как рассчитаться">
+      <Section title={t('group.howToSettle')}>
         {g.settlements.length === 0 ? (
-          <div className="row hint">Все в расчёте 🎉</div>
+          <div className="row hint">{t('group.allSettled')}</div>
         ) : (
           g.settlements.map((s) => (
             <Row
@@ -193,7 +185,7 @@ function BalancesTab({ g }: { g: GroupDetail }) {
                   className="small-btn"
                   onClick={() => navigate(`/g/${g.id}/transfer/new?from=${s.from}&to=${s.to}&amount=${s.amount}`)}
                 >
-                  Вернул
+                  {t('group.returned')}
                 </button>
               }
             />
@@ -202,7 +194,7 @@ function BalancesTab({ g }: { g: GroupDetail }) {
       </Section>
 
       <button type="button" className="text-btn" onClick={() => navigate(`/g/${g.id}/transfer/new`)}>
-        Записать перевод вручную
+        {t('group.manualTransfer')}
       </button>
     </>
   );

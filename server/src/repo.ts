@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { pickLang } from '../../shared/i18n/index.ts';
 import { computeBalances, type LedgerEntry, type SplitMode, settleUp } from '../../shared/money.ts';
 import type { TelegramUser } from './auth.ts';
 import { all, one, run } from './db.ts';
@@ -10,6 +11,7 @@ export interface UserRow {
   username: string | null;
   photo_url: string | null;
   notify: number;
+  lang: string | null;
 }
 
 export interface GroupRow {
@@ -56,14 +58,15 @@ export function upsertUser(u: TelegramUser, opts: { notify?: boolean } = {}) {
   // `notify` only ever gets switched on here (Telegram told us we may write); switching off is explicit.
   const notify = opts.notify ?? u.allows_write_to_pm === true;
   run(
-    `INSERT INTO users (id, first_name, last_name, username, photo_url, notify)
-     VALUES (?, ?, ?, ?, ?, ?)
+    `INSERT INTO users (id, first_name, last_name, username, photo_url, notify, lang)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        first_name = excluded.first_name,
        last_name = excluded.last_name,
        username = excluded.username,
        photo_url = COALESCE(excluded.photo_url, users.photo_url),
        notify = MAX(users.notify, excluded.notify),
+       lang = COALESCE(excluded.lang, users.lang),
        updated_at = datetime('now')`,
     u.id,
     u.first_name,
@@ -71,6 +74,7 @@ export function upsertUser(u: TelegramUser, opts: { notify?: boolean } = {}) {
     u.username ?? null,
     u.photo_url ?? null,
     notify ? 1 : 0,
+    u.language_code ? pickLang(u.language_code) : null,
   );
 }
 

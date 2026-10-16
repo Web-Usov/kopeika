@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { api, type InvitePreview } from '../api.ts';
+import { t } from '../i18n.ts';
 import { askNotifyOnce } from '../notify.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, haptic, MainButton } from '../tg.tsx';
-import { ErrorView, Loading, plural, Row, Section } from '../ui.tsx';
+import { ErrorView, Loading, Row, Section } from '../ui.tsx';
 
 export function Join({ code }: { code: string }) {
   const [invite, setInvite] = useState<InvitePreview>();
@@ -59,17 +60,11 @@ export function Join({ code }: { code: string }) {
       <header className="hero">
         <div className="hero-emoji">👋</div>
         <h1>{group.name}</h1>
-        <p className="hint">
-          Вас пригласили в группу · {group.membersCount}{' '}
-          {plural(group.membersCount, 'участник', 'участника', 'участников')}
-        </p>
+        <p className="hint">{t('join.invited', { members: t('common.members', { count: group.membersCount }) })}</p>
       </header>
 
       {unclaimed.length > 0 && (
-        <Section
-          title="Кто вы в этой группе?"
-          footer="Если вас уже добавили по имени, выберите себя: все траты с вашим участием останутся на месте."
-        >
+        <Section title={t('join.whoAreYou')} footer={t('join.whoFooter')}>
           {unclaimed.map((m) => (
             <Row
               key={m.id}
@@ -81,12 +76,12 @@ export function Join({ code }: { code: string }) {
           <Row
             onClick={() => setClaim(null)}
             left={<span className={`radio ${claim === null ? 'on' : ''}`} />}
-            title="Меня нет в списке"
+            title={t('join.notInList')}
           />
         </Section>
       )}
 
-      <MainButton text="Присоединиться" onClick={join} loading={saving} />
+      <MainButton text={t('join.join')} onClick={join} loading={saving} />
     </div>
   );
 }
