@@ -69,7 +69,12 @@ export function attachChat(link: ChatLinkRow, group: GroupRow, userId: number) {
     if (group.chat_id !== null && group.chat_id !== link.chat_id) {
       logActivity(group.id, userId, 'group.chat_unlink', { name: group.chat_title ?? '' });
     }
-    run('UPDATE groups SET chat_id = ?, chat_title = ? WHERE id = ?', link.chat_id, link.chat_title, group.id);
+    run(
+      "UPDATE groups SET chat_id = ?, chat_title = ?, chat_feed = 'each' WHERE id = ?",
+      link.chat_id,
+      link.chat_title,
+      group.id,
+    );
     run("UPDATE chat_links SET used_at = datetime('now') WHERE token = ?", link.token);
     logActivity(group.id, userId, 'group.chat_link', { name: link.chat_title });
   });

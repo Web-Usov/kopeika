@@ -35,15 +35,14 @@ function limited(lines: string[], lang: Lang, max = MAX_LINES): string[] {
 
 const signed = (v: number, currency: string, lang: Lang) => (v > 0 ? '+' : '') + formatMoney(v, currency, lang);
 
-/** Group balance for a chat: total, non-zero balances (biggest first), settlement plan. HTML-escaped. */
-export function balanceText(lang: Lang, g: BalanceInput): string {
+/** Non-zero balances (biggest first) and the settlement plan, or "all settled". HTML-escaped. Shared by /balance and the digest. */
+export function balanceSections(lang: Lang, g: Pick<BalanceInput, 'currency' | 'members' | 'settlements'>): string {
   const t = createT(lang);
   const money = (v: number) => formatMoney(v, g.currency, lang);
-  const head = `💰 <b>${esc(g.groupName)}</b>\n${t('bot.balanceTitle', { total: money(g.totalSpent) })}`;
   const nonZero = g.members
     .filter((m) => m.balance !== 0)
     .sort((a, b) => b.balance - a.balance || a.name.localeCompare(b.name));
-  if (nonZero.length === 0) return `${head}\n\n${t('bot.balanceSettled')}`;
+  if (nonZero.length === 0) return t('bot.balanceSettled');
   const balances = limited(
     nonZero.map((m) => `${esc(m.name)}: ${signed(m.balance, g.currency, lang)}`),
     lang,
@@ -53,10 +52,16 @@ export function balanceText(lang: Lang, g: BalanceInput): string {
     lang,
   );
   return [
-    head,
     `<b>${t('bot.balanceMembers')}</b>\n${balances.join('\n')}`,
     `<b>${t('bot.balanceSettle')}</b>\n${settle.join('\n')}`,
   ].join('\n\n');
+}
+
+/** Group balance for a chat: total, then balanceSections. HTML-escaped. */
+export function balanceText(lang: Lang, g: BalanceInput): string {
+  const t = createT(lang);
+  const head = `💰 <b>${esc(g.groupName)}</b>\n${t('bot.balanceTitle', { total: formatMoney(g.totalSpent, g.currency, lang) })}`;
+  return `${head}\n\n${balanceSections(lang, g)}`;
 }
 
 export interface PrivateBalanceGroup {

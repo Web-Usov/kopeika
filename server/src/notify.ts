@@ -22,6 +22,8 @@ export interface ChangeInput {
   authorName: string;
   /** Member names by id, for the payer. */
   memberNames: Map<number, string>;
+  /** Text for the group chat: no group header and no personal wording ("your share"). */
+  forChat?: boolean;
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -45,7 +47,7 @@ export function buildChangeMessage(i: ChangeInput): string | null {
   const author = esc(i.authorName);
   const { before: a, after: b } = i;
   const name = (id: number) => esc(i.memberNames.get(id) ?? '');
-  const head = (icon: string) => `${icon} <b>${esc(i.groupName)}</b>\n`;
+  const head = (icon: string) => (i.forChat ? `${icon} ` : `${icon} <b>${esc(i.groupName)}</b>\n`);
 
   if (!b) {
     if (a.kind === 'transfer') return head('💸') + t('bot.transferDeleted', { author, amount: money(a.amount) });
@@ -67,7 +69,10 @@ export function buildChangeMessage(i: ChangeInput): string | null {
   const titleChanged = a.title !== b.title;
   const oldShare = shareOf(a, i.recipientMemberId);
   const newShare = shareOf(b, i.recipientMemberId);
-  const shareChanged = oldShare !== newShare;
+  const sharesKey = (e: ExpenseSnap) =>
+    JSON.stringify(e.shares.map((s) => [s.memberId, s.amount]).sort((x, y) => x[0] - y[0]));
+  // In the chat nobody is "you": any change of the split counts.
+  const shareChanged = i.forChat ? sharesKey(a) !== sharesKey(b) : oldShare !== newShare;
   if (!titleChanged && !amountChanged && !payerChanged && !shareChanged) return null; // at most the date
 
   // Title only: one short line, no share.
@@ -79,7 +84,9 @@ export function buildChangeMessage(i: ChangeInput): string | null {
   if (titleChanged) changes.push(t('bot.changeTitle', { from: esc(a.title), to: esc(b.title) }));
   if (amountChanged) changes.push(amountText);
   if (payerChanged) changes.push(t('bot.changePayer', { from: name(a.payerId), to: name(b.payerId) }));
+  if (i.forChat && !titleChanged && !amountChanged && !payerChanged) changes.push(t('bot.changeShares'));
   let text = head('🧾') + t('bot.expenseChanged', { author, title: esc(b.title), changes: changes.join('; ') });
+  if (i.forChat) return text;
   if (newShare) text += `\n${t('bot.yourShare', { amount: money(newShare) })}`;
   else if (oldShare) text += `\n${t('bot.shareRemoved')}`;
   return text;
@@ -102,5 +109,28 @@ export function buildRemindMessage(i: RemindInput): string {
   const amount = formatMoney(i.amount, i.currency, i.lang);
   let text = `💰 <b>${esc(i.groupName)}</b>\n${t('bot.remind', { author: esc(i.authorName), amount })}`;
   if (i.hasPaymentInfo) text += `\n${t('bot.remindPayment')}`;
+  return text;
+}
+
+export interface ChatAddedInput {
+  lang: Lang;
+  currency: string;
+  authorName: string;
+  expense: ExpenseSnap;
+  memberNames: Map<number, string>;
+}
+
+/** Text for the linked chat about a new expense or transfer. Same wording as the personal notification, minus "your share". */
+export function buildChatAddedMessage(i: ChatAddedInput): string {
+  const t = createT(i.lang);
+  const e = i.expense;
+  const money = formatMoney(e.amount, i.currency, i.lang);
+  const author = esc(i.authorName);
+  const name = (id: number | undefined) => esc((id !== undefined && i.memberNames.get(id)) || '');
+  if (e.kind === 'transfer') {
+    return `💸 ${t('bot.chatTransfer', { author, from: name(e.payerId), to: name(e.shares[0]?.memberId), amount: money })}`;
+  }
+  let text = `🧾 ${t('bot.expenseAdded', { author, title: esc(e.title), amount: money })}`;
+  if (e.shares.length > 1) text += ` (${t('bot.chatSplit', { count: e.shares.length })})`;
   return text;
 }
