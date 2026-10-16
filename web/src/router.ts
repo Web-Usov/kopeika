@@ -6,7 +6,8 @@ const subscribe = (cb: () => void) => {
   window.addEventListener('hashchange', cb);
   return () => window.removeEventListener('hashchange', cb);
 };
-const getHash = () => location.hash.slice(1) || '/';
+// Anything that isn't a route (e.g. Telegram's "#tgWebAppData=..." launch params) means the home screen.
+const getHash = () => (location.hash.startsWith('#/') ? location.hash.slice(1) : '/');
 
 export function useLocation() {
   const hash = useSyncExternalStore(subscribe, getHash);
