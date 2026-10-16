@@ -18,7 +18,9 @@ export type ActivityAction =
   | 'expense.create'
   | 'expense.update'
   | 'expense.delete'
-  | 'debt.remind';
+  | 'debt.remind'
+  | 'group.chat_link'
+  | 'group.chat_unlink';
 
 export interface PersonRef {
   id: number;
@@ -64,6 +66,10 @@ export function activityText(lang: Lang, entry: ActivityEntry, currency: string)
       return t(lang, 'activity.groupCreate', { actor, name: p.name ?? '' });
     case 'group.rename':
       return t(lang, 'activity.groupRename', { actor, from: p.from ?? '', to: p.to ?? '' });
+    case 'group.chat_link':
+      return t(lang, 'activity.chatLink', { actor, name: p.name ?? '' });
+    case 'group.chat_unlink':
+      return t(lang, 'activity.chatUnlink', { actor, name: p.name ?? '' });
     case 'member.add':
       return t(lang, 'activity.memberAdd', { actor, name: p.name ?? '' });
     case 'member.rename':

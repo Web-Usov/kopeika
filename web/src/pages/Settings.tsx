@@ -84,6 +84,11 @@ function SettingsView({ g }: { g: GroupDetail }) {
     }
   };
 
+  const unlinkChat = async () => {
+    if (!g.chat || !(await confirmDialog(t('settings.confirmUnlinkChat', { title: g.chat.title })))) return;
+    await run(() => api.unlinkChat(g.id));
+  };
+
   const toggleArchive = async () => {
     if (!g.archived && !(await confirmDialog(t('settings.confirmArchive', { name: g.name })))) return;
     if (await run(() => (g.archived ? api.unarchiveGroup(g.id) : api.archiveGroup(g.id)))) {
@@ -156,6 +161,21 @@ function SettingsView({ g }: { g: GroupDetail }) {
             {t('common.add')}
           </button>
         </div>
+      </Section>
+
+      <Section title={t('settings.chatSection')} footer={g.chat ? t('settings.chatFooter') : undefined}>
+        {g.chat ? (
+          <Row
+            title={t('settings.chatLinked', { title: g.chat.title })}
+            right={
+              <button type="button" className="small-btn" onClick={() => void unlinkChat()}>
+                {t('settings.chatUnlink')}
+              </button>
+            }
+          />
+        ) : (
+          <div className="row hint">{t('settings.chatNone')}</div>
+        )}
       </Section>
 
       <Section title={t('settings.exportSection')} footer={t('settings.exportFooter')}>

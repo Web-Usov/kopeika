@@ -109,6 +109,22 @@ const migrations = [
     PRIMARY KEY (date, currency)
   );
   `,
+  // Linking a group chat to a group: one chat <-> one group. chat_links are one-time tokens (24 h) that the bot
+  // hands out when it is added to a chat; the Mini App exchanges one for groups.chat_id / chat_title.
+  `
+  ALTER TABLE groups ADD COLUMN chat_id INTEGER;
+  ALTER TABLE groups ADD COLUMN chat_title TEXT;
+  CREATE UNIQUE INDEX groups_chat ON groups(chat_id) WHERE chat_id IS NOT NULL;
+  CREATE TABLE chat_links (
+    token           TEXT PRIMARY KEY,
+    chat_id         INTEGER NOT NULL,
+    chat_title      TEXT NOT NULL,
+    created_by_user INTEGER NOT NULL,
+    expires_at      TEXT NOT NULL,   -- UTC, 'YYYY-MM-DD HH:MM:SS'
+    used_at         TEXT
+  );
+  CREATE INDEX chat_links_chat ON chat_links(chat_id);
+  `,
 ];
 
 const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
