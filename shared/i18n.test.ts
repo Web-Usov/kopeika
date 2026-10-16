@@ -84,6 +84,6 @@ test('SplitError carries a key that both dictionaries translate', () => {
   } catch (e) {
     assert.ok(e instanceof SplitError);
     assert.equal(t('ru', e.key), 'Сумма долей не совпадает с общей суммой');
-    assert.equal(t('en', e.key), "The amounts don't add up to the total");
+    assert.equal(t('en', e.key), 'The amounts don’t add up to the total');
   }
 });

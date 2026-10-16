@@ -1,7 +1,6 @@
-import { Fragment, useEffect, useState } from 'react';
-import { groupAchievements } from '../../../shared/achievements.ts';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { type ActivityEntry, activityText } from '../../../shared/activity.ts';
-import { type CategoryId, categoryEmoji, categoryKey, categoryTotals } from '../../../shared/categories.ts';
+import { type CategoryId, type CategoryTotal, categoryEmoji, categoryKey } from '../../../shared/categories.ts';
 import { formatMoney } from '../../../shared/money.ts';
 import {
   type ApiError,
@@ -10,6 +9,7 @@ import {
   forgetGroup,
   type GroupDetail,
   hasPaymentInfo,
+  loadMoreExpenses,
   type Member,
   type PaymentInfo,
   useGroup,
@@ -35,7 +35,7 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
     );
 
   const me = g.members.find((m) => m.id === g.meId)!;
-  const achievementList = groupAchievements(g);
+  const achievementList = g.achievements;
   const unlockedCount = achievementList.filter((a) => a.unlocked).length;
 
   return (
@@ -188,7 +188,42 @@ function ExpensesTab({ g }: { g: GroupDetail }) {
           })}
         </Section>
       ))}
+      {g.hasMoreExpenses && <LoadMore groupId={g.id} />}
     </>
+  );
+}
+
+/** «Показать ещё»: loads the next page of older expenses; also fires by itself when scrolled into view. */
+function LoadMore({ groupId }: { groupId: number }) {
+  const [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLButtonElement>(null);
+  const more = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await loadMoreExpenses(groupId);
+    } catch (e) {
+      await alertDialog((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const latest = useRef(more);
+  latest.current = more;
+  // Re-observed after each page (the button is re-created when the list grows past the viewport).
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) void latest.current();
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [busy]);
+  return (
+    <button type="button" ref={ref} className="text-btn" disabled={busy} onClick={more}>
+      {busy ? t('common.loading') : t('group.showMore')}
+    </button>
   );
 }
 
@@ -239,7 +274,7 @@ function HistoryTab({ g }: { g: GroupDetail }) {
   // Reload when the group changes under us (e.g. a rename), so fresh entries show up.
   useEffect(() => {
     load();
-  }, [g.id, g.expenses.length, g.name, g.members.length]);
+  }, [g.id, g.expensesTotal, g.name, g.members.length]);
 
   if (error && !items) return <ErrorView message={error} />;
   if (!items) return <Loading />;
@@ -348,7 +383,14 @@ function BalancesTab({ g }: { g: GroupDetail }) {
 }
 
 function Stats({ g }: { g: GroupDetail }) {
-  const { group, mine } = categoryTotals(g.expenses, g.meId);
+  // Category totals are computed by the server over all expenses, not from the loaded page.
+  const [totals, setTotals] = useState<{ group: CategoryTotal[]; mine: CategoryTotal[] }>();
+  const stamp = `${g.expensesTotal}:${g.totalSpent}`;
+  useEffect(() => {
+    api.stats(g.id).then(setTotals, () => {});
+  }, [g.id, stamp]);
+  if (!totals) return null;
+  const { group, mine } = totals;
   return (
     <>
       <Section title={`${t('group.statsTitle')} · ${t('group.statsGroup')}`}>

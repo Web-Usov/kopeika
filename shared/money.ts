@@ -10,7 +10,7 @@ export interface SplitInput {
   value: number;
 }
 
-type SplitKey =
+export type SplitKey =
   | 'errors.split.amountPositive'
   | 'errors.split.noParticipants'
   | 'errors.split.duplicateParticipant'
@@ -18,6 +18,10 @@ type SplitKey =
   | 'errors.split.sumMismatch'
   | 'errors.split.sharesInteger'
   | 'errors.split.sharesMissing'
+  | 'errors.receipt.unassigned'
+  | 'errors.receipt.discountTooBig'
+  | 'errors.receipt.badItem'
+  | 'errors.receipt.badAdjustment'
   | 'errors.rate.invalid'
   | 'errors.rate.tooSmall';
 

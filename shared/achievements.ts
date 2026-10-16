@@ -56,50 +56,75 @@ export interface Achievement {
 
 const dayNumber = (iso: string) => Math.floor(Date.parse(`${iso}T00:00:00Z`) / 86_400_000);
 
-export function groupAchievements(detail: AchievementInput): Achievement[] {
-  const spent = detail.expenses.filter((e) => e.kind === 'expense');
-  const count = spent.length;
-  const days = new Set(spent.map((e) => e.spentOn));
-  const categories = new Set(spent.map((e) => e.category).filter((c): c is string => Boolean(c)));
-  const currencies = new Set(spent.map((e) => e.originalCurrency ?? detail.currency));
-  const dayNums = [...days].map(dayNumber);
-  const span = dayNums.length ? Math.max(...dayNums) - Math.min(...dayNums) + 1 : 0;
-  const allZero = detail.members.every((m) => m.balance === 0);
+/** Всё, что нужно правилам. Считается по всем тратам группы: на сервере в SQL, в тестах — из списка трат. */
+export interface AchievementFacts {
+  membersCount: number;
+  allSettled: boolean;
+  /** Обычные траты (без переводов). */
+  expenseCount: number;
+  daysCount: number;
+  /** Дней от самой ранней траты до самой поздней включительно. */
+  spanDays: number;
+  categoriesCount: number;
+  currenciesCount: number;
+}
 
+export function achievementFacts(detail: AchievementInput): AchievementFacts {
+  const spent = detail.expenses.filter((e) => e.kind === 'expense');
+  const days = new Set(spent.map((e) => e.spentOn));
+  const dayNums = [...days].map(dayNumber);
+  return {
+    membersCount: detail.members.length,
+    allSettled: detail.members.every((m) => m.balance === 0),
+    expenseCount: spent.length,
+    daysCount: days.size,
+    spanDays: dayNums.length ? Math.max(...dayNums) - Math.min(...dayNums) + 1 : 0,
+    categoriesCount: new Set(spent.map((e) => e.category).filter((c): c is string => Boolean(c))).size,
+    currenciesCount: new Set(spent.map((e) => e.originalCurrency ?? detail.currency)).size,
+  };
+}
+
+/** Число дней между датами YYYY-MM-DD включительно (для сервера, где известны только min и max). */
+export const spanBetween = (min: string, max: string) => dayNumber(max) - dayNumber(min) + 1;
+
+export function achievementsFromFacts(f: AchievementFacts): Achievement[] {
+  const count = f.expenseCount;
   const counter = (id: AchievementId, current: number, target: number): Achievement =>
     current >= target ? { id, unlocked: true } : { id, unlocked: false, progress: { current, target } };
 
   return [
     counter('first', count, 1),
-    counter('crew', detail.members.length, MIN_CREW),
+    counter('crew', f.membersCount, MIN_CREW),
     counter('ten', count, TARGET_TEN),
     counter('hundred', count, TARGET_HUNDRED),
-    counter('travelers', currencies.size, MIN_CURRENCIES),
-    counter('allCategories', categories.size, MIN_CATEGORIES),
+    counter('travelers', f.currenciesCount, MIN_CURRENCIES),
+    counter('allCategories', f.categoriesCount, MIN_CATEGORIES),
     // «Ни копейки долга»: минимум MIN_CLEAN_EXPENSES трат, и сейчас все в расчёте.
-    count >= MIN_CLEAN_EXPENSES && allZero
+    count >= MIN_CLEAN_EXPENSES && f.allSettled
       ? { id: 'clean', unlocked: true }
       : {
           id: 'clean',
           unlocked: false,
           progress: { current: Math.min(count, MIN_CLEAN_EXPENSES - 1), target: MIN_CLEAN_EXPENSES },
         },
-    counter('week', days.size, WEEK_DAYS),
-    counter('month', span, MONTH_SPAN_DAYS),
+    counter('week', f.daysCount, WEEK_DAYS),
+    counter('month', f.spanDays, MONTH_SPAN_DAYS),
   ];
 }
+
+export const groupAchievements = (detail: AchievementInput): Achievement[] =>
+  achievementsFromFacts(achievementFacts(detail));
 
 export const achievementTitleKey = (id: AchievementId) => `achievements.items.${id}.title` as Key;
 export const achievementTextKey = (id: AchievementId) => `achievements.items.${id}.text` as Key;
 
-/** Какие достижения получены после сохранения и не были получены до. */
+/** Какие достижения получены в `after` и не были получены в `before`. */
+export function newlyUnlockedIn(before: Achievement[], after: Achievement[]): AchievementId[] {
+  const had = new Set(before.filter((a) => a.unlocked).map((a) => a.id));
+  return after.filter((a) => a.unlocked && !had.has(a.id)).map((a) => a.id);
+}
+
+/** То же по данным группы. */
 export function newlyUnlocked(before: AchievementInput, after: AchievementInput): AchievementId[] {
-  const had = new Set(
-    groupAchievements(before)
-      .filter((a) => a.unlocked)
-      .map((a) => a.id),
-  );
-  return groupAchievements(after)
-    .filter((a) => a.unlocked && !had.has(a.id))
-    .map((a) => a.id);
+  return newlyUnlockedIn(groupAchievements(before), groupAchievements(after));
 }
