@@ -19,6 +19,7 @@ import { all, one, run, tx } from './db.ts';
 import { buildCsv, exportFileName } from './export.ts';
 import { deserialize, isEmpty, PaymentInfoError, parsePaymentInfo, serialize } from './paymentInfo.ts';
 import { createRateLimiter } from './rateLimit.ts';
+import { getRate, RatesError } from './rates.ts';
 import {
   displayName,
   type ExpenseRow,
@@ -39,7 +40,7 @@ export const api = new Hono<Env>();
 /** An API error: carries a dictionary key, translated into the request user's language in `onError`. */
 class ApiError extends Error {
   constructor(
-    readonly status: 400 | 401 | 403 | 404 | 409 | 429,
+    readonly status: 400 | 401 | 403 | 404 | 409 | 429 | 503,
     readonly key: Key,
     readonly params?: Params,
   ) {
@@ -52,6 +53,7 @@ const fail = (status: ApiError['status'], key: Key, params?: Params) => new ApiE
 api.onError((err, c) => {
   const t: TFn = createT(c.get('lang') ?? 'ru');
   if (err instanceof ApiError) return c.json({ error: t(err.key, err.params) }, err.status);
+  if (err instanceof RatesError) return c.json({ error: t(err.key) }, err.status);
   if (err instanceof PaymentInfoError) return c.json({ error: t(err.key) }, 400);
   if (err instanceof SplitError) return c.json({ error: t(err.key, err.params) }, 400);
   if (err instanceof z.ZodError) return c.json({ error: t('errors.invalidData'), issues: err.issues }, 400);
@@ -358,6 +360,20 @@ api.post('/invite/:code/join', async (c) => {
     });
   }
   return c.json({ groupId: group.id });
+});
+
+// --- Exchange rates: suggested rate for a foreign-currency expense (the user can still edit it) ---
+api.get('/rates', async (c) => {
+  const q = z
+    .object({
+      base: z.enum(CURRENCIES as [string, ...string[]]),
+      currency: z.enum(CURRENCIES as [string, ...string[]]),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    })
+    .parse(c.req.query());
+  if (q.base === q.currency) throw fail(400, 'errors.rate.sameCurrency');
+  if (Number.isNaN(Date.parse(`${q.date}T00:00:00Z`))) throw fail(400, 'errors.invalidData');
+  return c.json(await getRate(q.base, q.currency, q.date));
 });
 
 // --- Expenses ---
