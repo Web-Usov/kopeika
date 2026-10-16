@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CATEGORIES,
   type CategoryId,
@@ -71,6 +71,13 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
   const [categoryPicked, setCategoryPicked] = useState(Boolean(expense));
   const [saving, setSaving] = useState(false);
 
+  const chipsRef = useRef<HTMLDivElement>(null);
+  // Show the selected category in the scrollable row when the form opens.
+  useEffect(() => {
+    const active = chipsRef.current?.querySelector<HTMLElement>('.chip.active');
+    active?.scrollIntoView?.({ inline: 'nearest', block: 'nearest' });
+  }, []);
+
   const amount = parseAmount(amountStr);
   const update = (id: number, patch: Partial<Participant>) => setParts((p) => ({ ...p, [id]: { ...p[id], ...patch } }));
 
@@ -141,7 +148,19 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
             if (!categoryPicked) setCategory(suggestCategory(e.target.value, lang) ?? DEFAULT_CATEGORY);
           }}
         />
-        <div className="chips">
+        <div className="amount-field">
+          <input
+            className="field amount"
+            inputMode="decimal"
+            placeholder="0"
+            value={amountStr}
+            onChange={(e) => setAmountStr(e.target.value)}
+          />
+          <span className="currency">{g.currency}</span>
+        </div>
+        {amountStr && amount === null && <div className="field-error">{t('expense.amountError')}</div>}
+        <div className="chips-caption">{t('expense.categorySection')}</div>
+        <div className="chips" ref={chipsRef}>
           {CATEGORIES.map((c) => (
             <button
               key={c.id}
@@ -154,21 +173,11 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
                 setCategoryPicked(true);
               }}
             >
-              <span aria-hidden="true">{c.emoji}</span> {t(categoryKey(c.id))}
+              <span aria-hidden="true">{c.emoji}</span>
+              {t(categoryKey(c.id))}
             </button>
           ))}
         </div>
-        <div className="amount-field">
-          <input
-            className="field amount"
-            inputMode="decimal"
-            placeholder="0"
-            value={amountStr}
-            onChange={(e) => setAmountStr(e.target.value)}
-          />
-          <span className="currency">{g.currency}</span>
-        </div>
-        {amountStr && amount === null && <div className="field-error">{t('expense.amountError')}</div>}
       </Section>
 
       <Section title={t('expense.whoPaid')}>
