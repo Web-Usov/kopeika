@@ -1,7 +1,7 @@
+import './test-env.ts';
 import assert from 'node:assert/strict';
 import { before, test } from 'node:test';
 
-process.env.DB_PATH = ':memory:';
 delete process.env.BOT_TOKEN;
 
 let d: typeof import('./digest.ts');
@@ -57,14 +57,14 @@ test('digest: only edits, and everyone settled', () => {
   assert.ok(!ru.includes('Балансы'));
 });
 
-test('digest: lists are cut at 10 lines with "and N more"', () => {
+test('digest: lists are cut at 15 lines (shared with /balance) with "and N more"', () => {
   const balances = Array.from({ length: 25 }, (_, i) => ({ name: `P${i}`, balance: (i % 2 ? -1 : 1) * 100 * (i + 1) }));
-  const settlements = Array.from({ length: 12 }, (_, i) => ({ from: `A${i}`, to: `B${i}`, amount: 100 }));
+  const settlements = Array.from({ length: 20 }, (_, i) => ({ from: `A${i}`, to: `B${i}`, amount: 100 }));
   const lines = d.buildDigest({ ...input, lang: 'ru', balances, settlements }).split('\n');
-  assert.ok(lines.includes('и ещё 15'));
-  assert.ok(lines.includes('и ещё 2'));
-  assert.equal(lines.filter((l) => l.startsWith('A')).length, 10);
-  assert.ok(d.buildDigest({ ...input, lang: 'en', balances, settlements }).includes('and 15 more'));
+  assert.ok(lines.includes('и ещё 10'));
+  assert.ok(lines.includes('и ещё 5'));
+  assert.equal(lines.filter((l) => l.startsWith('A')).length, 15);
+  assert.ok(d.buildDigest({ ...input, lang: 'en', balances, settlements }).includes('and 10 more'));
 });
 
 test('isDigestDue: from the configured hour, once per local day', () => {

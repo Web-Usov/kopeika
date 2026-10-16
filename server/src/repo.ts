@@ -190,17 +190,13 @@ export function groupDetail(group: GroupRow, me: MemberRow, inviteLink: string |
   };
 }
 
-/** Current balances and the settlement plan of a group, by member name (for the chat digest). */
-export function balanceView(groupId: number) {
-  const { members, balances } = loadLedger(groupId);
-  const names = new Map(members.map((m) => [m.id, m.name]));
+/** Everything a chat message needs about a group's balances; no viewer, so it works for people who aren't members. */
+export function groupBalanceSnapshot(group: GroupRow) {
+  const { members, expenses, balances } = loadLedger(group.id);
   return {
-    balances: members.map((m) => ({ name: m.name, balance: balances.get(m.id) ?? 0 })),
-    settlements: settleUp(balances).map((s) => ({
-      from: names.get(s.from) ?? '',
-      to: names.get(s.to) ?? '',
-      amount: s.amount,
-    })),
+    totalSpent: expenses.filter((e) => e.kind === 'expense').reduce((a, e) => a + e.amount, 0),
+    members: members.map((m) => ({ id: m.id, name: m.name, balance: balances.get(m.id) ?? 0 })),
+    settlements: settleUp(balances),
   };
 }
 

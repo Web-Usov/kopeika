@@ -371,8 +371,33 @@ export const ru = {
       many: '{count} трат на {amount}',
     },
     digestChanged: 'траты менялись',
-    digestBalances: 'Балансы',
-    digestMore: 'и ещё {count}',
+    balanceTitle: 'Всего потрачено: {total}',
+    balanceMembers: 'Балансы',
+    balanceSettle: 'Как рассчитаться',
+    balanceSettleLine: '{from} → {to}: {amount}',
+    balanceSettled: 'Все в расчёте 🎉',
+    balanceMore: 'и ещё {count}',
+    balanceUnlinked:
+      'Этот чат не привязан к группе. Привяжите его — и здесь можно будет смотреть балансы командой /balance.',
+    balanceUnlinkedNoButton: 'Этот чат не привязан к группе, а привязка сейчас недоступна.',
+    balancePrivateTitle: 'Ваши балансы по группам',
+    balancePrivateEmpty: 'У вас пока нет групп. Откройте Копейку и создайте первую.',
+    balancePrivateSettled: 'в расчёте',
+    helpPrivate:
+      'Я Копейка — помогаю делить общие траты.\n\n' +
+      '/balance — ваши балансы по группам\n' +
+      '/help — эта подсказка\n\n' +
+      'Группы, траты и переводы — в приложении. Я пришлю уведомление, когда кто-то добавит трату с вашим участием.',
+    helpGroup:
+      'Я Копейка — помогаю делить общие траты.\n\n' +
+      '/balance — кто кому сколько должен\n' +
+      '/unlink — отвязать чат от группы (для администраторов)\n' +
+      '/help — эта подсказка\n\n' +
+      'Чтобы привязать чат к группе, откройте группу в приложении.',
+    commandStart: 'Начать',
+    commandHelp: 'Что умеет бот',
+    commandBalance: 'Кто кому должен',
+    commandUnlink: 'Отвязать чат от группы',
   },
   dev: {
     userName: 'Тестер {id}',

@@ -4,11 +4,13 @@ import { formatMoney } from '../../shared/money.ts';
 import {
   type ChatMessage,
   createChatLink,
+  groupOfChat,
   linkedMessage,
   migrateChat,
   unlinkChat,
   welcomeMessage,
 } from './chatLink.ts';
+import { balanceText, esc, helpText, privateBalanceText } from './chatText.ts';
 import { config } from './config.ts';
 import { all, one, run } from './db.ts';
 import {
@@ -18,7 +20,7 @@ import {
   changeAudience,
   type ExpenseSnap,
 } from './notify.ts';
-import { type ExpenseRow, type GroupRow, upsertUser } from './repo.ts';
+import { type ExpenseRow, type GroupRow, groupBalanceSnapshot, groupsForUser, upsertUser } from './repo.ts';
 
 export const bot = config.botToken
   ? new Bot(config.botToken, {
@@ -131,6 +133,53 @@ function registerChatHandlers(b: Bot) {
     migrateChat(ctx.chat.id, ctx.message.migrate_to_chat_id);
   });
 
+  b.command('help', async (ctx) => {
+    const lang = pickLang(ctx.from?.language_code);
+    await ctx.reply(helpText(lang, isGroupChat(ctx.chat.type)));
+  });
+
+  b.command('balance', async (ctx) => {
+    if (!ctx.from) return;
+    upsertUser(ctx.from);
+    const lang = pickLang(ctx.from.language_code);
+    const t = createT(lang);
+    const html = { parse_mode: 'HTML' as const, link_preview_options: { is_disabled: true } };
+    if (ctx.chat.type === 'private') {
+      const groups = groupsForUser(ctx.from.id).filter((g) => !g.archived);
+      const keyboard = config.appUrl ? new InlineKeyboard().webApp(t('bot.openApp'), config.appUrl) : undefined;
+      await ctx.reply(privateBalanceText(lang, groups), { ...html, reply_markup: keyboard });
+      return;
+    }
+    if (!isGroupChat(ctx.chat.type)) return;
+    const chat: { id: number; title?: string } = ctx.chat;
+    const group = groupOfChat(chat.id);
+    if (!group) {
+      const token = createChatLink(chat.id, chat.title ?? String(chat.id), ctx.from.id);
+      const url = appLink(`link_${token}`);
+      const text = t(url ? 'bot.balanceUnlinked' : 'bot.balanceUnlinkedNoButton');
+      await ctx.reply(text, { reply_markup: url ? new InlineKeyboard().url(t('bot.chatLinkButton'), url) : undefined });
+      return;
+    }
+    const snap = groupBalanceSnapshot(group);
+    const names = new Map(snap.members.map((m) => [m.id, m.name]));
+    const text = balanceText(lang, {
+      groupName: group.name,
+      currency: group.currency,
+      totalSpent: snap.totalSpent,
+      members: snap.members,
+      settlements: snap.settlements.map((s) => ({
+        from: names.get(s.from) ?? '',
+        to: names.get(s.to) ?? '',
+        amount: s.amount,
+      })),
+    });
+    const url = appLink(group.invite_code);
+    await ctx.reply(text, {
+      ...html,
+      reply_markup: url ? new InlineKeyboard().url(t('bot.openGroup'), url) : undefined,
+    });
+  });
+
   b.command('unlink', async (ctx) => {
     if (!ctx.from || !isGroupChat(ctx.chat.type)) return;
     const t = createT(pickLang(ctx.from.language_code));
@@ -164,6 +213,38 @@ async function setupBotProfile(b: Bot) {
       .catch((e) => console.warn('setChatMenuButton failed', e instanceof Error ? e.message : e));
   }
   await setBotProfile();
+  await setBotCommands(b);
+}
+
+/** Command menu per scope and language; no code = default for every other language. Best-effort. */
+async function setBotCommands(b: Bot) {
+  const variants: [lang: Lang, code?: 'ru' | 'en'][] = [['ru', 'ru'], ['en', 'en'], ['en']];
+  for (const [lang, language_code] of variants) {
+    const t = createT(lang);
+    const lists = [
+      {
+        type: 'all_private_chats' as const,
+        commands: [
+          { command: 'start', description: t('bot.commandStart') },
+          { command: 'help', description: t('bot.commandHelp') },
+          { command: 'balance', description: t('bot.commandBalance') },
+        ],
+      },
+      {
+        type: 'all_group_chats' as const,
+        commands: [
+          { command: 'balance', description: t('bot.commandBalance') },
+          { command: 'help', description: t('bot.commandHelp') },
+          { command: 'unlink', description: t('bot.commandUnlink') },
+        ],
+      },
+    ];
+    for (const { type, commands } of lists) {
+      await b.api
+        .setMyCommands(commands, { scope: { type }, ...(language_code && { language_code }) })
+        .catch((e) => console.warn('setMyCommands failed', e instanceof Error ? e.message : e));
+    }
+  }
 }
 
 /** Bot description and short description in both languages; no code = default for every other language. */
@@ -179,8 +260,6 @@ async function setBotProfile() {
       .catch((e) => console.warn('setMyShortDescription failed', e));
   }
 }
-
-const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 async function send(userId: number, text: string, group: GroupRow, lang: Lang) {
   if (!bot || !botReady) return;

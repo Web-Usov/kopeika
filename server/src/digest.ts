@@ -2,15 +2,13 @@ import { createT, type Lang, pickLang } from '../../shared/i18n/index.ts';
 import { formatMoney } from '../../shared/money.ts';
 import { appLink, sendToChat } from './bot.ts';
 import type { ChatMessage } from './chatLink.ts';
+import { balanceSections, esc } from './chatText.ts';
 import { config } from './config.ts';
 import { all, one, run } from './db.ts';
-import { balanceView, type GroupRow } from './repo.ts';
+import { type GroupRow, groupBalanceSnapshot } from './repo.ts';
 
 const CHECK_EVERY_MS = 60 * 60 * 1000;
-/** Max lines in each list of the digest (balances, settlements); the rest is "and N more". */
-export const DIGEST_MAX_LINES = 10;
 
-const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const pad = (n: number) => String(n).padStart(2, '0');
 
 /** Server-local calendar day, YYYY-MM-DD. */
@@ -44,33 +42,28 @@ export interface DigestInput {
   settlements: { from: string; to: string; amount: number }[];
 }
 
-/** Text of the daily digest (HTML). Lists are cut at DIGEST_MAX_LINES with "and N more". */
+/** Text of the daily digest (HTML). Balance lists are the same as in /balance (chatText.ts). */
 export function buildDigest(i: DigestInput): string {
   const t = createT(i.lang);
   const money = (v: number) => formatMoney(v, i.currency, i.lang);
   const summary =
     i.newCount > 0 ? t('bot.digestExpenses', { count: i.newCount, amount: money(i.newTotal) }) : t('bot.digestChanged');
-  const lines = [`📊 <b>${t('bot.digestHead', { name: esc(i.groupName) })}</b>: ${summary}`];
+  const head = `📊 <b>${t('bot.digestHead', { name: esc(i.groupName) })}</b>: ${summary}`;
+  return `${head}\n\n${balanceSections(i.lang, { currency: i.currency, members: i.balances, settlements: i.settlements })}`;
+}
 
-  const list = (title: string, rows: string[]) => {
-    lines.push('', `<b>${title}</b>`, ...rows.slice(0, DIGEST_MAX_LINES));
-    if (rows.length > DIGEST_MAX_LINES) lines.push(t('bot.digestMore', { count: rows.length - DIGEST_MAX_LINES }));
+/** Balances and the settlement plan with member names, as the digest text wants them. */
+function digestBalances(g: GroupRow) {
+  const snap = groupBalanceSnapshot(g);
+  const names = new Map(snap.members.map((m) => [m.id, m.name]));
+  return {
+    balances: snap.members,
+    settlements: snap.settlements.map((s) => ({
+      from: names.get(s.from) ?? '',
+      to: names.get(s.to) ?? '',
+      amount: s.amount,
+    })),
   };
-
-  const open = i.balances.filter((b) => b.balance !== 0).sort((a, b) => b.balance - a.balance);
-  if (open.length === 0) {
-    lines.push('', t('group.allSettled'));
-  } else {
-    list(
-      t('bot.digestBalances'),
-      open.map((b) => `${esc(b.name)}: ${b.balance > 0 ? '+' : ''}${money(b.balance)}`),
-    );
-    list(
-      t('group.howToSettle'),
-      i.settlements.map((s) => `${esc(s.from)} → ${esc(s.to)}: ${money(s.amount)}`),
-    );
-  }
-  return lines.join('\n');
 }
 
 /** Resolves true when the message went out. */
@@ -111,7 +104,7 @@ export async function runDigests(
       currency: g.currency,
       newCount: added?.n ?? 0,
       newTotal: added?.total ?? 0,
-      ...balanceView(g.id),
+      ...digestBalances(g),
     });
     run('UPDATE groups SET last_digest_date = ?, last_digest_at = ? WHERE id = ?', localDate(now), sqlTime(now), g.id);
     const url = link(g.invite_code);

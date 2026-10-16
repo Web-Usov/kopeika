@@ -3,6 +3,13 @@ import path from 'node:path';
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 import { config } from './config.ts';
 
+// `node --test` children have NODE_TEST_CONTEXT; a test without its own DB_PATH would write to data/kopeika.db.
+if (process.env.NODE_TEST_CONTEXT && !process.env.DB_PATH) {
+  throw new Error(
+    "В тестах задайте DB_PATH (например ':memory:') до импорта db.ts: импортируйте './test-env.ts' первым.",
+  );
+}
+
 fs.mkdirSync(path.dirname(config.dbPath), { recursive: true });
 
 export const db = new DatabaseSync(config.dbPath);
