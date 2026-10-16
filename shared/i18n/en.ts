@@ -493,6 +493,8 @@ export const en: Dict = {
     chatLinkInvalid: 'This chat link is not valid',
     chatLinkExpired: 'This chat link has expired. Add the bot to the chat again.',
     chatLinkUsed: 'This chat link has already been used',
+    chatLinkNotAdmin: 'Only a chat admin can link the chat',
+    botUnavailable: 'The bot is unavailable right now. Try again in a moment.',
     chatNotLinked: 'No chat is linked to this group',
     memberTaken: 'This member has already been claimed',
     foreignMember: "This member isn't in the group",

@@ -7,12 +7,15 @@ delete process.env.BOT_TOKEN;
 
 let api: typeof import('./api.ts').api;
 let chatLink: typeof import('./chatLink.ts');
+let db: typeof import('./db.ts');
 let auth: typeof import('./auth.ts');
 let createApp: typeof import('./app.ts').createApp;
 before(async () => {
   ({ api } = await import('./api.ts'));
   chatLink = await import('./chatLink.ts');
   auth = await import('./auth.ts');
+  db = await import('./db.ts');
+  (await import('./bot.ts')).setBotTestHooks({ chatMember: async () => 'administrator' });
   ({ createApp } = await import('./app.ts'));
 });
 
@@ -168,7 +171,15 @@ test('spare tokens of a chat die when one of them is used', async () => {
   const attacker = nextUser++;
   const chatId = nextChat--;
   const t1 = chatLink.createChatLink(chatId, 'Чат', u);
-  const t2 = chatLink.createChatLink(chatId, 'Чат', u);
+  // Repeated requests reuse the token; a second one is only possible once the first expires (here: made by hand).
+  assert.equal(chatLink.createChatLink(chatId, 'Чат', u), t1);
+  const t2 = 'spare-token-of-the-same-chat';
+  db.run(
+    "INSERT INTO chat_links (token, chat_id, chat_title, created_by_user, expires_at) VALUES (?, ?, 'Чат', ?, datetime('now', '+1 hour'))",
+    t2,
+    chatId,
+    u,
+  );
   const mine = await group(u);
   assert.equal((await call(u, 'POST', `/chat-links/${t1}/attach`, { groupId: mine.id })).status, 200);
   const theirs = await group(attacker);
