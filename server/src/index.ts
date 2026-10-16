@@ -3,6 +3,7 @@ import { createApp } from './app.ts';
 import { startBackupSchedule } from './backup.ts';
 import { startBot } from './bot.ts';
 import { config } from './config.ts';
+import { startRecurringSchedule } from './recurring.ts';
 import { version } from './version.ts';
 
 const app = createApp(config.staticDir);
@@ -16,3 +17,5 @@ serve({ fetch: app.fetch, port: config.port }, (info) => console.log(`Kopeika ${
 startBot();
 
 startBackupSchedule();
+
+startRecurringSchedule();

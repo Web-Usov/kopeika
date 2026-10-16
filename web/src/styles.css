@@ -724,6 +724,11 @@ select.field {
   opacity: 0.5;
 }
 
+/* Подзаголовок, который может переноситься (например, расписание регулярной траты). */
+.row.wrap .row-subtitle {
+  white-space: normal;
+}
+
 /* --- Celebration overlay ("all settled up") --- */
 .celebration {
   position: fixed;
