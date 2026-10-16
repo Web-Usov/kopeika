@@ -3,6 +3,7 @@ import { pickLang } from '../../shared/i18n/index.ts';
 import { computeBalances, type LedgerEntry, type SplitMode, settleUp } from '../../shared/money.ts';
 import type { TelegramUser } from './auth.ts';
 import { all, one, run } from './db.ts';
+import { deserialize } from './paymentInfo.ts';
 
 export interface UserRow {
   id: number;
@@ -12,6 +13,7 @@ export interface UserRow {
   photo_url: string | null;
   notify: number;
   lang: string | null;
+  payment_info: string | null;
 }
 
 export interface GroupRow {
@@ -28,6 +30,7 @@ export interface MemberRow {
   group_id: number;
   user_id: number | null;
   name: string;
+  payment_info: string | null;
 }
 
 export interface ExpenseRow {
@@ -39,6 +42,7 @@ export interface ExpenseRow {
   payer_id: number;
   split_mode: SplitMode;
   spent_on: string;
+  category: string;
   created_by: number;
   created_at: string;
 }
@@ -87,8 +91,10 @@ export function findMembership(groupId: number, userId: number) {
 }
 
 function loadLedger(groupId: number) {
-  const members = all<MemberRow & { username: string | null; photo_url: string | null }>(
-    `SELECT m.*, u.username, u.photo_url FROM members m LEFT JOIN users u ON u.id = m.user_id
+  const members = all<
+    MemberRow & { username: string | null; photo_url: string | null; user_payment_info: string | null }
+  >(
+    `SELECT m.*, u.username, u.photo_url, u.payment_info AS user_payment_info FROM members m LEFT JOIN users u ON u.id = m.user_id
      WHERE m.group_id = ? ORDER BY m.id`,
     groupId,
   );
@@ -135,6 +141,8 @@ export function groupDetail(group: GroupRow, me: MemberRow, inviteLink: string |
       userId: m.user_id,
       username: m.username,
       photoUrl: m.photo_url,
+      // Only ever returned to members of this group (loadGroupFor guards every caller).
+      paymentInfo: deserialize(m.user_id === null ? m.payment_info : m.user_payment_info),
       balance: balances.get(m.id) ?? 0,
     })),
     expenses: expenses.map((e) => ({
@@ -145,6 +153,7 @@ export function groupDetail(group: GroupRow, me: MemberRow, inviteLink: string |
       payerId: e.payer_id,
       splitMode: e.split_mode,
       spentOn: e.spent_on,
+      category: e.kind === 'expense' ? e.category : null,
       createdAt: e.created_at,
       shares: (sharesByExpense.get(e.id) ?? []).map((s) => ({
         memberId: s.member_id,

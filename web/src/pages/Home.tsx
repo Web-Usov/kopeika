@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { api, useGroups } from '../api.ts';
+import { api, hasPaymentInfo, type PaymentInfo, useGroups } from '../api.ts';
 import { rich, t } from '../i18n.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, inTelegram, MainButton, requestWriteAccess } from '../tg.tsx';
 import { ErrorView, Loading, Money, Row, Section } from '../ui.tsx';
+import { PaymentForm } from './PaymentForm.tsx';
 
 export function Home() {
   const { data: groups, error } = useGroups();
@@ -48,6 +49,8 @@ export function Home() {
         </Section>
       )}
 
+      {groups && <MyPaymentInfo />}
+
       {groups && <NotifySetting />}
 
       <p className="app-version">{t('common.version', { version: __APP_VERSION__ })}</p>
@@ -81,5 +84,41 @@ function NotifySetting() {
     <Section footer={t('home.notifyFooter')}>
       <Row title={t('home.notifyTitle')} onClick={toggle} right={<span className={`switch ${notify ? 'on' : ''}`} />} />
     </Section>
+  );
+}
+
+function MyPaymentInfo() {
+  const [info, setInfo] = useState<PaymentInfo>();
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    api.myPaymentInfo().then(setInfo, () => {});
+  }, []);
+  if (!info) return null;
+
+  if (!open)
+    return (
+      <Section footer={t('payment.myFooter')}>
+        <Row
+          title={t('payment.mySection')}
+          onClick={() => setOpen(true)}
+          right={
+            <span className="hint">
+              {hasPaymentInfo(info) ? t('payment.mySummaryFilled') : t('payment.mySummaryEmpty')} ›
+            </span>
+          }
+        />
+      </Section>
+    );
+  return (
+    <PaymentForm
+      title={t('payment.mySection')}
+      footer={t('payment.myFooter')}
+      initial={info}
+      onSave={async (next) => {
+        const saved = await api.setMyPaymentInfo(next);
+        setInfo(saved);
+        return saved;
+      }}
+    />
   );
 }

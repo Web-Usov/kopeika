@@ -1,11 +1,13 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
+import { CATEGORY_IDS, DEFAULT_CATEGORY } from '../../shared/categories.ts';
 import { createT, type Key, type Lang, type Params, pickLang, type TFn } from '../../shared/i18n/index.ts';
 import { CURRENCIES, computeShares, SplitError } from '../../shared/money.ts';
 import { type TelegramUser, validateInitData } from './auth.ts';
-import { appLink, notifyExpense } from './bot.ts';
+import { appLink, loadExpenseSnap, notifyExpense, notifyExpenseChange } from './bot.ts';
 import { config } from './config.ts';
 import { all, one, run, tx } from './db.ts';
+import { deserialize, PaymentInfoError, parsePaymentInfo, serialize } from './paymentInfo.ts';
 import { createRateLimiter } from './rateLimit.ts';
 import {
   displayName,
@@ -40,6 +42,7 @@ const fail = (status: ApiError['status'], key: Key, params?: Params) => new ApiE
 api.onError((err, c) => {
   const t: TFn = createT(c.get('lang') ?? 'ru');
   if (err instanceof ApiError) return c.json({ error: t(err.key, err.params) }, err.status);
+  if (err instanceof PaymentInfoError) return c.json({ error: t(err.key) }, 400);
   if (err instanceof SplitError) return c.json({ error: t(err.key, err.params) }, 400);
   if (err instanceof z.ZodError) return c.json({ error: t('errors.invalidData'), issues: err.issues }, 400);
   console.error(err);
@@ -103,6 +106,27 @@ api.put('/me', async (c) => {
   const body = z.object({ notify: z.boolean() }).parse(await c.req.json());
   run('UPDATE users SET notify = ? WHERE id = ?', body.notify ? 1 : 0, c.get('user').id);
   return c.json({ ok: true });
+});
+
+const paymentInfoBody = z
+  .object({
+    phone: z.string().max(40).optional(),
+    bank: z.string().max(500).optional(),
+    card: z.string().max(40).optional(),
+    link: z.string().max(1000).optional(),
+    note: z.string().max(1000).optional(),
+  })
+  .strict();
+
+api.get('/me/payment-info', (c) => {
+  const u = one<UserRow>('SELECT * FROM users WHERE id = ?', c.get('user').id)!;
+  return c.json(deserialize(u.payment_info));
+});
+
+api.put('/me/payment-info', async (c) => {
+  const info = parsePaymentInfo(paymentInfoBody.parse(await c.req.json()));
+  run('UPDATE users SET payment_info = ? WHERE id = ?', serialize(info), c.get('user').id);
+  return c.json(info);
 });
 
 // --- Groups ---
@@ -169,14 +193,20 @@ api.post('/groups/:id/members', async (c) => {
 
 api.patch('/groups/:id/members/:memberId', async (c) => {
   const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
-  const body = z.object({ name }).parse(await c.req.json());
-  const res = run(
-    'UPDATE members SET name = ? WHERE id = ? AND group_id = ?',
-    body.name,
-    idParam(c.req.param('memberId')),
-    group.id,
-  );
-  if (res.changes === 0) throw fail(404, 'errors.memberNotFound');
+  const body = z
+    .object({ name: name.optional(), paymentInfo: paymentInfoBody.optional() })
+    .refine((b) => b.name !== undefined || b.paymentInfo !== undefined)
+    .parse(await c.req.json());
+  const memberId = idParam(c.req.param('memberId'));
+  const member = one<MemberRow>('SELECT * FROM members WHERE id = ? AND group_id = ?', memberId, group.id);
+  if (!member) throw fail(404, 'errors.memberNotFound');
+  // People with Telegram edit their own payment details on the home screen, not through the group.
+  if (body.paymentInfo && member.user_id !== null) throw fail(409, 'errors.paymentInfoTelegram');
+  const info = body.paymentInfo && parsePaymentInfo(body.paymentInfo);
+  tx(() => {
+    if (body.name !== undefined) run('UPDATE members SET name = ? WHERE id = ?', body.name, memberId);
+    if (info) run('UPDATE members SET payment_info = ? WHERE id = ?', serialize(info), memberId);
+  });
   return c.json(detail(group, me));
 });
 
@@ -239,6 +269,7 @@ const expenseBody = z.object({
   payerId: z.number().int().positive(),
   splitMode: z.enum(['equal', 'shares', 'exact']),
   spentOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  category: z.enum(CATEGORY_IDS).optional(),
   shares: z
     .array(z.object({ memberId: z.number().int().positive(), value: z.number().int().min(0) }))
     .min(1)
@@ -256,6 +287,7 @@ function validateExpense(groupId: number, body: ExpenseBody, lang: Lang) {
     body.splitMode = 'exact';
     body.shares[0].value = body.amount;
     body.title ||= createT(lang)('transfer.defaultTitle');
+    body.category = DEFAULT_CATEGORY;
   } else if (!body.title) {
     throw fail(400, 'errors.titleRequired');
   }
@@ -282,8 +314,8 @@ api.post('/groups/:id/expenses', async (c) => {
   const computed = validateExpense(group.id, body, c.get('lang'));
   const expense = tx(() => {
     const res = run(
-      `INSERT INTO expenses (group_id, kind, title, amount, payer_id, split_mode, spent_on, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO expenses (group_id, kind, title, amount, payer_id, split_mode, spent_on, category, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       group.id,
       body.kind,
       body.title,
@@ -291,6 +323,7 @@ api.post('/groups/:id/expenses', async (c) => {
       body.payerId,
       body.splitMode,
       body.spentOn,
+      body.category ?? DEFAULT_CATEGORY,
       user.id,
     );
     const id = Number(res.lastInsertRowid);
@@ -309,25 +342,34 @@ api.put('/groups/:id/expenses/:expenseId', async (c) => {
   const body = expenseBody.parse(await c.req.json());
   body.kind = existing.kind;
   const computed = validateExpense(group.id, body, c.get('lang'));
+  const before = loadExpenseSnap(expenseId);
   tx(() => {
     run(
-      `UPDATE expenses SET title = ?, amount = ?, payer_id = ?, split_mode = ?, spent_on = ?, updated_at = datetime('now')
+      `UPDATE expenses SET title = ?, amount = ?, payer_id = ?, split_mode = ?, spent_on = ?, category = ?, updated_at = datetime('now')
        WHERE id = ?`,
       body.title,
       body.amount,
       body.payerId,
       body.splitMode,
       body.spentOn,
+      body.kind === 'transfer' ? DEFAULT_CATEGORY : (body.category ?? existing.category),
       expenseId,
     );
     saveShares(expenseId, body, computed);
   });
+  const after = loadExpenseSnap(expenseId);
+  if (before && after) notifyExpenseChange(group, before, after, c.get('user').id, me.name);
   return c.json(detail(group, me));
 });
 
 api.delete('/groups/:id/expenses/:expenseId', (c) => {
   const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
-  const res = run('DELETE FROM expenses WHERE id = ? AND group_id = ?', idParam(c.req.param('expenseId')), group.id);
+  const expenseId = idParam(c.req.param('expenseId'));
+  const before = one<{ id: number }>('SELECT id FROM expenses WHERE id = ? AND group_id = ?', expenseId, group.id)
+    ? loadExpenseSnap(expenseId)
+    : null;
+  const res = run('DELETE FROM expenses WHERE id = ? AND group_id = ?', expenseId, group.id);
   if (res.changes === 0) throw fail(404, 'errors.expenseNotFound');
+  if (before) notifyExpenseChange(group, before, null, c.get('user').id, me.name);
   return c.json(detail(group, me));
 });

@@ -1,7 +1,18 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import type { CategoryId } from '../../shared/categories.ts';
 import type { SplitMode } from '../../shared/money.ts';
 import { lang, t } from './i18n.ts';
 import { authHeader, inTelegram } from './tg.tsx';
+
+export interface PaymentInfo {
+  phone?: string;
+  bank?: string;
+  card?: string;
+  link?: string;
+  note?: string;
+}
+
+export const hasPaymentInfo = (p: PaymentInfo | undefined) => Boolean(p && Object.keys(p).length > 0);
 
 export interface Member {
   id: number;
@@ -10,6 +21,7 @@ export interface Member {
   username: string | null;
   photoUrl: string | null;
   balance: number;
+  paymentInfo: PaymentInfo;
 }
 
 export interface Expense {
@@ -20,6 +32,8 @@ export interface Expense {
   payerId: number;
   splitMode: SplitMode;
   spentOn: string;
+  /** null for transfers */
+  category: CategoryId | null;
   createdAt: string;
   shares: { memberId: number; input: number; amount: number }[];
 }
@@ -60,6 +74,7 @@ export interface ExpenseInput {
   payerId: number;
   splitMode: SplitMode;
   spentOn: string;
+  category?: CategoryId;
   shares: { memberId: number; value: number }[];
 }
 
@@ -137,6 +152,10 @@ export function useGroups() {
 
 export const api = {
   me: () => request<{ id: number; name: string; notify: boolean }>('GET', '/me'),
+  myPaymentInfo: () => request<PaymentInfo>('GET', '/me/payment-info'),
+  setMyPaymentInfo: (info: PaymentInfo) => request<PaymentInfo>('PUT', '/me/payment-info', info),
+  setMemberPaymentInfo: (id: number, memberId: number, paymentInfo: PaymentInfo) =>
+    request<GroupDetail>('PATCH', `/groups/${id}/members/${memberId}`, { paymentInfo }),
   setNotify: (notify: boolean) => request('PUT', '/me', { notify }),
   createGroup: (body: { name: string; currency: string; memberNames: string[] }) =>
     request<GroupDetail>('POST', '/groups', body),

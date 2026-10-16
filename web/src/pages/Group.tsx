@@ -1,7 +1,9 @@
-import { type Expense, type GroupDetail, useGroup } from '../api.ts';
+import { Fragment, useState } from 'react';
+import { type CategoryId, categoryEmoji, categoryKey, categoryTotals } from '../../../shared/categories.ts';
+import { type Expense, type GroupDetail, hasPaymentInfo, type Member, type PaymentInfo, useGroup } from '../api.ts';
 import { rich, t } from '../i18n.ts';
 import { navigate } from '../router.ts';
-import { BackButton, haptic, MainButton, shareLink } from '../tg.tsx';
+import { BackButton, copyText, haptic, MainButton, openLink, shareLink } from '../tg.tsx';
 import { Avatar, ErrorView, formatDay, Loading, Money, Row, Section, Segmented } from '../ui.tsx';
 
 type Tab = 'expenses' | 'balances';
@@ -112,7 +114,7 @@ function ExpensesTab({ g }: { g: GroupDetail }) {
               <Row
                 key={e.id}
                 onClick={() => navigate(`/g/${g.id}/expense/${e.id}`)}
-                left={<span className="expense-icon">🧾</span>}
+                left={<span className="expense-icon">{categoryEmoji(e.category ?? 'other')}</span>}
                 title={e.title}
                 subtitle={paidByMe ? t('group.paidByMe') : t('group.paidBy', { name: name(e.payerId) })}
                 right={
@@ -171,24 +173,26 @@ function BalancesTab({ g }: { g: GroupDetail }) {
           <div className="row hint">{t('group.allSettled')}</div>
         ) : (
           g.settlements.map((s) => (
-            <Row
-              key={`${s.from}-${s.to}`}
-              title={
-                <>
-                  {label(s.from)} → {label(s.to)}
-                </>
-              }
-              subtitle={<Money value={s.amount} currency={g.currency} />}
-              right={
-                <button
-                  type="button"
-                  className="small-btn"
-                  onClick={() => navigate(`/g/${g.id}/transfer/new?from=${s.from}&to=${s.to}&amount=${s.amount}`)}
-                >
-                  {t('group.returned')}
-                </button>
-              }
-            />
+            <Fragment key={`${s.from}-${s.to}`}>
+              <Row
+                title={
+                  <>
+                    {label(s.from)} → {label(s.to)}
+                  </>
+                }
+                subtitle={<Money value={s.amount} currency={g.currency} />}
+                right={
+                  <button
+                    type="button"
+                    className="small-btn"
+                    onClick={() => navigate(`/g/${g.id}/transfer/new?from=${s.from}&to=${s.to}&amount=${s.amount}`)}
+                  >
+                    {t('group.returned')}
+                  </button>
+                }
+              />
+              {s.from === g.meId && <PaymentDetails to={member(s.to)} />}
+            </Fragment>
           ))
         )}
       </Section>
@@ -196,6 +200,93 @@ function BalancesTab({ g }: { g: GroupDetail }) {
       <button type="button" className="text-btn" onClick={() => navigate(`/g/${g.id}/transfer/new`)}>
         {t('group.manualTransfer')}
       </button>
+
+      <Stats g={g} />
     </>
+  );
+}
+
+function Stats({ g }: { g: GroupDetail }) {
+  const { group, mine } = categoryTotals(g.expenses, g.meId);
+  return (
+    <>
+      <Section title={`${t('group.statsTitle')} · ${t('group.statsGroup')}`}>
+        <CategoryBars totals={group} currency={g.currency} empty={t('group.statsEmpty')} />
+      </Section>
+      <Section title={`${t('group.statsTitle')} · ${t('group.statsMine')}`} footer={t('group.statsFooter')}>
+        <CategoryBars totals={mine} currency={g.currency} empty={t('group.statsMineEmpty')} />
+      </Section>
+    </>
+  );
+}
+
+function CategoryBars({
+  totals,
+  currency,
+  empty,
+}: {
+  totals: { category: CategoryId; amount: number }[];
+  currency: string;
+  empty: string;
+}) {
+  if (totals.length === 0) return <div className="row hint">{empty}</div>;
+  const max = totals[0].amount;
+  return (
+    <>
+      {totals.map((c) => (
+        <Row
+          key={c.category}
+          left={<span className="expense-icon">{categoryEmoji(c.category)}</span>}
+          title={t(categoryKey(c.category))}
+          subtitle={
+            <span className="bar">
+              <span className="accent" style={{ width: `${(c.amount / max) * 100}%` }} />
+            </span>
+          }
+          right={<Money value={c.amount} currency={currency} />}
+        />
+      ))}
+    </>
+  );
+}
+
+const spaced = (digits: string, size: number) => digits.replace(new RegExp(`(.{${size}})(?=.)`, 'g'), '$1 ');
+
+/** What the debtor needs to pay the creditor: details with one-tap copy buttons. */
+function PaymentDetails({ to }: { to: Member }) {
+  const info: PaymentInfo = to.paymentInfo;
+  const [copied, setCopied] = useState<'phone' | 'card'>();
+  if (!hasPaymentInfo(info)) return <div className="row hint small">{t('payment.none', { name: to.name })}</div>;
+
+  const copy = async (what: 'phone' | 'card') => {
+    if (!(await copyText(info[what]!))) return;
+    setCopied(what);
+    setTimeout(() => setCopied(undefined), 2000);
+  };
+
+  return (
+    <div className="row payment">
+      {info.phone && <span className="payment-line">{[info.phone, info.bank].filter(Boolean).join(' · ')}</span>}
+      {!info.phone && info.bank && <span className="payment-line">{info.bank}</span>}
+      {info.card && <span className="payment-line">{spaced(info.card, 4)}</span>}
+      {info.note && <span className="payment-line">{info.note}</span>}
+      <div className="buttons-wrap">
+        {info.phone && (
+          <button type="button" className="small-btn" onClick={() => copy('phone')}>
+            {copied === 'phone' ? t('payment.copied') : t('payment.copyPhone')}
+          </button>
+        )}
+        {info.card && (
+          <button type="button" className="small-btn" onClick={() => copy('card')}>
+            {copied === 'card' ? t('payment.copied') : t('payment.copyCard')}
+          </button>
+        )}
+        {info.link && (
+          <button type="button" className="small-btn" onClick={() => openLink(info.link!)}>
+            {t('payment.openLink')}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

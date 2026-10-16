@@ -4,6 +4,7 @@ import { t } from '../i18n.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, confirmDialog, haptic, shareLink } from '../tg.tsx';
 import { Avatar, ErrorView, Loading, Row, Section } from '../ui.tsx';
+import { PaymentForm } from './PaymentForm.tsx';
 
 export function Settings({ id }: { id: number }) {
   const { data: g, error } = useGroup(id);
@@ -144,20 +145,33 @@ function MemberRow({ g, m }: { g: GroupDetail; m: Member }) {
       setEditing(false);
     };
     return (
-      <div className="row">
-        <input
-          className="field inline"
-          value={name}
-          maxLength={64}
-          // biome-ignore lint/a11y/noAutofocus: поле появляется по нажатию «изменить» — фокус нужен сразу
-          autoFocus
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && save()}
-        />
-        <button type="button" className="small-btn" onClick={save}>
-          {t('common.done')}
-        </button>
-      </div>
+      <>
+        <div className="row">
+          <input
+            className="field inline"
+            value={name}
+            maxLength={64}
+            // biome-ignore lint/a11y/noAutofocus: поле появляется по нажатию «изменить» — фокус нужен сразу
+            autoFocus
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && save()}
+          />
+          <button type="button" className="small-btn" onClick={save}>
+            {t('common.done')}
+          </button>
+        </div>
+        {m.userId === null && (
+          <PaymentForm
+            bare
+            initial={m.paymentInfo}
+            onSave={async (next) => {
+              const updated = await api.setMemberPaymentInfo(g.id, m.id, next);
+              setGroup(updated);
+              return updated.members.find((x) => x.id === m.id)?.paymentInfo ?? {};
+            }}
+          />
+        )}
+      </>
     );
   }
 

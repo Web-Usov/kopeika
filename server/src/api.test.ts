@@ -260,3 +260,145 @@ test('the user language is stored on every request and used by the bot', async (
   await api.request('/me', { headers: { Authorization: `dev ${u}` } });
   assert.equal(one<{ lang: string }>('SELECT lang FROM users WHERE id = ?', u)?.lang, 'ru');
 });
+
+test('expense category: default, create, update, validation, transfers', async () => {
+  const u = newUser();
+  const g = await createGroup(u, ['Маша']);
+  const url = `/groups/${g.id}/expenses`;
+
+  let res = await call(u, 'POST', url, expense(g));
+  assert.equal(res.status, 201);
+  assert.equal(res.body.expenses[0].category, 'other');
+
+  res = await call(u, 'POST', url, expense(g, { title: 'Такси', category: 'transport' }));
+  assert.equal(res.status, 201);
+  const taxi = res.body.expenses.find((e: Json) => e.title === 'Такси');
+  assert.equal(taxi.category, 'transport');
+
+  // Update without a category keeps the stored one; with a category changes it.
+  res = await call(u, 'PUT', `${url}/${taxi.id}`, expense(g, { title: 'Такси 2' }));
+  assert.equal(res.body.expenses.find((e: Json) => e.id === taxi.id).category, 'transport');
+  res = await call(u, 'PUT', `${url}/${taxi.id}`, expense(g, { title: 'Такси 2', category: 'fun' }));
+  assert.equal(res.body.expenses.find((e: Json) => e.id === taxi.id).category, 'fun');
+
+  res = await call(u, 'POST', url, expense(g, { category: 'rocket' }));
+  assert.equal(res.status, 400);
+  res = await call(u, 'PUT', `${url}/${taxi.id}`, expense(g, { category: 'rocket' }));
+  assert.equal(res.status, 400);
+
+  const other = g.members.find((m: Json) => m.id !== g.meId);
+  res = await call(u, 'POST', url, {
+    kind: 'transfer',
+    amount: 500,
+    payerId: g.meId,
+    splitMode: 'exact',
+    spentOn: '2025-01-16',
+    category: 'food',
+    shares: [{ memberId: other.id, value: 500 }],
+  });
+  assert.equal(res.status, 201);
+  assert.equal(res.body.expenses.find((e: Json) => e.kind === 'transfer').category, null);
+});
+
+// --- Payment details ---
+const putInfo = (u: number, body: Json) => call(u, 'PUT', '/me/payment-info', body);
+
+test('own payment details: saved, normalized, read back', async () => {
+  const u = newUser();
+  assert.deepEqual((await call(u, 'GET', '/me/payment-info')).body, {});
+  const res = await putInfo(u, {
+    phone: '8 (900) 123-45-67',
+    bank: ' Т-Банк ',
+    card: '2200 1234 5678 9010',
+    link: 'https://example.com/pay',
+    note: '',
+  });
+  assert.equal(res.status, 200);
+  const expected = { phone: '+79001234567', bank: 'Т-Банк', card: '2200123456789010', link: 'https://example.com/pay' };
+  assert.deepEqual(res.body, expected);
+  assert.deepEqual((await call(u, 'GET', '/me/payment-info')).body, expected);
+  // Saving an empty object clears the details.
+  assert.deepEqual((await putInfo(u, {})).body, {});
+  assert.deepEqual((await call(u, 'GET', '/me/payment-info')).body, {});
+});
+
+test('phone normalization: +7 forms and international numbers', async () => {
+  const u = newUser();
+  assert.equal((await putInfo(u, { phone: '+7 900 123-45-67' })).body.phone, '+79001234567');
+  assert.equal((await putInfo(u, { phone: '79001234567' })).body.phone, '+79001234567');
+  assert.equal((await putInfo(u, { phone: '+1 (555) 123-4567' })).body.phone, '+15551234567');
+});
+
+test('payment details validation: 400 with a message', async () => {
+  const u = newUser();
+  for (const bad of [
+    { phone: 'abc' },
+    { phone: '123' },
+    { card: '1234' },
+    { card: '1234 5678 9012 345a' },
+    { link: 'http://example.com' },
+    { link: 'javascript:alert(1)' },
+    { link: 'не ссылка' },
+    { bank: 'x'.repeat(65) },
+    { note: 'x'.repeat(201) },
+    { unknown: 'field' },
+  ]) {
+    const res = await putInfo(u, bad);
+    assert.equal(res.status, 400, JSON.stringify(bad));
+    assert.ok(res.body.error);
+  }
+  assert.deepEqual((await call(u, 'GET', '/me/payment-info')).body, {});
+});
+
+test('payment details are visible to co-members, not to outsiders or in the invite preview', async () => {
+  const owner = newUser();
+  const friend = newUser();
+  const outsider = newUser();
+  await putInfo(owner, { phone: '+79001234567', bank: 'Т-Банк' });
+  const g = await createGroup(owner);
+
+  const preview = await call(friend, 'GET', `/invite/${g.inviteCode}`);
+  assert.ok(!JSON.stringify(preview.body).includes('79001234567'));
+  assert.ok(!JSON.stringify(preview.body).includes('paymentInfo'));
+
+  await call(friend, 'POST', `/invite/${g.inviteCode}/join`, {});
+  const seen = (await call(friend, 'GET', `/groups/${g.id}`)).body;
+  const ownerMember = seen.members.find((m: Json) => m.userId === owner);
+  assert.deepEqual(ownerMember.paymentInfo, { phone: '+79001234567', bank: 'Т-Банк' });
+  const friendMember = seen.members.find((m: Json) => m.userId === friend);
+  assert.deepEqual(friendMember.paymentInfo, {});
+
+  assert.equal((await call(outsider, 'GET', `/groups/${g.id}`)).status, 404);
+  assert.ok(!JSON.stringify((await call(outsider, 'GET', '/groups')).body).includes('79001234567'));
+});
+
+test('payment details of a member without Telegram: set via PATCH member', async () => {
+  const owner = newUser();
+  const g = await createGroup(owner, ['Маша']);
+  const masha = g.members.find((m: Json) => m.name === 'Маша');
+  const path = `/groups/${g.id}/members/${masha.id}`;
+  const res = await call(owner, 'PATCH', path, { paymentInfo: { phone: '89001112233', card: '4276 0000 1111 2222' } });
+  assert.equal(res.status, 200);
+  const updated = res.body.members.find((m: Json) => m.id === masha.id);
+  assert.deepEqual(updated.paymentInfo, { phone: '+79001112233', card: '4276000011112222' });
+  assert.equal(updated.name, 'Маша');
+
+  // Renaming alone keeps the details.
+  const renamed = await call(owner, 'PATCH', path, { name: 'Маша К.' });
+  assert.deepEqual(renamed.body.members.find((m: Json) => m.id === masha.id).paymentInfo, updated.paymentInfo);
+
+  // Bad values and an empty body are rejected.
+  assert.equal((await call(owner, 'PATCH', path, { paymentInfo: { card: '12' } })).status, 400);
+  assert.equal((await call(owner, 'PATCH', path, {})).status, 400);
+
+  // Someone outside the group cannot touch it.
+  assert.equal((await call(newUser(), 'PATCH', path, { paymentInfo: { bank: 'X' } })).status, 404);
+});
+
+test('payment details cannot be set through the group for a member with Telegram', async () => {
+  const owner = newUser();
+  const g = await createGroup(owner);
+  const res = await call(owner, 'PATCH', `/groups/${g.id}/members/${g.meId}`, { paymentInfo: { bank: 'X' } });
+  assert.equal(res.status, 409);
+  assert.deepEqual((await call(owner, 'GET', '/me/payment-info')).body, {});
+});
