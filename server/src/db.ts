@@ -82,6 +82,17 @@ const migrations = [
   `,
   // Archived groups are hidden from the home screen (a new expense brings the group back).
   `ALTER TABLE groups ADD COLUMN archived_at TEXT;`,
+  // Debt reminders ("Remind" button): at most one per (group, from, to) per 24 hours. created_at is UTC.
+  `
+  CREATE TABLE reminders (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id    INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    from_member INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,  -- creditor who reminds
+    to_member   INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,  -- debtor who is reminded
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX reminders_pair ON reminders(group_id, from_member, to_member, created_at);
+  `,
 ];
 
 const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;

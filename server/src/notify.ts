@@ -84,3 +84,23 @@ export function buildChangeMessage(i: ChangeInput): string | null {
   else if (oldShare) text += `\n${t('bot.shareRemoved')}`;
   return text;
 }
+
+export interface RemindInput {
+  lang: Lang;
+  currency: string;
+  groupName: string;
+  /** Name of the creditor, who pressed "Remind". */
+  authorName: string;
+  amount: number;
+  /** The creditor has payment details to show in the app. */
+  hasPaymentInfo: boolean;
+}
+
+/** Text of a debt reminder for the debtor, in their language. */
+export function buildRemindMessage(i: RemindInput): string {
+  const t = createT(i.lang);
+  const amount = formatMoney(i.amount, i.currency, i.lang);
+  let text = `💰 <b>${esc(i.groupName)}</b>\n${t('bot.remind', { author: esc(i.authorName), amount })}`;
+  if (i.hasPaymentInfo) text += `\n${t('bot.remindPayment')}`;
+  return text;
+}

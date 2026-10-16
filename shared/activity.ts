@@ -17,7 +17,8 @@ export type ActivityAction =
   | 'group.unarchive'
   | 'expense.create'
   | 'expense.update'
-  | 'expense.delete';
+  | 'expense.delete'
+  | 'debt.remind';
 
 export interface PersonRef {
   id: number;
@@ -37,6 +38,7 @@ export interface ActivityPayload {
   expenseId?: number;
   memberId?: number;
   name?: string;
+  amount?: number;
   from?: string;
   to?: string;
   before?: ExpenseSnapshot;
@@ -80,6 +82,8 @@ export function activityText(lang: Lang, entry: ActivityEntry, currency: string)
       return t(lang, 'activity.memberClaim', { actor, name: p.name ?? '' });
     case 'member.payment_info':
       return t(lang, 'activity.paymentInfo', { actor, name: p.name ?? '' });
+    case 'debt.remind':
+      return t(lang, 'activity.remind', { actor, name: p.name ?? '', amount: money(p.amount ?? 0) });
     case 'expense.create': {
       const e = p.expense;
       if (!e) return actor;

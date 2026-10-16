@@ -23,6 +23,7 @@ export interface Member {
   photoUrl: string | null;
   balance: number;
   paymentInfo: PaymentInfo;
+  canNotify: boolean;
 }
 
 export interface Expense {
@@ -81,7 +82,14 @@ export interface ExpenseInput {
   shares: { memberId: number; value: number }[];
 }
 
-export class ApiError extends Error {}
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message);
+  }
+}
 
 export async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`/api${path}`, {
@@ -96,7 +104,10 @@ export async function request<T>(method: string, path: string, body?: unknown): 
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok)
-    throw new ApiError((data as { error?: string }).error ?? t('common.errorStatus', { status: res.status }));
+    throw new ApiError(
+      (data as { error?: string }).error ?? t('common.errorStatus', { status: res.status }),
+      res.status,
+    );
   return data as T;
 }
 
@@ -182,6 +193,7 @@ export const api = {
       'GET',
       `/groups/${id}/activity${before ? `?before=${before}` : ''}`,
     ),
+  remind: (id: number, memberId: number) => request<{ ok: true }>('POST', `/groups/${id}/remind`, { memberId }),
   deleteExpense: (id: number, expenseId: number) =>
     request<GroupDetail>('DELETE', `/groups/${id}/expenses/${expenseId}`),
 };

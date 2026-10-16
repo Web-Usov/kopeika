@@ -69,3 +69,9 @@ test('members and group', () => {
   assert.equal(text('en', entry('group.create', { name: 'Дача' })), 'Маша created the group “Дача”');
   assert.equal(text('ru', entry('member.payment_info', { name: 'Коля' })), 'Маша обновил(а) реквизиты: Коля');
 });
+
+test('debt reminder', () => {
+  const e = entry('debt.remind', { memberId: 3, name: 'Петя', amount: 150000 });
+  assert.equal(text('ru', e), 'Маша напомнил(а) о долге: Петя, 1 500 ₽');
+  assert.match(text('en', e), /^Маша sent a debt reminder: Петя, /);
+});
