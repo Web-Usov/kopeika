@@ -56,6 +56,40 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
 
+      # Smoke test: the image must start and answer before it is published.
+      - name: Build image for smoke test
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: kopeika:ci
+          cache-from: type=gha
+
+      - name: Smoke test image
+        run: |
+          docker run -d --name kopeika-ci -e DEV_AUTH=1 -e BOT_POLLING=0 -p 3000:3000 kopeika:ci
+          fail() {
+            echo "::error::$1"
+            docker logs kopeika-ci
+            exit 1
+          }
+          ok=0
+          for _ in $(seq 1 30); do
+            if [ "$(curl -fs localhost:3000/healthz)" = "ok" ]; then ok=1; break; fi
+            sleep 1
+          done
+          [ "$ok" = 1 ] || fail "/healthz did not return ok within 30s"
+          code=$(curl -s -o /dev/null -w '%{http_code}' localhost:3000/)
+          [ "$code" = 200 ] || fail "GET / returned $code, expected 200"
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST localhost:3000/api/groups \
+            -H 'Authorization: dev 1' -H 'Content-Type: application/json' \
+            -d '{"name":"CI","currency":"RUB"}')
+          [ "$code" = 201 ] || fail "POST /api/groups returned $code, expected 201"
+          echo "Smoke test passed"
+          docker rm -f kopeika-ci
+
       - uses: docker/build-push-action@v7
         with:
           context: .
