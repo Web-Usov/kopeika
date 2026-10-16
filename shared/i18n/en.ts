@@ -26,6 +26,7 @@ export const en: Dict = {
     emptyHint:
       'Create a group for a trip, a cabin or a shared flat, invite your friends and note down who paid for what.',
     myGroups: 'My groups',
+    archive: 'Archive · {count}',
     groupSubtitle: '{members} · spent {spent}',
     settled: 'settled up',
     createGroup: 'Create group',
@@ -126,6 +127,13 @@ export const en: Dict = {
     membersSection: 'Members · {count}',
     membersFooter: 'A member without Telegram can be removed if they have no expenses.',
     newMemberPlaceholder: 'New member name',
+    archiveGroup: 'Archive group',
+    unarchiveGroup: 'Restore from archive',
+    archiveFooter: 'An archived group is hidden from the home screen. A new expense brings it back.',
+    confirmArchive: 'Archive the group “{name}”? You can restore it later.',
+    leaveGroup: 'Leave group',
+    confirmLeave:
+      'Leave the group “{name}”? Your name and expenses stay for everyone else, but you will no longer see the group. You can come back with an invite link.',
     deleteGroup: 'Delete group',
     confirmDeleteGroup: 'Delete the group “{name}” with all its expenses? This can’t be undone.',
     confirmDeleteMember: 'Remove the member “{name}”?',
@@ -204,6 +212,8 @@ export const en: Dict = {
     tooMany: 'Too many requests, please try again in a minute',
     notFound: 'Not found',
     groupNotFound: 'Group not found',
+    lastMemberLeave:
+      'You’re the last member with Telegram, so you can’t leave. Delete the group or invite someone first.',
     ownerOnlyDelete: 'Only the creator can delete the group',
     memberNotFound: 'Member not found',
     memberHasTelegram: "You can't remove a member who joined via Telegram",

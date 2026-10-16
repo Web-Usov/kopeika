@@ -183,6 +183,38 @@ api.delete('/groups/:id', (c) => {
   return c.json({ ok: true });
 });
 
+api.post('/groups/:id/archive', (c) => {
+  const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
+  run("UPDATE groups SET archived_at = COALESCE(archived_at, datetime('now')) WHERE id = ?", group.id);
+  return c.json(detail({ ...group, archived_at: group.archived_at ?? 'now' }, me));
+});
+
+api.post('/groups/:id/unarchive', (c) => {
+  const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
+  run('UPDATE groups SET archived_at = NULL WHERE id = ?', group.id);
+  return c.json(detail({ ...group, archived_at: null }, me));
+});
+
+// Leaving keeps the person in the group as a name-only member, so history and balances stay intact.
+api.post('/groups/:id/leave', (c) => {
+  const user = c.get('user');
+  const { group, me } = loadGroupFor(c.req.param('id'), user.id);
+  tx(() => {
+    if (group.created_by === user.id) {
+      const heir = one<{ user_id: number }>(
+        'SELECT user_id FROM members WHERE group_id = ? AND user_id IS NOT NULL AND user_id != ? ORDER BY id LIMIT 1',
+        group.id,
+        user.id,
+      );
+      // The last person with Telegram can only delete the group: otherwise nobody could ever manage it.
+      if (!heir) throw fail(409, 'errors.lastMemberLeave');
+      run('UPDATE groups SET created_by = ? WHERE id = ?', heir.user_id, group.id);
+    }
+    run('UPDATE members SET user_id = NULL WHERE id = ?', me.id);
+  });
+  return c.json({ ok: true });
+});
+
 // --- Members ---
 api.post('/groups/:id/members', async (c) => {
   const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
@@ -328,10 +360,11 @@ api.post('/groups/:id/expenses', async (c) => {
     );
     const id = Number(res.lastInsertRowid);
     saveShares(id, body, computed);
+    run('UPDATE groups SET archived_at = NULL WHERE id = ?', group.id);
     return one<ExpenseRow>('SELECT * FROM expenses WHERE id = ?', id)!;
   });
   notifyExpense(group, expense, user.id, me.name);
-  return c.json(detail(group, me), 201);
+  return c.json(detail({ ...group, archived_at: null }, me), 201);
 });
 
 api.put('/groups/:id/expenses/:expenseId', async (c) => {

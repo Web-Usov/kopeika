@@ -67,6 +67,8 @@ const migrations = [
   `ALTER TABLE users ADD COLUMN payment_info TEXT; ALTER TABLE members ADD COLUMN payment_info TEXT;`,
   // Expense category id (see shared/categories.ts); transfers keep 'other' and never show it.
   `ALTER TABLE expenses ADD COLUMN category TEXT NOT NULL DEFAULT 'other';`,
+  // Archived groups are hidden from the home screen (a new expense brings the group back).
+  `ALTER TABLE groups ADD COLUMN archived_at TEXT;`,
 ];
 
 const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
