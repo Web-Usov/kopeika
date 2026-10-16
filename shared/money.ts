@@ -107,7 +107,7 @@ export function parseAmount(input: string): number | null {
   const s = input.replace(/[\s ]/g, '').replace(',', '.');
   if (!/^\d+(\.\d{0,2})?$/.test(s)) return null;
   const [int, frac = ''] = s.split('.');
-  const v = Number(int) * 100 + Number((frac + '00').slice(0, 2));
+  const v = Number(int) * 100 + Number(`${frac}00`.slice(0, 2));
   return Number.isSafeInteger(v) ? v : null;
 }
 

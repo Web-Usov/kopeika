@@ -79,7 +79,9 @@ export async function request<T>(method: string, path: string, body?: unknown): 
 const groupCache = new Map<number, GroupDetail>();
 let groupsList: GroupSummary[] | undefined;
 const listeners = new Set<() => void>();
-const emit = () => listeners.forEach((l) => l());
+const emit = () => {
+  for (const l of listeners) l();
+};
 const subscribe = (l: () => void) => {
   listeners.add(l);
   return () => listeners.delete(l);

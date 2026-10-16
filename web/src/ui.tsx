@@ -42,19 +42,38 @@ export function Row(props: {
   subtitle?: ReactNode;
   right?: ReactNode;
   onClick?: () => void;
+  /** Отдельная кнопка справа: кнопку нельзя вкладывать в кнопку, поэтому строка делится на две части. */
+  action?: ReactNode;
   className?: string;
 }) {
-  const Tag = props.onClick ? 'button' : 'div';
-  return (
-    <Tag className={`row ${props.onClick ? 'clickable' : ''} ${props.className ?? ''}`} onClick={props.onClick}>
+  const content = (
+    <>
       {props.left && <span className="row-left">{props.left}</span>}
       <span className="row-main">
         <span className="row-title">{props.title}</span>
         {props.subtitle && <span className="row-subtitle">{props.subtitle}</span>}
       </span>
       {props.right !== undefined && <span className="row-right">{props.right}</span>}
-    </Tag>
+    </>
   );
+  if (props.onClick && props.action) {
+    return (
+      <div className={`row clickable split ${props.className ?? ''}`}>
+        <button type="button" className="row-hit" onClick={props.onClick}>
+          {content}
+        </button>
+        {props.action}
+      </div>
+    );
+  }
+  if (props.onClick) {
+    return (
+      <button type="button" className={`row clickable ${props.className ?? ''}`} onClick={props.onClick}>
+        {content}
+      </button>
+    );
+  }
+  return <div className={`row ${props.className ?? ''}`}>{content}</div>;
 }
 
 export function Segmented<T extends string>(props: {
@@ -66,6 +85,7 @@ export function Segmented<T extends string>(props: {
     <div className="segmented">
       {props.options.map((o) => (
         <button
+          type="button"
           key={o.value}
           className={o.value === props.value ? 'active' : ''}
           onClick={() => props.onChange(o.value)}

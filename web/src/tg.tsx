@@ -115,7 +115,7 @@ export function MainButton(props: { text: string; onClick: () => void; disabled?
   if (inTelegram) return null;
   return (
     <div className="main-button-bar">
-      <button className="main-button" disabled={disabled || loading} onClick={() => handler.current()}>
+      <button type="button" className="main-button" disabled={disabled || loading} onClick={() => handler.current()}>
         {loading ? '…' : text}
       </button>
     </div>
@@ -141,7 +141,7 @@ export function BackButton({ onClick }: { onClick: () => void }) {
 
   if (inTelegram) return null;
   return (
-    <button className="dev-back" onClick={() => handler.current()}>
+    <button type="button" className="dev-back" onClick={() => handler.current()}>
       ‹ Назад
     </button>
   );
