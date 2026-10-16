@@ -68,9 +68,3 @@ export async function scanReceipt(
   }
   return draft;
 }
-
-/**
- * Hook for limits and cost tracking (#102): called after every provider call that returned, with the tokens spent.
- * Intentionally empty for now.
- */
-export function recordReceiptUsage(_userId: number, _groupId: number, _usage: ReceiptUsage): void {}

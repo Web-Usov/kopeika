@@ -18,6 +18,7 @@ export const STAT_EVENTS = [
   'inline.query',
   'bot.start',
   'user.delete',
+  'receipt.scan',
 ] as const;
 export type StatEvent = (typeof STAT_EVENTS)[number];
 

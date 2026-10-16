@@ -90,6 +90,34 @@ export const config = {
   receiptsFallbackModel: env.RECEIPTS_FALLBACK_MODEL?.trim() ?? '',
   /** Timeout of one recognition request to the provider, seconds. */
   receiptsTimeoutSec: parseNumber('RECEIPTS_TIMEOUT_SEC', env.RECEIPTS_TIMEOUT_SEC, { default: 30, max: 300 }),
+  /** Free scans per group per calendar month (server-local) while the group has no `receipts` entitlement. */
+  receiptsGroupTrialMonthly: parseNumber('RECEIPTS_GROUP_TRIAL_MONTHLY', env.RECEIPTS_GROUP_TRIAL_MONTHLY, {
+    default: 5,
+    min: 0,
+    max: 100_000,
+  }),
+  /** Receipt requests per user per minute (every attempt counts, successful or not). */
+  receiptsPerMin: parseNumber('RECEIPTS_USER_PER_MIN', env.RECEIPTS_USER_PER_MIN, { default: 3, max: 1000 }),
+  /** Global spend ceiling per calendar month, USD, by the real token usage of the provider. */
+  receiptsGlobalMonthlyUsd: parseNumber('RECEIPTS_GLOBAL_MONTHLY_USD', env.RECEIPTS_GLOBAL_MONTHLY_USD, {
+    default: 10,
+    min: 0.01,
+    max: 1_000_000,
+    int: false,
+  }),
+  /** Provider price, USD per 1M tokens (Haiku 5.5). Applies to every model: set it if the fallback cascade is on. */
+  receiptsPriceInUsdPerM: parseNumber('RECEIPTS_PRICE_IN_USD_PER_M', env.RECEIPTS_PRICE_IN_USD_PER_M, {
+    default: 0.1,
+    min: 0,
+    max: 10_000,
+    int: false,
+  }),
+  receiptsPriceOutUsdPerM: parseNumber('RECEIPTS_PRICE_OUT_USD_PER_M', env.RECEIPTS_PRICE_OUT_USD_PER_M, {
+    default: 0.5,
+    min: 0,
+    max: 10_000,
+    int: false,
+  }),
   /** Quotas, so one account cannot grow the database without bound. */
   maxGroupsPerUser: parseNumber('MAX_GROUPS_PER_USER', env.MAX_GROUPS_PER_USER, { default: 100, max: 1_000_000 }),
   maxMembersPerGroup: parseNumber('MAX_MEMBERS_PER_GROUP', env.MAX_MEMBERS_PER_GROUP, { default: 100, max: 1_000_000 }),
