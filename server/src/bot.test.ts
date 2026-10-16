@@ -50,3 +50,18 @@ test('logTelegramError: method, code and description only, never the request pay
   assert.equal(out, 'sendMessage failed: sendMessage 400 Bad Request: chat not found');
   assert.ok(!out.includes('Тайной') && !out.includes('123456789'));
 });
+
+test('logTelegramError: non-Telegram errors keep their stack trace', async () => {
+  const { logTelegramError } = await import('./logging.ts');
+  const bug = new TypeError('real bug');
+  const calls: unknown[][] = [];
+  const orig = console.error;
+  console.error = (...args: unknown[]) => void calls.push(args);
+  try {
+    logTelegramError('Recurring #1 failed', bug);
+  } finally {
+    console.error = orig;
+  }
+  assert.deepEqual(calls, [['Recurring #1 failed', bug]]);
+  assert.ok(String((calls[0][1] as Error).stack).includes('real bug'));
+});

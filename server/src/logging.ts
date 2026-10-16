@@ -12,6 +12,8 @@ export function describeTelegramError(e: unknown): string {
   return typeof e === 'string' ? e : 'unknown error';
 }
 
+/** Telegram API errors are reduced to method/code/description; anything else (a bug) keeps its full stack trace. */
 export function logTelegramError(context: string, e: unknown) {
-  console.warn(`${context}: ${describeTelegramError(e)}`);
+  if (e instanceof GrammyError || e instanceof HttpError) console.warn(`${context}: ${describeTelegramError(e)}`);
+  else console.error(context, e);
 }
