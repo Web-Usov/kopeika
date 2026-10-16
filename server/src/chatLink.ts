@@ -26,8 +26,31 @@ export function newChatToken(): string {
 
 const sqlTime = (d: Date) => d.toISOString().slice(0, 19).replace('T', ' ');
 
-/** Creates a one-time token for a chat the bot was just added to. */
+const KEEP_DAYS = 7;
+
+/** Deletes used and expired tokens older than a week. Idempotent; returns the number of removed rows. */
+export function cleanupChatLinks(now = new Date()): number {
+  const cutoff = sqlTime(new Date(now.getTime() - KEEP_DAYS * 24 * 3600_000));
+  const res = run(
+    'DELETE FROM chat_links WHERE expires_at < ? OR (used_at IS NOT NULL AND used_at < ?)',
+    cutoff,
+    cutoff,
+  );
+  return Number(res.changes);
+}
+
+/**
+ * A one-time token for a chat the bot was just added to (or asked for /balance in). Returns the chat's existing valid
+ * unused token if there is one, so repeated calls do not grow the table. Stale rows are cleaned up on the way.
+ */
 export function createChatLink(chatId: number, chatTitle: string, userId: number, now = new Date()): string {
+  cleanupChatLinks(now);
+  const existing = one<{ token: string }>(
+    'SELECT token FROM chat_links WHERE chat_id = ? AND used_at IS NULL AND expires_at > ? ORDER BY expires_at DESC LIMIT 1',
+    chatId,
+    sqlTime(now),
+  );
+  if (existing) return existing.token;
   const token = newChatToken();
   run(
     'INSERT INTO chat_links (token, chat_id, chat_title, created_by_user, expires_at) VALUES (?, ?, ?, ?, ?)',

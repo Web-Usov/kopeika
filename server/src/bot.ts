@@ -43,6 +43,25 @@ let botUsername = '';
 /** True only after bot.init() succeeded; until then everything behaves as if the bot isn't configured. */
 let botReady = false;
 
+export type ChatMemberLookup = (chatId: number, userId: number) => Promise<string>;
+
+let chatMemberLookup: ChatMemberLookup | null = null;
+
+/** Tests replace the Bot API call that tells the user's role in a chat. Call with no argument to reset. */
+export function setBotTestHooks(hooks: { chatMember?: ChatMemberLookup } = {}) {
+  chatMemberLookup = hooks.chatMember ?? null;
+}
+
+/**
+ * The user's status in the chat ('creator', 'administrator', 'member', ...), or null when the bot isn't available.
+ * Throws if Telegram refuses (the bot was removed from the chat, etc.).
+ */
+export async function chatMemberStatus(chatId: number, userId: number): Promise<string | null> {
+  if (chatMemberLookup) return chatMemberLookup(chatId, userId);
+  if (!bot || !botReady) return null;
+  return (await bot.api.getChatMember(chatId, userId)).status;
+}
+
 const RETRY_DELAYS_SEC = [5, 10, 30, 60];
 
 /** Pause before retry number `attempt` (1-based): 5, 10, 30, 60 s, then every 60 s. */
