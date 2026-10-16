@@ -45,7 +45,7 @@ test('digest text (ru): summary, balances without zeros, settlement plan', () =>
 
 test('digest text (en): plurals and wording', () => {
   const one = nbsp(d.buildDigest({ ...input, lang: 'en', newCount: 1, newTotal: 10000 }));
-  assert.ok(one.startsWith('📊 <b>Daily summary for “Дача &lt;3”</b>: 1 expense for'), one);
+  assert.ok(one.startsWith('📊 <b>Daily digest for “Дача &lt;3”</b>: 1 expense for'), one);
   assert.ok(one.includes('<b>How to settle up</b>'));
   assert.ok(nbsp(d.buildDigest({ ...input, lang: 'en' })).includes('4 expenses for'));
 });
