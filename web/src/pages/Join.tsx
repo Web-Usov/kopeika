@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { api, type InvitePreview } from '../api.ts';
-import { navigate } from '../router.ts';
 import { askNotifyOnce } from '../notify.ts';
-import { BackButton, MainButton, alertDialog, haptic } from '../tg.tsx';
-import { ErrorView, Loading, Row, Section, plural } from '../ui.tsx';
+import { navigate } from '../router.ts';
+import { alertDialog, BackButton, haptic, MainButton } from '../tg.tsx';
+import { ErrorView, Loading, plural, Row, Section } from '../ui.tsx';
 
 export function Join({ code }: { code: string }) {
   const [invite, setInvite] = useState<InvitePreview>();
@@ -37,8 +37,20 @@ export function Join({ code }: { code: string }) {
   };
 
   const back = <BackButton onClick={() => navigate('/', { replace: true })} />;
-  if (error) return <div className="page">{back}<ErrorView message={error} /></div>;
-  if (!invite) return <div className="page">{back}<Loading /></div>;
+  if (error)
+    return (
+      <div className="page">
+        {back}
+        <ErrorView message={error} />
+      </div>
+    );
+  if (!invite)
+    return (
+      <div className="page">
+        {back}
+        <Loading />
+      </div>
+    );
 
   const { group, unclaimed } = invite;
   return (
@@ -48,7 +60,8 @@ export function Join({ code }: { code: string }) {
         <div className="hero-emoji">👋</div>
         <h1>{group.name}</h1>
         <p className="hint">
-          Вас пригласили в группу · {group.membersCount} {plural(group.membersCount, 'участник', 'участника', 'участников')}
+          Вас пригласили в группу · {group.membersCount}{' '}
+          {plural(group.membersCount, 'участник', 'участника', 'участников')}
         </p>
       </header>
 

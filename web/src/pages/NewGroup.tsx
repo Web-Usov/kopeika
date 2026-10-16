@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { CURRENCIES } from '../../../shared/money.ts';
 import { api, setGroup } from '../api.ts';
-import { navigate } from '../router.ts';
 import { askNotifyOnce } from '../notify.ts';
-import { BackButton, MainButton, alertDialog, haptic } from '../tg.tsx';
+import { navigate } from '../router.ts';
+import { alertDialog, BackButton, haptic, MainButton } from '../tg.tsx';
 import { Section } from '../ui.tsx';
 
 export function NewGroup() {
@@ -75,7 +75,11 @@ export function NewGroup() {
               autoFocus={i === others.length - 1}
               onChange={(e) => setOthers(others.map((x, j) => (j === i ? e.target.value : x)))}
             />
-            <button className="icon-btn" onClick={() => setOthers(others.filter((_, j) => j !== i))} aria-label="Убрать">
+            <button
+              className="icon-btn"
+              onClick={() => setOthers(others.filter((_, j) => j !== i))}
+              aria-label="Убрать"
+            >
               ✕
             </button>
           </div>

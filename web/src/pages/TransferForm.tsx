@@ -1,18 +1,44 @@
 import { useState } from 'react';
 import { amountToInput, parseAmount } from '../../../shared/money.ts';
-import { api, setGroup, useGroup, type Expense, type GroupDetail } from '../api.ts';
+import { api, type Expense, type GroupDetail, setGroup, useGroup } from '../api.ts';
 import { navigate } from '../router.ts';
-import { BackButton, MainButton, alertDialog, confirmDialog, haptic } from '../tg.tsx';
+import { alertDialog, BackButton, confirmDialog, haptic, MainButton } from '../tg.tsx';
 import { ErrorView, Loading, Section, todayIso } from '../ui.tsx';
 
-export function TransferForm({ groupId, expenseId, prefill }: { groupId: number; expenseId?: number; prefill: URLSearchParams }) {
+export function TransferForm({
+  groupId,
+  expenseId,
+  prefill,
+}: {
+  groupId: number;
+  expenseId?: number;
+  prefill: URLSearchParams;
+}) {
   const { data: g, error } = useGroup(groupId);
   const back = <BackButton onClick={() => navigate(`/g/${groupId}?tab=balances`, { replace: true })} />;
-  if (!g) return <div className="page">{back}{error ? <ErrorView message={error} /> : <Loading />}</div>;
+  if (!g)
+    return (
+      <div className="page">
+        {back}
+        {error ? <ErrorView message={error} /> : <Loading />}
+      </div>
+    );
 
   const transfer = expenseId ? g.expenses.find((e) => e.id === expenseId && e.kind === 'transfer') : undefined;
-  if (expenseId && !transfer) return <div className="page">{back}<ErrorView message="Перевод не найден" /></div>;
-  if (g.members.length < 2) return <div className="page">{back}<ErrorView message="В группе нужен хотя бы ещё один участник" /></div>;
+  if (expenseId && !transfer)
+    return (
+      <div className="page">
+        {back}
+        <ErrorView message="Перевод не найден" />
+      </div>
+    );
+  if (g.members.length < 2)
+    return (
+      <div className="page">
+        {back}
+        <ErrorView message="В группе нужен хотя бы ещё один участник" />
+      </div>
+    );
   return (
     <div className="page">
       {back}
@@ -29,7 +55,8 @@ function Editor({ g, transfer, prefill }: { g: GroupDetail; transfer?: Expense; 
   };
   const defaultFrom = transfer?.payerId ?? (isMember(pre('from') ?? 0) ? pre('from')! : g.meId);
   const defaultTo =
-    transfer?.shares[0]?.memberId ?? (isMember(pre('to') ?? 0) ? pre('to')! : g.members.find((m) => m.id !== defaultFrom)!.id);
+    transfer?.shares[0]?.memberId ??
+    (isMember(pre('to') ?? 0) ? pre('to')! : g.members.find((m) => m.id !== defaultFrom)!.id);
 
   const [from, setFrom] = useState(defaultFrom);
   const [to, setTo] = useState(defaultTo);
@@ -117,7 +144,13 @@ function Editor({ g, transfer, prefill }: { g: GroupDetail; transfer?: Expense; 
       </Section>
 
       <Section title="Когда">
-        <input className="field" type="date" value={spentOn} max={todayIso()} onChange={(e) => setSpentOn(e.target.value || todayIso())} />
+        <input
+          className="field"
+          type="date"
+          value={spentOn}
+          max={todayIso()}
+          onChange={(e) => setSpentOn(e.target.value || todayIso())}
+        />
       </Section>
 
       {transfer && (

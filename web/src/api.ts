@@ -1,6 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { authHeader } from './tg.tsx';
 import type { SplitMode } from '../../shared/money.ts';
+import { authHeader } from './tg.tsx';
 
 export interface Member {
   id: number;
@@ -143,5 +143,6 @@ export const api = {
   addExpense: (id: number, body: ExpenseInput) => request<GroupDetail>('POST', `/groups/${id}/expenses`, body),
   updateExpense: (id: number, expenseId: number, body: ExpenseInput) =>
     request<GroupDetail>('PUT', `/groups/${id}/expenses/${expenseId}`, body),
-  deleteExpense: (id: number, expenseId: number) => request<GroupDetail>('DELETE', `/groups/${id}/expenses/${expenseId}`),
+  deleteExpense: (id: number, expenseId: number) =>
+    request<GroupDetail>('DELETE', `/groups/${id}/expenses/${expenseId}`),
 };

@@ -1,8 +1,8 @@
 import { Bot, GrammyError, InlineKeyboard } from 'grammy';
+import { formatMoney } from '../../shared/money.ts';
 import { config } from './config.ts';
 import { all, run } from './db.ts';
-import { upsertUser, type ExpenseRow, type GroupRow } from './repo.ts';
-import { formatMoney } from '../../shared/money.ts';
+import { type ExpenseRow, type GroupRow, upsertUser } from './repo.ts';
 
 export const bot = config.botToken ? new Bot(config.botToken) : null;
 let botUsername = '';
@@ -43,9 +43,9 @@ export async function startBot() {
 
   if (config.botPolling) {
     // Not awaited: bot.start() resolves only when polling stops.
-    bot.start({ drop_pending_updates: true, onStart: () => console.log('Bot polling started') }).catch((e) =>
-      console.error('Bot polling stopped', e),
-    );
+    bot
+      .start({ drop_pending_updates: true, onStart: () => console.log('Bot polling started') })
+      .catch((e) => console.error('Bot polling stopped', e));
   }
 }
 
@@ -56,7 +56,11 @@ async function send(userId: number, text: string, group: GroupRow) {
   const link = appLink(group.invite_code);
   const reply_markup = link ? new InlineKeyboard().url('Открыть группу', link) : undefined;
   try {
-    await bot.api.sendMessage(userId, text, { parse_mode: 'HTML', reply_markup, link_preview_options: { is_disabled: true } });
+    await bot.api.sendMessage(userId, text, {
+      parse_mode: 'HTML',
+      reply_markup,
+      link_preview_options: { is_disabled: true },
+    });
   } catch (e) {
     // 403: user blocked the bot or never started it. Stop trying until they allow it again.
     if (e instanceof GrammyError && e.error_code === 403) run('UPDATE users SET notify = 0 WHERE id = ?', userId);

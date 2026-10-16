@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
-import { all, one, run } from './db.ts';
+import { computeBalances, type LedgerEntry, type SplitMode, settleUp } from '../../shared/money.ts';
 import type { TelegramUser } from './auth.ts';
-import { computeBalances, settleUp, type LedgerEntry, type SplitMode } from '../../shared/money.ts';
+import { all, one, run } from './db.ts';
 
 export interface UserRow {
   id: number;
@@ -142,7 +142,11 @@ export function groupDetail(group: GroupRow, me: MemberRow, inviteLink: string |
       splitMode: e.split_mode,
       spentOn: e.spent_on,
       createdAt: e.created_at,
-      shares: (sharesByExpense.get(e.id) ?? []).map((s) => ({ memberId: s.member_id, input: s.input, amount: s.amount })),
+      shares: (sharesByExpense.get(e.id) ?? []).map((s) => ({
+        memberId: s.member_id,
+        input: s.input,
+        amount: s.amount,
+      })),
     })),
     settlements: settleUp(balances),
   };

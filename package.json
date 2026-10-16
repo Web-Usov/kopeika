@@ -11,9 +11,13 @@
     "dev:web": "npm run dev -w web",
     "build": "npm run build -w web && npm run build -w server",
     "typecheck": "npm run typecheck -w server && npm run typecheck -w web",
-    "test": "tsx --test shared/*.test.ts server/src/*.test.ts"
+    "test": "tsx --test shared/*.test.ts server/src/*.test.ts",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "check": "biome check . && npm run typecheck && npm test"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.15",
     "@types/node": "^22.19.0",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3"

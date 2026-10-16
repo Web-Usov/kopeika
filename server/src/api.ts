@@ -1,23 +1,23 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
+import { CURRENCIES, computeShares, SplitError } from '../../shared/money.ts';
+import { type TelegramUser, validateInitData } from './auth.ts';
+import { appLink, notifyExpense } from './bot.ts';
 import { config } from './config.ts';
-import { validateInitData, type TelegramUser } from './auth.ts';
 import { all, one, run, tx } from './db.ts';
 import {
   displayName,
+  type ExpenseRow,
   findMembership,
+  type GroupRow,
   groupDetail,
   groupsForUser,
-  newInviteCode,
-  upsertUser,
-  type ExpenseRow,
-  type GroupRow,
   type MemberRow,
+  newInviteCode,
   type UserRow,
+  upsertUser,
 } from './repo.ts';
-import { appLink, notifyExpense } from './bot.ts';
-import { computeShares, CURRENCIES, SplitError } from '../../shared/money.ts';
 
 type Env = { Variables: { user: TelegramUser } };
 
@@ -145,7 +145,12 @@ api.post('/groups/:id/members', async (c) => {
 api.patch('/groups/:id/members/:memberId', async (c) => {
   const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
   const body = z.object({ name }).parse(await c.req.json());
-  const res = run('UPDATE members SET name = ? WHERE id = ? AND group_id = ?', body.name, idParam(c.req.param('memberId')), group.id);
+  const res = run(
+    'UPDATE members SET name = ? WHERE id = ? AND group_id = ?',
+    body.name,
+    idParam(c.req.param('memberId')),
+    group.id,
+  );
   if (res.changes === 0) throw fail(404, 'Участник не найден');
   return c.json(detail(group, me));
 });
@@ -209,7 +214,10 @@ const expenseBody = z.object({
   payerId: z.number().int().positive(),
   splitMode: z.enum(['equal', 'shares', 'exact']),
   spentOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  shares: z.array(z.object({ memberId: z.number().int().positive(), value: z.number().int().min(0) })).min(1).max(100),
+  shares: z
+    .array(z.object({ memberId: z.number().int().positive(), value: z.number().int().min(0) }))
+    .min(1)
+    .max(100),
 });
 type ExpenseBody = z.infer<typeof expenseBody>;
 

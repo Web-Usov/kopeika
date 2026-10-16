@@ -1,17 +1,29 @@
 import { useMemo, useState } from 'react';
 import { amountToInput, computeShares, parseAmount, type SplitInput, type SplitMode } from '../../../shared/money.ts';
-import { api, setGroup, useGroup, type Expense, type GroupDetail } from '../api.ts';
+import { api, type Expense, type GroupDetail, setGroup, useGroup } from '../api.ts';
 import { navigate } from '../router.ts';
-import { BackButton, MainButton, alertDialog, confirmDialog, haptic } from '../tg.tsx';
+import { alertDialog, BackButton, confirmDialog, haptic, MainButton } from '../tg.tsx';
 import { Avatar, ErrorView, Loading, Money, Row, Section, Segmented, todayIso } from '../ui.tsx';
 
 export function ExpenseForm({ groupId, expenseId }: { groupId: number; expenseId?: number }) {
   const { data: g, error } = useGroup(groupId);
   const back = <BackButton onClick={() => navigate(`/g/${groupId}`, { replace: true })} />;
-  if (!g) return <div className="page">{back}{error ? <ErrorView message={error} /> : <Loading />}</div>;
+  if (!g)
+    return (
+      <div className="page">
+        {back}
+        {error ? <ErrorView message={error} /> : <Loading />}
+      </div>
+    );
 
   const expense = expenseId ? g.expenses.find((e) => e.id === expenseId && e.kind === 'expense') : undefined;
-  if (expenseId && !expense) return <div className="page">{back}<ErrorView message="Трата не найдена" /></div>;
+  if (expenseId && !expense)
+    return (
+      <div className="page">
+        {back}
+        <ErrorView message="Трата не найдена" />
+      </div>
+    );
   return (
     <div className="page">
       {back}
@@ -32,7 +44,7 @@ function initialParticipants(g: GroupDetail, e?: Expense): Record<number, Partic
     const s = e?.shares.find((x) => x.memberId === m.id);
     out[m.id] = {
       on: e ? Boolean(s) : true,
-      weight: e?.splitMode === 'shares' ? s?.input ?? 0 : 1,
+      weight: e?.splitMode === 'shares' ? (s?.input ?? 0) : 1,
       exact: e?.splitMode === 'exact' && s ? amountToInput(s.input) : '',
     };
   }
@@ -62,7 +74,8 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
   }, [g.members, parts, mode]);
 
   const exactSum = mode === 'exact' ? inputs.reduce((a, i) => a + i.value, 0) : 0;
-  const exactBadInput = mode === 'exact' && g.members.some((m) => parts[m.id].exact.trim() && parseAmount(parts[m.id].exact) === null);
+  const exactBadInput =
+    mode === 'exact' && g.members.some((m) => parts[m.id].exact.trim() && parseAmount(parts[m.id].exact) === null);
 
   let computed: Map<number, number> | null = null;
   let splitError: string | null = null;
@@ -138,7 +151,13 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
       </Section>
 
       <Section title="Когда">
-        <input className="field" type="date" value={spentOn} max={todayIso()} onChange={(e) => setSpentOn(e.target.value || todayIso())} />
+        <input
+          className="field"
+          type="date"
+          value={spentOn}
+          max={todayIso()}
+          onChange={(e) => setSpentOn(e.target.value || todayIso())}
+        />
       </Section>
 
       <Section
@@ -148,7 +167,9 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
             {mode === 'equal' && (
               <button
                 className="text-btn small"
-                onClick={() => setParts((p) => Object.fromEntries(g.members.map((m) => [m.id, { ...p[m.id], on: !allOn }])))}
+                onClick={() =>
+                  setParts((p) => Object.fromEntries(g.members.map((m) => [m.id, { ...p[m.id], on: !allOn }])))
+                }
               >
                 {allOn ? 'Снять всех' : 'Выбрать всех'}
               </button>
@@ -160,9 +181,13 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
             exactSum === amount ? (
               <span className="pos">✓ Сумма распределена полностью</span>
             ) : exactSum < amount ? (
-              <>Осталось распределить <Money value={amount - exactSum} currency={g.currency} /></>
+              <>
+                Осталось распределить <Money value={amount - exactSum} currency={g.currency} />
+              </>
             ) : (
-              <span className="neg">Распределено больше на <Money value={exactSum - amount} currency={g.currency} /></span>
+              <span className="neg">
+                Распределено больше на <Money value={exactSum - amount} currency={g.currency} />
+              </span>
             )
           ) : splitError && amount ? (
             <span className="neg">{splitError}</span>
@@ -212,7 +237,10 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
                 subtitle={shareView}
                 right={
                   <span className="stepper">
-                    <button onClick={() => update(m.id, { weight: Math.max(0, p.weight - 1) })} disabled={p.weight === 0}>
+                    <button
+                      onClick={() => update(m.id, { weight: Math.max(0, p.weight - 1) })}
+                      disabled={p.weight === 0}
+                    >
                       −
                     </button>
                     <span>{p.weight}</span>

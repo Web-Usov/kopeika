@@ -11,7 +11,10 @@ export function Avatar({ member, size = 36 }: { member: Pick<Member, 'id' | 'nam
     .map((w) => w[0]?.toUpperCase() ?? '')
     .join('');
   return (
-    <span className="avatar" style={{ width: size, height: size, background: palette[member.id % palette.length], fontSize: size * 0.4 }}>
+    <span
+      className="avatar"
+      style={{ width: size, height: size, background: palette[member.id % palette.length], fontSize: size * 0.4 }}
+    >
       {member.photoUrl ? <img src={member.photoUrl} alt="" /> : initials}
     </span>
   );
@@ -54,11 +57,19 @@ export function Row(props: {
   );
 }
 
-export function Segmented<T extends string>(props: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
+export function Segmented<T extends string>(props: {
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (v: T) => void;
+}) {
   return (
     <div className="segmented">
       {props.options.map((o) => (
-        <button key={o.value} className={o.value === props.value ? 'active' : ''} onClick={() => props.onChange(o.value)}>
+        <button
+          key={o.value}
+          className={o.value === props.value ? 'active' : ''}
+          onClick={() => props.onChange(o.value)}
+        >
           {o.label}
         </button>
       ))}
