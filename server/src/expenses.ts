@@ -13,6 +13,7 @@ import { expenseSnapshot, logActivity } from './activity.ts';
 import { all, one, run } from './db.ts';
 import { fail } from './errors.ts';
 import type { ExpenseRow, GroupRow } from './repo.ts';
+import { countEvent } from './stats.ts';
 
 export const expenseBody = z.object({
   kind: z.enum(['expense', 'transfer']).default('expense'),
@@ -115,6 +116,9 @@ export function createExpense(group: GroupRow, userId: number, body: ExpenseBody
     expense: expenseSnapshot(id)!,
     ...(recurring ? { recurring: true } : {}),
   });
+  // Demo play is not usage.
+  if (!group.is_demo)
+    countEvent(recurring ? 'expense.recurring' : body.kind === 'transfer' ? 'transfer.create' : 'expense.create');
   run('UPDATE groups SET archived_at = NULL WHERE id = ?', group.id);
   return one<ExpenseRow>('SELECT * FROM expenses WHERE id = ?', id)!;
 }

@@ -2,6 +2,16 @@ import path from 'node:path';
 
 const env = process.env;
 
+/** "1, 2" -> Set{1, 2}; junk is dropped. */
+export function parseAdminIds(raw: string | undefined): Set<number> {
+  return new Set(
+    (raw ?? '')
+      .split(',')
+      .map((v) => Number(v.trim()))
+      .filter((n) => Number.isInteger(n) && n > 0),
+  );
+}
+
 export const config = {
   port: Number(env.PORT ?? 3000),
   botToken: env.BOT_TOKEN ?? '',
@@ -29,6 +39,8 @@ export const config = {
   devAuth: env.DEV_AUTH === '1',
   /** How long a Telegram initData signature stays valid. */
   initDataMaxAgeSec: Number(env.INIT_DATA_MAX_AGE ?? 24 * 60 * 60),
+  /** Telegram ids (comma-separated) that may use /stats in a private chat with the bot. Empty = nobody. */
+  adminUserIds: parseAdminIds(env.ADMIN_USER_IDS),
   /** Max API requests per user per minute. */
   rateLimitPerMin: Number(env.RATE_LIMIT_PER_MIN ?? 120),
 };

@@ -143,3 +143,21 @@ test('demo group: expenses can be added and edited to play with', async () => {
   assert.equal(res.status, 201);
   assert.equal(res.body.expenses.length, g.expenses.length + 1);
 });
+
+test('demo group is not counted in usage stats', async () => {
+  const stats = await import('./stats.ts');
+  const before = stats.collectStats();
+  const u = newUser();
+  const g = (await call(u, 'POST', '/demo')).body;
+  await call(u, 'POST', `/groups/${g.id}/expenses`, {
+    title: 'Кофе',
+    amount: 500,
+    payerId: g.meId,
+    splitMode: 'equal',
+    spentOn: '2025-01-15',
+    shares: g.members.map((m: Json) => ({ memberId: m.id, value: 1 })),
+  });
+  const after = stats.collectStats();
+  assert.equal(after.groups, before.groups);
+  assert.deepEqual(after.events[30], before.events[30]);
+});

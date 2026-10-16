@@ -175,6 +175,15 @@ const migrations = [
   // Placeholder "deleted user" (id 0 never collides with a Telegram id). Account deletion points expenses.created_by,
   // activity.user_id and recurring.created_by of the removed user here, so history stays but is anonymous.
   `INSERT INTO users (id, first_name) VALUES (0, '');`,
+  // Anonymous daily usage counters (server-local day). No user or group ids: only how often something happened.
+  `
+  CREATE TABLE stats_daily (
+    date   TEXT NOT NULL,      -- YYYY-MM-DD
+    event  TEXT NOT NULL,
+    count  INTEGER NOT NULL,
+    PRIMARY KEY (date, event)
+  );
+  `,
   // Demo group ("Look at an example" on first launch): a sandbox with made-up people and expenses. Invites, the bot,
   // chat links, recurring templates and the inline list ignore it; it is deleted like any other group.
   `ALTER TABLE groups ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0;`,
