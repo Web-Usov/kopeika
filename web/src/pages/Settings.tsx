@@ -40,6 +40,7 @@ function SettingsView({ g }: { g: GroupDetail }) {
   const [name, setName] = useState(g.name);
   const [newMember, setNewMember] = useState('');
   const [copied, setCopied] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const copy = async () => {
     const text = g.inviteLink ?? g.inviteCode;
@@ -66,6 +67,20 @@ function SettingsView({ g }: { g: GroupDetail }) {
       navigate('/', { replace: true });
     } catch (e) {
       await alertDialog((e as Error).message);
+    }
+  };
+
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      await api.exportGroup(g.id);
+      haptic.success();
+      await alertDialog(t('settings.exportSent'));
+    } catch (e) {
+      haptic.error();
+      await alertDialog((e as Error).message);
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -141,6 +156,13 @@ function SettingsView({ g }: { g: GroupDetail }) {
             {t('common.add')}
           </button>
         </div>
+      </Section>
+
+      <Section title={t('settings.exportSection')} footer={t('settings.exportFooter')}>
+        <Row
+          title={exporting ? t('settings.exporting') : t('settings.exportCsv')}
+          onClick={exporting ? undefined : exportCsv}
+        />
       </Section>
 
       <Section footer={t('settings.archiveFooter')}>
