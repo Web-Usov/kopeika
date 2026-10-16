@@ -23,6 +23,7 @@ import {
   changeAudience,
   type ExpenseSnap,
 } from './notify.ts';
+import { grantReceipts, revokeReceipts, setBudgetNotifier } from './receipts/limits.ts';
 import {
   type ExpenseRow,
   type GroupRow,
@@ -83,6 +84,7 @@ export function startBot() {
     console.warn('BOT_TOKEN is not set: bot and Telegram auth are disabled');
     return;
   }
+  registerBudgetNotifier();
   void connectBot(bot);
 }
 
@@ -245,6 +247,20 @@ function registerChatHandlers(b: Bot) {
     await ctx.reply(buildStatsReport(pickLang(ctx.from?.language_code), collectStats()));
   });
 
+  // Owner only, private chat only, silent for everyone else (like /stats): give or take back the `receipts` right.
+  for (const command of ['grant', 'revoke'] as const) {
+    b.command(command, async (ctx) => {
+      const reply = ownerCommandReply(
+        command,
+        ctx.match,
+        ctx.from?.id,
+        ctx.chat.type,
+        pickLang(ctx.from?.language_code),
+      );
+      if (reply !== null) await ctx.reply(reply);
+    });
+  }
+
   b.command('unlink', async (ctx) => {
     if (!ctx.from || !isGroupChat(ctx.chat.type)) return;
     const t = createT(pickLang(ctx.from.language_code));
@@ -257,6 +273,36 @@ function registerChatHandlers(b: Bot) {
     const group = unlinkChat(ctx.chat.id, ctx.from.id);
     await ctx.reply(t(group ? 'bot.chatUnlinked' : 'bot.chatNotLinked'));
   });
+}
+
+/**
+ * /grant <inviteCode> [days] and /revoke <inviteCode>. Returns the reply text, or null when the sender is not the owner
+ * in a private chat (the command stays invisible to everyone else).
+ */
+export function ownerCommandReply(
+  command: 'grant' | 'revoke',
+  args: string,
+  userId: number | undefined,
+  chatType: string,
+  lang: Lang,
+  admins: Set<number> = config.adminUserIds,
+): string | null {
+  if (!canSeeStats(userId, chatType, admins) || userId === undefined) return null;
+  const t = createT(lang);
+  const [code, daysRaw, ...rest] = args.trim().split(/\s+/);
+  if (command === 'revoke') {
+    if (!code || daysRaw !== undefined) return t('bot.revokeUsage');
+    const g = revokeReceipts(code);
+    return g ? t('bot.revokeDone', { name: g.name }) : t('bot.grantNotFound');
+  }
+  const days = daysRaw === undefined ? null : Number(daysRaw);
+  if (!code || rest.length > 0 || (days !== null && !(Number.isInteger(days) && days >= 1 && days <= 3650))) {
+    return t('bot.grantUsage');
+  }
+  const g = grantReceipts(code, days, userId);
+  if (!g) return t('bot.grantNotFound');
+  const until = g.expiresAt === null ? t('bot.grantForever') : t('bot.grantUntil', { date: g.expiresAt.slice(0, 10) });
+  return t('bot.grantDone', { name: g.name, until });
 }
 
 /** After a successful link: confirmation in the chat in the linking user's language. Fire-and-forget. */
@@ -558,4 +604,21 @@ export function notifyRemind(
     hasPaymentInfo,
   });
   void send(debtorUserId, text, group, lang);
+}
+
+/** Budget thresholds of receipt scanning: tell every owner (ADMIN_USER_IDS), each in their language. */
+function registerBudgetNotifier() {
+  setBudgetNotifier((kind, spentMicro, capMicro) => {
+    if (!bot || !botReady) return;
+    const usd = (micro: number) => (micro / 1_000_000).toFixed(2);
+    for (const id of config.adminUserIds) {
+      const lang = pickLang(one<{ lang: string | null }>('SELECT lang FROM users WHERE id = ?', id)?.lang);
+      const t = createT(lang);
+      const text = t(kind === 'warn' ? 'bot.budgetWarn' : 'bot.budgetStop', {
+        spent: usd(spentMicro),
+        cap: usd(capMicro),
+      });
+      bot.api.sendMessage(id, text).catch((e) => logTelegramError('receipt budget notice failed', e));
+    }
+  });
 }

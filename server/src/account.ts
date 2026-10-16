@@ -6,6 +6,7 @@ import { countEvent } from './stats.ts';
 
 /** Removes a group with everything in it (expenses, shares, members; history, reminders and templates cascade). */
 export function eraseGroup(groupId: number) {
+  run('DELETE FROM group_entitlements WHERE group_id = ?', groupId);
   run('DELETE FROM expense_shares WHERE expense_id IN (SELECT id FROM expenses WHERE group_id = ?)', groupId);
   run('DELETE FROM expenses WHERE group_id = ?', groupId);
   run('DELETE FROM members WHERE group_id = ?', groupId);
@@ -63,6 +64,8 @@ export function deleteAccount(userId: number) {
         groupsDeleted++;
       }
     }
+    // The scan ledger is only numbers, but it still points at a person: detach it. The spend stays in the budget.
+    run('UPDATE receipt_scans SET user_id = ? WHERE user_id = ?', DELETED_USER_ID, userId);
     run('DELETE FROM chat_links WHERE created_by_user = ?', userId);
     // A template would keep creating expenses on behalf of a person who is gone: stop it, the group can resume it.
     run('UPDATE recurring SET active = 0, created_by = ? WHERE created_by = ?', DELETED_USER_ID, userId);

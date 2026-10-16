@@ -33,8 +33,17 @@ import { deserialize, isEmpty, PaymentInfoError, parsePaymentInfo, serialize } f
 import { assertCanJoinMoreGroups, assertRoomForMembers, assertRoomForRecurring } from './quota.ts';
 import { createRateLimiter } from './rateLimit.ts';
 import { getRate, RatesError } from './rates.ts';
+import {
+  acquireScan,
+  budgetExhausted,
+  canScan,
+  othersInFlight,
+  recordReceiptScan,
+  releaseScan,
+} from './receipts/limits.ts';
+import type { ReceiptUsage } from './receipts/provider.ts';
 import { receiptsEnabled } from './receipts/provider.ts';
-import { MEDIA_TYPES, matchesSignature, recordReceiptUsage, scanReceipt } from './receipts/service.ts';
+import { MEDIA_TYPES, matchesSignature, scanReceipt } from './receipts/service.ts';
 import {
   expenseFor,
   isoDate,
@@ -141,12 +150,27 @@ const name = z.string().trim().min(1).max(64);
 api.get('/me', (c) => {
   const u = one<UserRow>('SELECT * FROM users WHERE id = ?', c.get('user').id)!;
   // No Telegram id: the client identifies itself through `meId` of the group.
-  return c.json({ name: displayName(u), notify: u.notify === 1, receiptsEnabled: receiptsEnabled() });
+  return c.json({
+    name: displayName(u),
+    notify: u.notify === 1,
+    receiptsEnabled: receiptsEnabled(),
+    receiptConsent: u.receipt_consent_at !== null,
+  });
 });
 
 api.put('/me', async (c) => {
   const body = z.object({ notify: z.boolean() }).parse(await c.req.json());
   run('UPDATE users SET notify = ? WHERE id = ?', body.notify ? 1 : 0, c.get('user').id);
+  return c.json({ ok: true });
+});
+
+// The user agrees that receipt photos are sent to the recognition provider (see the privacy text). Required before parse.
+api.post('/me/receipt-consent', (c) => {
+  run(
+    'UPDATE users SET receipt_consent_at = COALESCE(receipt_consent_at, ?) WHERE id = ?',
+    new Date().toISOString(),
+    c.get('user').id,
+  );
   return c.json({ ok: true });
 });
 
@@ -510,6 +534,9 @@ const receiptBody = z.object({
   mediaType: z.enum(MEDIA_TYPES as [string, ...string[]]),
 });
 
+// Receipt photos cost money: a stricter limit of their own (plus one scan at a time per user, see limits.ts).
+export const receiptsLimiter = createRateLimiter({ limit: config.receiptsPerMin });
+
 api.post(
   '/groups/:id/receipts/parse',
   bodyLimit({
@@ -519,16 +546,34 @@ api.post(
   async (c) => {
     const user = c.get('user');
     const { group } = loadGroupFor(c.req.param('id'), user.id);
+    // The demo group is a sandbox open to everyone: scanning there would only burn the shared budget.
+    if (group.is_demo) throw fail(409, 'errors.demoNotAllowed');
     if (!receiptsEnabled()) throw fail(503, 'errors.receipt.disabled');
-    const body = receiptBody.parse(await c.req.json());
-    const mediaType = body.mediaType as (typeof MEDIA_TYPES)[number];
-    const bytes = Buffer.from(body.image, 'base64');
-    if (bytes.length === 0 || !matchesSignature(bytes, mediaType)) throw fail(400, 'errors.invalidData');
-    const draft = await scanReceipt({ mediaType, base64: body.image }, group.currency, (usage) =>
-      recordReceiptUsage(user.id, group.id, usage),
+    const consent = one<{ receipt_consent_at: string | null }>(
+      'SELECT receipt_consent_at FROM users WHERE id = ?',
+      user.id,
     );
-    c.header('Cache-Control', 'no-store');
-    return c.json(draft);
+    if (!consent?.receipt_consent_at) throw fail(409, 'errors.receipt.consentRequired');
+    if (budgetExhausted()) throw fail(503, 'errors.receipt.budget');
+    if (!receiptsLimiter.allow(user.id)) throw fail(429, 'errors.receipt.tooFast');
+    if (!acquireScan(user.id, group.id)) throw fail(429, 'errors.receipt.busy');
+    const usages: ReceiptUsage[] = [];
+    let success = false;
+    try {
+      if (!canScan(group.id, new Date(), othersInFlight(group.id))) throw fail(429, 'errors.receipt.groupLimit');
+      const body = receiptBody.parse(await c.req.json());
+      const mediaType = body.mediaType as (typeof MEDIA_TYPES)[number];
+      const bytes = Buffer.from(body.image, 'base64');
+      if (bytes.length === 0 || !matchesSignature(bytes, mediaType)) throw fail(400, 'errors.invalidData');
+      const draft = await scanReceipt({ mediaType, base64: body.image }, group.currency, (usage) => usages.push(usage));
+      success = true;
+      c.header('Cache-Control', 'no-store');
+      return c.json(draft);
+    } finally {
+      // Every call that returned tokens costs money (also "not a receipt"); only a returned draft uses the free quota.
+      recordReceiptScan(user.id, group.id, usages, success);
+      releaseScan(user.id, group.id);
+    }
   },
 );
 

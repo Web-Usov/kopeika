@@ -8,17 +8,22 @@ delete process.env.BOT_TOKEN;
 delete process.env.ANTHROPIC_API_KEY;
 
 let api: typeof import('./api.ts').api;
+let api_: typeof import('./api.ts');
 let config: typeof import('./config.ts').config;
 let providerModule: typeof import('./receipts/provider.ts');
 let normalize: typeof import('./receipts/normalize.ts');
 let anthropicModule: typeof import('./receipts/anthropic.ts');
 
 before(async () => {
-  ({ api } = await import('./api.ts'));
+  api_ = await import('./api.ts');
+  api = api_.api;
   ({ config } = await import('./config.ts'));
   providerModule = await import('./receipts/provider.ts');
   normalize = await import('./receipts/normalize.ts');
   anthropicModule = await import('./receipts/anthropic.ts');
+  // These tests scan a lot with one user and group: the limits have their own file (receiptLimits.test.ts).
+  api_.receiptsLimiter.setLimit(10_000);
+  config.receiptsGroupTrialMonthly = 10_000;
 });
 after(() => providerModule.setReceiptProviderForTests());
 
@@ -40,6 +45,7 @@ async function call(user: number | null, method: string, path: string, body?: un
 async function createGroup(user: number, currency = 'RUB') {
   const res = await call(user, 'POST', '/groups', { name: 'Ужин', currency });
   assert.equal(res.status, 201);
+  assert.equal((await call(user, 'POST', '/me/receipt-consent')).status, 200);
   return res.body as Json;
 }
 
