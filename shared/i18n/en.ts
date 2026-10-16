@@ -553,5 +553,11 @@ export const en: Dict = {
       sharesInteger: 'Shares must be whole numbers',
       sharesMissing: 'Set the shares',
     },
+    receipt: {
+      unassigned: 'Nobody is picked for these items: {ids}',
+      discountTooBig: 'The discount is bigger than the items total',
+      badItem: 'Invalid receipt item',
+      badAdjustment: 'Invalid surcharge or discount',
+    },
   },
 };
