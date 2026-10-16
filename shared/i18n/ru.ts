@@ -562,5 +562,11 @@ export const ru = {
       sharesInteger: 'Доли должны быть целыми числами',
       sharesMissing: 'Укажите доли',
     },
+    receipt: {
+      unassigned: 'Не выбрано, кто платит за позиции: {ids}',
+      discountTooBig: 'Скидка больше суммы позиций',
+      badItem: 'Некорректная позиция чека',
+      badAdjustment: 'Некорректная надбавка или скидка',
+    },
   },
 } as const;
