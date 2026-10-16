@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { ActivityEntry } from '../../shared/activity.ts';
+import type { CategoryId } from '../../shared/categories.ts';
 import type { SplitMode } from '../../shared/money.ts';
 import { lang, t } from './i18n.ts';
 import { authHeader, inTelegram } from './tg.tsx';
@@ -32,6 +33,8 @@ export interface Expense {
   payerId: number;
   splitMode: SplitMode;
   spentOn: string;
+  /** null for transfers */
+  category: CategoryId | null;
   createdAt: string;
   shares: { memberId: number; input: number; amount: number }[];
 }
@@ -72,6 +75,7 @@ export interface ExpenseInput {
   payerId: number;
   splitMode: SplitMode;
   spentOn: string;
+  category?: CategoryId;
   shares: { memberId: number; value: number }[];
 }
 
