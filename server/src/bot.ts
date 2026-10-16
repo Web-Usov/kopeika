@@ -13,8 +13,16 @@ import {
 import { balanceText, esc, helpText, privateBalanceText } from './chatText.ts';
 import { config } from './config.ts';
 import { all, one, run } from './db.ts';
+import { buildInlineResults } from './inline.ts';
 import { buildChangeMessage, buildRemindMessage, changeAudience, type ExpenseSnap } from './notify.ts';
-import { type ExpenseRow, type GroupRow, groupBalanceSnapshot, groupsForUser, upsertUser } from './repo.ts';
+import {
+  type ExpenseRow,
+  type GroupRow,
+  groupBalanceSnapshot,
+  groupsForUser,
+  inlineGroupsForUser,
+  upsertUser,
+} from './repo.ts';
 
 export const bot = config.botToken
   ? new Bot(config.botToken, {
@@ -129,7 +137,7 @@ function registerChatHandlers(b: Bot) {
 
   b.command('help', async (ctx) => {
     const lang = pickLang(ctx.from?.language_code);
-    await ctx.reply(helpText(lang, isGroupChat(ctx.chat.type)));
+    await ctx.reply(helpText(lang, isGroupChat(ctx.chat.type), botUsername));
   });
 
   b.command('balance', async (ctx) => {
@@ -172,6 +180,18 @@ function registerChatHandlers(b: Bot) {
       ...html,
       reply_markup: url ? new InlineKeyboard().url(t('bot.openGroup'), url) : undefined,
     });
+  });
+
+  b.on('inline_query', async (ctx) => {
+    const from = ctx.inlineQuery.from;
+    upsertUser(from);
+    const results = buildInlineResults(
+      pickLang(from.language_code),
+      inlineGroupsForUser(from.id),
+      ctx.inlineQuery.query,
+      { groupLink: (code) => appLink(code), botLink: botUsername ? `https://t.me/${botUsername}` : null },
+    );
+    await ctx.answerInlineQuery(results, { cache_time: 10, is_personal: true });
   });
 
   b.command('unlink', async (ctx) => {

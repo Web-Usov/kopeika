@@ -213,3 +213,22 @@ export function groupsForUser(userId: number) {
     };
   });
 }
+
+/** Non-archived groups of a user for inline queries; the heavy ledger is loaded lazily via `snapshot()`. */
+export function inlineGroupsForUser(userId: number) {
+  const groups = all<GroupRow & { member_id: number }>(
+    `SELECT g.*, m.id AS member_id FROM groups g JOIN members m ON m.group_id = g.id
+     WHERE m.user_id = ? AND g.archived_at IS NULL ORDER BY g.created_at DESC, g.id DESC`,
+    userId,
+  );
+  return groups.map((g) => ({
+    id: g.id,
+    name: g.name,
+    currency: g.currency,
+    inviteCode: g.invite_code,
+    snapshot: () => {
+      const snap = groupBalanceSnapshot(g);
+      return { ...snap, myBalance: snap.members.find((m) => m.id === g.member_id)?.balance ?? 0 };
+    },
+  }));
+}

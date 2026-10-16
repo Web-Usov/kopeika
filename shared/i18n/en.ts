@@ -354,6 +354,7 @@ export const en: Dict = {
       'I am Kopeika: I help split shared expenses.\n\n' +
       '/balance - your balances in each group\n' +
       '/help - this message\n\n' +
+      'In any chat, type @{bot} and a group name to share its balance.\n\n' +
       'Groups, expenses and transfers live in the app. I will message you when someone adds an expense you take part in.',
     helpGroup:
       'I am Kopeika: I help split shared expenses.\n\n' +
@@ -361,6 +362,12 @@ export const en: Dict = {
       '/unlink - unlink the chat from the group (admins only)\n' +
       '/help - this message\n\n' +
       'To link the chat to a group, open the group in the app.',
+    inlineEmptyTitle: "You don't have any groups yet",
+    inlineEmptyDescription: 'Open Kopeika and create the first one',
+    inlineOpenBot: 'Open Kopeika',
+    inlineDescription: 'Total {total} · {mine}',
+    inlineMine: 'you: {amount}',
+    inlineMineSettled: "you're settled up",
     commandStart: 'Start',
     commandHelp: 'What the bot can do',
     commandBalance: 'Who owes whom',

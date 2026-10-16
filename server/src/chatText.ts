@@ -76,6 +76,8 @@ export function privateBalanceText(lang: Lang, groups: PrivateBalanceGroup[]): s
   return `<b>${t('bot.balancePrivateTitle')}</b>\n${limited(lines, lang, MAX_GROUPS).join('\n')}`;
 }
 
-export function helpText(lang: Lang, isGroup: boolean): string {
-  return createT(lang)(isGroup ? 'bot.helpGroup' : 'bot.helpPrivate');
+export function helpText(lang: Lang, isGroup: boolean, botUsername = ''): string {
+  const text = createT(lang)(isGroup ? 'bot.helpGroup' : 'bot.helpPrivate', { bot: botUsername });
+  // Without a known username the inline hint would read «@ …»: drop that paragraph.
+  return botUsername ? text : text.replace(/\n\n[^\n]*@[^\n]*\n\n/, '\n\n');
 }
