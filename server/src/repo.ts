@@ -32,6 +32,7 @@ export interface GroupRow {
   chat_feed: ChatFeed;
   last_digest_date: string | null;
   last_digest_at: string | null;
+  is_demo: number;
 }
 
 export interface MemberRow {
@@ -169,7 +170,9 @@ export function groupDetail(group: GroupRow, me: MemberRow, inviteLink: string |
     name: group.name,
     currency: group.currency,
     inviteCode: group.invite_code,
-    inviteLink,
+    // The demo group cannot be joined, so it has no invite.
+    inviteLink: group.is_demo ? null : inviteLink,
+    isDemo: group.is_demo === 1,
     isOwner: group.created_by === me.user_id,
     archived: group.archived_at !== null,
     // Only the title: the numeric chat id never leaves the server.
@@ -249,6 +252,7 @@ export function groupsForUser(userId: number) {
     totalSpent: totals.get(g.id) ?? 0,
     myBalance: balanceOf.get(g.member_id) ?? 0,
     archived: g.archived_at !== null,
+    isDemo: g.is_demo === 1,
   }));
 }
 
@@ -256,7 +260,7 @@ export function groupsForUser(userId: number) {
 export function inlineGroupsForUser(userId: number) {
   const groups = all<GroupRow & { member_id: number }>(
     `SELECT g.*, m.id AS member_id FROM groups g JOIN members m ON m.group_id = g.id
-     WHERE m.user_id = ? AND g.archived_at IS NULL ORDER BY g.created_at DESC, g.id DESC`,
+     WHERE m.user_id = ? AND g.archived_at IS NULL AND g.is_demo = 0 ORDER BY g.created_at DESC, g.id DESC`,
     userId,
   );
   return groups.map((g) => ({

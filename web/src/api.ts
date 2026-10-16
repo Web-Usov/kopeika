@@ -56,6 +56,8 @@ export interface GroupDetail {
   inviteCode: string;
   inviteLink: string | null;
   isOwner: boolean;
+  /** Sandbox group with made-up people: no invites, no bot, no chat link. */
+  isDemo: boolean;
   archived: boolean;
   /** Linked Telegram chat (title only), if any. */
   chat: { title: string; feed: ChatFeed } | null;
@@ -74,6 +76,7 @@ export interface GroupSummary {
   totalSpent: number;
   myBalance: number;
   archived: boolean;
+  isDemo: boolean;
 }
 
 export interface InvitePreview {
@@ -234,6 +237,7 @@ export const api = {
   createGroup: (body: { name: string; currency: string; memberNames: string[] }) =>
     request<GroupDetail>('POST', '/groups', body),
   renameGroup: (id: number, name: string) => request<GroupDetail>('PATCH', `/groups/${id}`, { name }),
+  createDemo: () => request<GroupDetail>('POST', '/demo'),
   deleteGroup: (id: number) => request('DELETE', `/groups/${id}`),
   archiveGroup: (id: number) => request<GroupDetail>('POST', `/groups/${id}/archive`),
   unarchiveGroup: (id: number) => request<GroupDetail>('POST', `/groups/${id}/unarchive`),

@@ -175,6 +175,9 @@ const migrations = [
   // Placeholder "deleted user" (id 0 never collides with a Telegram id). Account deletion points expenses.created_by,
   // activity.user_id and recurring.created_by of the removed user here, so history stays but is anonymous.
   `INSERT INTO users (id, first_name) VALUES (0, '');`,
+  // Demo group ("Look at an example" on first launch): a sandbox with made-up people and expenses. Invites, the bot,
+  // chat links, recurring templates and the inline list ignore it; it is deleted like any other group.
+  `ALTER TABLE groups ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0;`,
 ];
 
 const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;

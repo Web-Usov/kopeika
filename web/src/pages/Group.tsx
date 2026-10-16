@@ -6,6 +6,7 @@ import {
   type ApiError,
   api,
   type Expense,
+  forgetGroup,
   type GroupDetail,
   hasPaymentInfo,
   type Member,
@@ -15,7 +16,7 @@ import {
 import { Celebration } from '../Celebration.tsx';
 import { dateLocale, lang, rich, t } from '../i18n.ts';
 import { navigate } from '../router.ts';
-import { alertDialog, BackButton, copyText, haptic, MainButton, openLink, shareLink } from '../tg.tsx';
+import { alertDialog, BackButton, confirmDialog, copyText, haptic, MainButton, openLink, shareLink } from '../tg.tsx';
 import { Avatar, ErrorView, formatDay, Loading, Money, Row, Section, Segmented } from '../ui.tsx';
 
 export type Tab = 'expenses' | 'balances' | 'history';
@@ -37,6 +38,7 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
   return (
     <div className="page">
       {back}
+      {g.isDemo && <DemoBanner g={g} />}
       <header className="group-header">
         <h2>{g.name}</h2>
         <div className="hint">
@@ -83,6 +85,27 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
   );
 }
 
+function DemoBanner({ g }: { g: GroupDetail }) {
+  const remove = async () => {
+    if (!(await confirmDialog(t('group.demoConfirmDelete')))) return;
+    try {
+      await api.deleteGroup(g.id);
+      forgetGroup(g.id);
+      navigate('/', { replace: true });
+    } catch (e) {
+      await alertDialog((e as Error).message);
+    }
+  };
+  return (
+    <div className="banner">
+      {t('group.demoBanner')}{' '}
+      <button type="button" className="link-btn" onClick={() => void remove()}>
+        {t('group.demoDelete')}
+      </button>
+    </div>
+  );
+}
+
 function invite(g: GroupDetail) {
   const link = g.inviteLink;
   if (!link) {
@@ -93,13 +116,18 @@ function invite(g: GroupDetail) {
 }
 
 function ExpensesTab({ g }: { g: GroupDetail }) {
+  // A real group with only its creator in it: the next step is inviting people.
+  const solo = !g.isDemo && g.members.length === 1;
   if (g.expenses.length === 0) {
     return (
-      <div className="empty">
-        <div className="empty-emoji">🧾</div>
-        <p>{t('group.noExpenses')}</p>
-        <p className="hint">{t('group.noExpensesHint')}</p>
-      </div>
+      <>
+        <div className="empty">
+          <div className="empty-emoji">🧾</div>
+          <p>{t('group.noExpenses')}</p>
+          <p className="hint">{t('group.noExpensesHint')}</p>
+        </div>
+        {solo && <InviteHint g={g} />}
+      </>
     );
   }
   const byDay = new Map<string, Expense[]>();
@@ -109,6 +137,7 @@ function ExpensesTab({ g }: { g: GroupDetail }) {
 
   return (
     <>
+      {solo && <InviteHint g={g} />}
       {[...byDay].map(([day, list]) => (
         <Section key={day} title={formatDay(day)}>
           {list.map((e) => {
@@ -153,6 +182,18 @@ function ExpensesTab({ g }: { g: GroupDetail }) {
         </Section>
       ))}
     </>
+  );
+}
+
+function InviteHint({ g }: { g: GroupDetail }) {
+  return (
+    <div className="empty">
+      <p>{t('group.soloTitle')}</p>
+      <p className="hint">{t('group.soloHint')}</p>
+      <button type="button" className="small-btn primary" onClick={() => invite(g)}>
+        {t('group.soloInvite')}
+      </button>
+    </div>
   );
 }
 

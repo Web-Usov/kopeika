@@ -138,27 +138,29 @@ function SettingsView({ g }: { g: GroupDetail }) {
         </div>
       </Section>
 
-      <Section title={t('settings.inviteSection')} footer={t('settings.inviteFooter')}>
-        {g.inviteLink ? (
-          <>
-            <div className="row invite-link">{g.inviteLink}</div>
-            <div className="row buttons">
-              <button type="button" className="small-btn" onClick={copy}>
-                {copied ? t('settings.copied') : t('settings.copy')}
-              </button>
-              <button
-                type="button"
-                className="small-btn primary"
-                onClick={() => shareLink(g.inviteLink!, t('settings.shareText', { name: g.name }))}
-              >
-                {t('settings.share')}
-              </button>
-            </div>
-          </>
-        ) : (
-          <div className="row hint">{t('settings.noLink', { code: g.inviteCode })}</div>
-        )}
-      </Section>
+      {!g.isDemo && (
+        <Section title={t('settings.inviteSection')} footer={t('settings.inviteFooter')}>
+          {g.inviteLink ? (
+            <>
+              <div className="row invite-link">{g.inviteLink}</div>
+              <div className="row buttons">
+                <button type="button" className="small-btn" onClick={copy}>
+                  {copied ? t('settings.copied') : t('settings.copy')}
+                </button>
+                <button
+                  type="button"
+                  className="small-btn primary"
+                  onClick={() => shareLink(g.inviteLink!, t('settings.shareText', { name: g.name }))}
+                >
+                  {t('settings.share')}
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="row hint">{t('settings.noLink', { code: g.inviteCode })}</div>
+          )}
+        </Section>
+      )}
 
       <Section title={t('settings.membersSection', { count: g.members.length })} footer={t('settings.membersFooter')}>
         {g.members.map((m) => (
@@ -179,33 +181,35 @@ function SettingsView({ g }: { g: GroupDetail }) {
         </div>
       </Section>
 
-      <Section title={t('settings.chatSection')} footer={g.chat ? t(FEED_FOOTER[g.chat.feed]) : undefined}>
-        {g.chat ? (
-          <>
-            <Row
-              title={t('settings.chatLinked', { title: g.chat.title })}
-              right={
-                <button type="button" className="small-btn" onClick={() => void unlinkChat()}>
-                  {t('settings.chatUnlink')}
-                </button>
-              }
-            />
-            <Segmented<ChatFeed>
-              value={g.chat.feed}
-              options={[
-                { value: 'off', label: t('settings.feedOff') },
-                { value: 'each', label: t('settings.feedEach') },
-                { value: 'daily', label: t('settings.feedDaily') },
-              ]}
-              onChange={(feed) => void run(() => api.setChatFeed(g.id, feed))}
-            />
-          </>
-        ) : (
-          <div className="row hint">{t('settings.chatNone')}</div>
-        )}
-      </Section>
+      {!g.isDemo && (
+        <Section title={t('settings.chatSection')} footer={g.chat ? t(FEED_FOOTER[g.chat.feed]) : undefined}>
+          {g.chat ? (
+            <>
+              <Row
+                title={t('settings.chatLinked', { title: g.chat.title })}
+                right={
+                  <button type="button" className="small-btn" onClick={() => void unlinkChat()}>
+                    {t('settings.chatUnlink')}
+                  </button>
+                }
+              />
+              <Segmented<ChatFeed>
+                value={g.chat.feed}
+                options={[
+                  { value: 'off', label: t('settings.feedOff') },
+                  { value: 'each', label: t('settings.feedEach') },
+                  { value: 'daily', label: t('settings.feedDaily') },
+                ]}
+                onChange={(feed) => void run(() => api.setChatFeed(g.id, feed))}
+              />
+            </>
+          ) : (
+            <div className="row hint">{t('settings.chatNone')}</div>
+          )}
+        </Section>
+      )}
 
-      <RecurringSection g={g} />
+      {!g.isDemo && <RecurringSection g={g} />}
 
       <Section title={t('settings.exportSection')} footer={t('settings.exportFooter')}>
         <Row

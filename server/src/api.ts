@@ -20,6 +20,7 @@ import {
 import { attachChat, checkChatLink, groupOfChat, unlinkGroup } from './chatLink.ts';
 import { config } from './config.ts';
 import { all, one, run, tx } from './db.ts';
+import { createDemoGroup } from './demo.ts';
 import { ApiError, fail } from './errors.ts';
 import { createExpense, expenseBody, saveShares, validateExpense } from './expenses.ts';
 import { buildCsv, exportFileName } from './export.ts';
@@ -181,6 +182,14 @@ api.post('/groups', async (c) => {
   return c.json(detail(group, me), 201);
 });
 
+// "Look at an example": creates the demo group of the caller, or returns the one they already have.
+api.post('/demo', (c) => {
+  const user = c.get('user');
+  const { group, created } = createDemoGroup(user, c.get('lang'));
+  const me = findMembership(group.id, user.id)!;
+  return c.json(detail(group, me), created ? 201 : 200);
+});
+
 api.get('/groups/:id', (c) => {
   const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
   return c.json(detail(group, me));
@@ -328,6 +337,7 @@ api.post('/chat-links/:token/attach', async (c) => {
   const body = z.object({ groupId: z.number().int().positive() }).parse(await c.req.json());
   const link = loadChatLink(c.req.param('token'));
   const { group, me } = loadGroupFor(String(body.groupId), user.id);
+  if (group.is_demo) throw fail(409, 'errors.demoNotAllowed');
   attachChat(link, group, user.id);
   const linked = one<GroupRow>('SELECT * FROM groups WHERE id = ?', group.id)!;
   notifyChatLinked(link.chat_id, linked, c.get('lang'));
@@ -337,6 +347,7 @@ api.post('/chat-links/:token/attach', async (c) => {
 api.put('/groups/:id/chat/feed', async (c) => {
   const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
   const { feed } = z.object({ feed: z.enum(CHAT_FEEDS as [ChatFeed, ...ChatFeed[]]) }).parse(await c.req.json());
+  if (group.is_demo) throw fail(409, 'errors.demoNotAllowed');
   if (group.chat_id === null) throw fail(409, 'errors.chatNotLinked');
   run('UPDATE groups SET chat_feed = ? WHERE id = ?', feed, group.id);
   return c.json(detail({ ...group, chat_feed: feed }, me));
@@ -350,7 +361,7 @@ api.post('/groups/:id/chat/unlink', (c) => {
 
 // --- Invites ---
 api.get('/invite/:code', (c) => {
-  const group = one<GroupRow>('SELECT * FROM groups WHERE invite_code = ?', c.req.param('code'));
+  const group = one<GroupRow>('SELECT * FROM groups WHERE invite_code = ? AND is_demo = 0', c.req.param('code'));
   if (!group) throw fail(404, 'errors.inviteInvalid');
   const me = findMembership(group.id, c.get('user').id);
   const members = all<MemberRow>('SELECT * FROM members WHERE group_id = ? ORDER BY id', group.id);
@@ -364,7 +375,7 @@ api.get('/invite/:code', (c) => {
 api.post('/invite/:code/join', async (c) => {
   const user = c.get('user');
   const body = z.object({ claimMemberId: z.number().int().positive().optional() }).parse(await c.req.json());
-  const group = one<GroupRow>('SELECT * FROM groups WHERE invite_code = ?', c.req.param('code'));
+  const group = one<GroupRow>('SELECT * FROM groups WHERE invite_code = ? AND is_demo = 0', c.req.param('code'));
   if (!group) throw fail(404, 'errors.inviteInvalid');
   if (!findMembership(group.id, user.id)) {
     tx(() => {
@@ -505,6 +516,7 @@ api.get('/groups/:id/recurring', (c) => {
 api.post('/groups/:id/recurring', async (c) => {
   const user = c.get('user');
   const { group } = loadGroupFor(c.req.param('id'), user.id);
+  if (group.is_demo) throw fail(409, 'errors.demoNotAllowed');
   const body = recurringCreate.parse(await c.req.json());
   const today = localDate();
   // Never earlier than today: a template does not back-fill the past.
