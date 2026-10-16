@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { pickLang } from '../../shared/i18n/index.ts';
-import { computeBalances, type LedgerEntry, type SplitMode, settleUp } from '../../shared/money.ts';
+import { type SplitMode, settleUp } from '../../shared/money.ts';
 import type { TelegramUser } from './auth.ts';
 import { all, one, run } from './db.ts';
 import { deserialize } from './paymentInfo.ts';
@@ -102,8 +102,36 @@ export function findMembership(groupId: number, userId: number) {
   return one<MemberRow>('SELECT * FROM members WHERE group_id = ? AND user_id = ?', groupId, userId);
 }
 
-function loadLedger(groupId: number) {
-  const members = all<
+/**
+ * Member balances straight from SQL: paid (expenses by payer) minus owed (shares by member), per member.
+ * Same numbers as `computeBalances` from shared/money.ts (a test compares them), without loading any ledger rows.
+ * Positive = the group owes this member. `where` filters `members m`; its params follow.
+ */
+function memberBalances(where: string, ...params: number[]) {
+  return all<{ id: number; group_id: number; balance: number }>(
+    `SELECT m.id, m.group_id,
+            COALESCE((SELECT SUM(e.amount) FROM expenses e WHERE e.payer_id = m.id), 0)
+          - COALESCE((SELECT SUM(s.amount) FROM expense_shares s WHERE s.member_id = m.id), 0) AS balance
+     FROM members m WHERE ${where}`,
+    ...params,
+  );
+}
+
+/** Sum of real expenses (transfers excluded) per group. */
+function totalsSpent(where: string, ...params: number[]) {
+  const rows = all<{ group_id: number; total: number }>(
+    `SELECT group_id, SUM(amount) AS total FROM expenses WHERE kind = 'expense' AND ${where} GROUP BY group_id`,
+    ...params,
+  );
+  return new Map(rows.map((r) => [r.group_id, r.total]));
+}
+
+export function groupBalances(groupId: number) {
+  return new Map(memberBalances('m.group_id = ?', groupId).map((r) => [r.id, r.balance]));
+}
+
+function loadMembers(groupId: number) {
+  return all<
     MemberRow & {
       username: string | null;
       photo_url: string | null;
@@ -115,34 +143,27 @@ function loadLedger(groupId: number) {
      WHERE m.group_id = ? ORDER BY m.id`,
     groupId,
   );
-  const expenses = all<ExpenseRow>(
-    'SELECT * FROM expenses WHERE group_id = ? ORDER BY spent_on DESC, id DESC',
-    groupId,
-  );
-  const shares = all<ShareRow>(
-    `SELECT s.* FROM expense_shares s JOIN expenses e ON e.id = s.expense_id WHERE e.group_id = ?`,
-    groupId,
-  );
-  const sharesByExpense = new Map<number, ShareRow[]>();
-  for (const s of shares) {
-    const list = sharesByExpense.get(s.expense_id) ?? [];
-    list.push(s);
-    sharesByExpense.set(s.expense_id, list);
-  }
-  const entries: LedgerEntry[] = expenses.map((e) => ({
-    payerId: e.payer_id,
-    amount: e.amount,
-    shares: (sharesByExpense.get(e.id) ?? []).map((s) => ({ memberId: s.member_id, amount: s.amount })),
-  }));
-  const balances = computeBalances(
-    members.map((m) => m.id),
-    entries,
-  );
-  return { members, expenses, sharesByExpense, balances };
 }
 
 export function groupDetail(group: GroupRow, me: MemberRow, inviteLink: string | null) {
-  const { members, expenses, sharesByExpense, balances } = loadLedger(group.id);
+  const members = loadMembers(group.id);
+  const balances = groupBalances(group.id);
+  const expenses = all<ExpenseRow>(
+    'SELECT * FROM expenses WHERE group_id = ? ORDER BY spent_on DESC, id DESC',
+    group.id,
+  );
+  const shares = all<ShareRow>(
+    'SELECT s.* FROM expense_shares s JOIN expenses e ON e.id = s.expense_id WHERE e.group_id = ?',
+    group.id,
+  );
+  const sharesByExpense = new Map<number, ShareRow[]>();
+  let totalSpent = 0;
+  for (const e of expenses) if (e.kind === 'expense') totalSpent += e.amount;
+  for (const s of shares) {
+    const list = sharesByExpense.get(s.expense_id);
+    if (list) list.push(s);
+    else sharesByExpense.set(s.expense_id, [s]);
+  }
   return {
     id: group.id,
     name: group.name,
@@ -154,7 +175,7 @@ export function groupDetail(group: GroupRow, me: MemberRow, inviteLink: string |
     // Only the title: the numeric chat id never leaves the server.
     chat: group.chat_id === null ? null : { title: group.chat_title ?? '', feed: group.chat_feed },
     meId: me.id,
-    totalSpent: expenses.filter((e) => e.kind === 'expense').reduce((a, e) => a + e.amount, 0),
+    totalSpent,
     members: members.map((m) => ({
       id: m.id,
       name: m.name,
@@ -192,9 +213,13 @@ export function groupDetail(group: GroupRow, me: MemberRow, inviteLink: string |
 
 /** Everything a chat message needs about a group's balances; no viewer, so it works for people who aren't members. */
 export function groupBalanceSnapshot(group: GroupRow) {
-  const { members, expenses, balances } = loadLedger(group.id);
+  const members = all<{ id: number; name: string }>(
+    'SELECT id, name FROM members WHERE group_id = ? ORDER BY id',
+    group.id,
+  );
+  const balances = groupBalances(group.id);
   return {
-    totalSpent: expenses.filter((e) => e.kind === 'expense').reduce((a, e) => a + e.amount, 0),
+    totalSpent: totalsSpent('group_id = ?', group.id).get(group.id) ?? 0,
     members: members.map((m) => ({ id: m.id, name: m.name, balance: balances.get(m.id) ?? 0 })),
     settlements: settleUp(balances),
   };
@@ -206,18 +231,25 @@ export function groupsForUser(userId: number) {
      WHERE m.user_id = ? ORDER BY g.created_at DESC, g.id DESC`,
     userId,
   );
-  return groups.map((g) => {
-    const { members, expenses, balances } = loadLedger(g.id);
-    return {
-      id: g.id,
-      name: g.name,
-      currency: g.currency,
-      membersCount: members.length,
-      totalSpent: expenses.filter((e) => e.kind === 'expense').reduce((a, e) => a + e.amount, 0),
-      myBalance: balances.get(g.member_id) ?? 0,
-      archived: g.archived_at !== null,
-    };
-  });
+  const totals = totalsSpent('group_id IN (SELECT group_id FROM members WHERE user_id = ?)', userId);
+  // Only the viewer's own balance is needed here, not everyone's.
+  const balanceOf = new Map(memberBalances('m.user_id = ?', userId).map((r) => [r.id, r.balance]));
+  const counts = new Map(
+    all<{ group_id: number; n: number }>(
+      `SELECT group_id, COUNT(*) AS n FROM members
+       WHERE group_id IN (SELECT group_id FROM members WHERE user_id = ?) GROUP BY group_id`,
+      userId,
+    ).map((r) => [r.group_id, r.n]),
+  );
+  return groups.map((g) => ({
+    id: g.id,
+    name: g.name,
+    currency: g.currency,
+    membersCount: counts.get(g.id) ?? 0,
+    totalSpent: totals.get(g.id) ?? 0,
+    myBalance: balanceOf.get(g.member_id) ?? 0,
+    archived: g.archived_at !== null,
+  }));
 }
 
 /** Non-archived groups of a user for inline queries; the heavy ledger is loaded lazily via `snapshot()`. */
