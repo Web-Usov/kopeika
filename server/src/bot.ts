@@ -3,7 +3,7 @@ import { createT, type Lang, pickLang } from '../../shared/i18n/index.ts';
 import { formatMoney } from '../../shared/money.ts';
 import { config } from './config.ts';
 import { all, one, run } from './db.ts';
-import { buildChangeMessage, changeAudience, type ExpenseSnap } from './notify.ts';
+import { buildChangeMessage, buildRemindMessage, changeAudience, type ExpenseSnap } from './notify.ts';
 import { type ExpenseRow, type GroupRow, upsertUser } from './repo.ts';
 
 export const bot = config.botToken ? new Bot(config.botToken) : null;
@@ -191,4 +191,25 @@ export function notifyExpenseChange(
   } catch (e) {
     console.warn('notifyExpenseChange failed', e);
   }
+}
+
+/** Sends a debt reminder to the debtor's DM in their language. Fire-and-forget. */
+export function notifyRemind(
+  group: GroupRow,
+  debtorUserId: number,
+  creditorName: string,
+  amount: number,
+  hasPaymentInfo: boolean,
+) {
+  if (!bot) return;
+  const lang = pickLang(one<{ lang: string | null }>('SELECT lang FROM users WHERE id = ?', debtorUserId)?.lang);
+  const text = buildRemindMessage({
+    lang,
+    currency: group.currency,
+    groupName: group.name,
+    authorName: creditorName,
+    amount,
+    hasPaymentInfo,
+  });
+  void send(debtorUserId, text, group, lang);
 }

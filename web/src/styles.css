@@ -665,3 +665,13 @@ select.field {
   white-space: normal;
   overflow: visible;
 }
+
+.row.buttons-wrap-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.small-btn:disabled {
+  opacity: 0.5;
+}

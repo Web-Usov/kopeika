@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { buildChangeMessage, changeAudience, type ExpenseSnap } from './notify.ts';
+import { buildChangeMessage, buildRemindMessage, changeAudience, type ExpenseSnap } from './notify.ts';
 
 const names = new Map([
   [1, 'Маша'],
@@ -93,4 +93,15 @@ test('transfers', () => {
   assert.equal(buildChangeMessage({ ...base, lang: 'ru', before: tr, after: { ...tr } }), null);
   assert.ok(buildChangeMessage({ ...base, lang: 'ru', before: tr, after: null })?.includes('удалил(а) перевод'));
   assert.ok(buildChangeMessage({ ...base, lang: 'en', before: tr, after: null })?.includes('deleted a transfer'));
+});
+
+test('remind message (ru, en)', () => {
+  const input = { currency: 'RUB', groupName: 'Дача <1>', authorName: 'Маша', amount: 150000, hasPaymentInfo: false };
+  const ru = nbsp(buildRemindMessage({ ...input, lang: 'ru' }));
+  assert.equal(ru, '💰 <b>Дача &lt;1&gt;</b>\nМаша напоминает о долге: 1 500 ₽');
+  const withInfo = buildRemindMessage({ ...input, lang: 'ru', hasPaymentInfo: true });
+  assert.ok(withInfo.endsWith('\nРеквизиты — в приложении'));
+  const en = buildRemindMessage({ ...input, lang: 'en', hasPaymentInfo: true });
+  assert.ok(en.includes('Маша is reminding you about a debt: '), en);
+  assert.ok(en.endsWith('\nPayment details are in the app'));
 });

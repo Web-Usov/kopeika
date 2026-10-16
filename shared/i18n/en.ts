@@ -77,6 +77,9 @@ export const en: Dict = {
     howToSettle: 'How to settle up',
     allSettled: 'Everyone is settled up 🎉',
     returned: 'Paid back',
+    remind: 'Remind',
+    reminded: 'Reminded',
+    remindNoNotify: '{name} has not enabled notifications',
     manualTransfer: 'Record a transfer manually',
     statsTitle: 'Stats',
     statsGroup: 'Whole group',
@@ -122,6 +125,7 @@ export const en: Dict = {
     empty: 'Nothing has changed yet',
     emptyHint: 'Every change in the group shows up here: who added, edited or deleted what.',
     loadMore: 'Show more',
+    remind: '{actor} sent a debt reminder: {name}, {amount}',
   },
   payment: {
     mySection: 'My payment details',
@@ -239,6 +243,8 @@ export const en: Dict = {
     changeTitle: 'title “{from}” → “{to}”',
     changePayer: 'paid by {from} → {to}',
     shareRemoved: 'You were removed from this expense',
+    remind: '{author} is reminding you about a debt: {amount}',
+    remindPayment: 'Payment details are in the app',
   },
   export: {
     date: 'Date',
@@ -267,6 +273,9 @@ export const en: Dict = {
       'You’re the last member with Telegram, so you can’t leave. Delete the group or invite someone first.',
     ownerOnlyDelete: 'Only the creator can delete the group',
     memberNotFound: 'Member not found',
+    remindNotAllowed: 'This person does not owe you right now',
+    remindNoNotify: 'This person has not enabled notifications, so a reminder cannot be sent',
+    remindToday: 'Already reminded today',
     memberHasTelegram: "You can't remove a member who joined via Telegram",
     paymentInfoTelegram: 'A member with Telegram sets their own payment details on the home screen',
     payment: {
