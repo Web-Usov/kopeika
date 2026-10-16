@@ -955,3 +955,46 @@ select.field {
   font-weight: 500;
   vertical-align: middle;
 }
+
+/* --- Achievements --- */
+.achievement {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+}
+
+.achievement + .achievement {
+  border-top: 1px solid rgba(128, 128, 128, 0.15);
+}
+
+.achievement-emoji {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.achievement-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.achievement-title {
+  font-weight: 600;
+}
+
+.achievement-progress {
+  white-space: nowrap;
+}
+
+.achievement.locked .achievement-emoji {
+  filter: grayscale(1);
+  opacity: 0.45;
+}
+
+.achievement.locked .achievement-title {
+  color: var(--hint);
+}
+
+.achievement.unlocked .achievement-title {
+  color: var(--accent);
+}

@@ -157,6 +157,23 @@ export const en: Dict = {
       shopping: 'Shopaholic',
     },
   },
+  achievements: {
+    title: 'Achievements',
+    counter: '🏅 {done}/{total}',
+    progress: '{current} of {target}',
+    newTitle: 'New achievement!',
+    items: {
+      first: { title: 'First expense', text: 'The first expense is in the group.' },
+      crew: { title: 'Full crew', text: 'Four or more people in the group.' },
+      ten: { title: '10 expenses', text: 'Ten expenses recorded.' },
+      hundred: { title: '100 expenses', text: 'A hundred expenses — that is friendship.' },
+      travelers: { title: 'Travelers', text: 'Expenses in two or more currencies.' },
+      allCategories: { title: 'All the colors', text: 'Expenses in five or more categories.' },
+      clean: { title: 'All square', text: 'Everyone is settled after five or more expenses.' },
+      week: { title: 'A week together', text: 'Expenses on seven different days.' },
+      month: { title: 'A month together', text: 'Expenses spread over a month or more.' },
+    },
+  },
   activity: {
     groupCreate: '{actor} created the group “{name}”',
     groupRename: '{actor} renamed the group: “{from}” → “{to}”',

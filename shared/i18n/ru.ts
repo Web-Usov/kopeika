@@ -157,6 +157,23 @@ export const ru = {
       shopping: 'Шопоголик',
     },
   },
+  achievements: {
+    title: 'Достижения',
+    counter: '🏅 {done}/{total}',
+    progress: '{current} из {target}',
+    newTitle: 'Новое достижение!',
+    items: {
+      first: { title: 'Первая трата', text: 'В группе появилась первая трата.' },
+      crew: { title: 'Компания в сборе', text: 'В группе четверо и больше участников.' },
+      ten: { title: '10 трат', text: 'Записали десять трат.' },
+      hundred: { title: '100 трат', text: 'Записали сто трат — вот это дружба.' },
+      travelers: { title: 'Путешественники', text: 'Траты в двух и более валютах.' },
+      allCategories: { title: 'Все краски', text: 'Траты в пяти и более категориях.' },
+      clean: { title: 'Ни копейки долга', text: 'Все в расчёте после пяти и более трат.' },
+      week: { title: 'Неделя вместе', text: 'Траты в семь разных дней.' },
+      month: { title: 'Месяц вместе', text: 'Траты растянулись на месяц и больше.' },
+    },
+  },
   activity: {
     groupCreate: '{actor} создал(а) группу «{name}»',
     groupRename: '{actor} переименовал(а) группу: «{from}» → «{to}»',
