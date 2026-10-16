@@ -1,11 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
-import { config } from './config.ts';
+import { Hono } from 'hono';
 import { api } from './api.ts';
 import { startBot } from './bot.ts';
+import { config } from './config.ts';
 
 const app = new Hono();
 
@@ -20,7 +20,10 @@ if (fs.existsSync(config.staticDir)) {
   });
   app.use('*', serveStatic({ root }));
   // Single-page app: anything else gets index.html, never cached so new deploys show up immediately.
-  app.get('*', serveStatic({ root, path: 'index.html', onFound: (_p, c) => void c.header('Cache-Control', 'no-cache') }));
+  app.get(
+    '*',
+    serveStatic({ root, path: 'index.html', onFound: (_p, c) => void c.header('Cache-Control', 'no-cache') }),
+  );
 }
 
 if (config.devAuth) console.warn('DEV_AUTH=1: accepting fake users. Never enable this in production!');

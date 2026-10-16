@@ -1,5 +1,5 @@
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { test } from 'node:test';
 import { signInitData, validateInitData } from './auth.ts';
 
 const token = '123456:TEST-token';

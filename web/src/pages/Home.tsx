@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api, useGroups } from '../api.ts';
 import { navigate } from '../router.ts';
-import { MainButton, inTelegram, requestWriteAccess, alertDialog } from '../tg.tsx';
-import { ErrorView, Loading, Money, Row, Section, plural } from '../ui.tsx';
+import { alertDialog, inTelegram, MainButton, requestWriteAccess } from '../tg.tsx';
+import { ErrorView, Loading, Money, plural, Row, Section } from '../ui.tsx';
 
 export function Home() {
   const { data: groups, error } = useGroups();
@@ -61,7 +61,10 @@ export function Home() {
 function NotifySetting() {
   const [notify, setNotify] = useState<boolean>();
   useEffect(() => {
-    api.me().then((me) => setNotify(me.notify), () => {});
+    api.me().then(
+      (me) => setNotify(me.notify),
+      () => {},
+    );
   }, []);
   if (notify === undefined) return null;
 
@@ -77,11 +80,7 @@ function NotifySetting() {
 
   return (
     <Section footer="Бот пришлёт сообщение, когда в группе появится трата с вашим участием.">
-      <Row
-        title="Уведомления о тратах"
-        onClick={toggle}
-        right={<span className={`switch ${notify ? 'on' : ''}`} />}
-      />
+      <Row title="Уведомления о тратах" onClick={toggle} right={<span className={`switch ${notify ? 'on' : ''}`} />} />
     </Section>
   );
 }

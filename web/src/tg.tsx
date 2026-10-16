@@ -56,7 +56,7 @@ const devParams = new URLSearchParams(location.search);
 export const devUserId = devParams.get('dev') ?? '1';
 
 export function startParam(): string | undefined {
-  return inTelegram ? tg!.initDataUnsafe.start_param : devParams.get('startapp') ?? undefined;
+  return inTelegram ? tg!.initDataUnsafe.start_param : (devParams.get('startapp') ?? undefined);
 }
 
 export function authHeader(): string {

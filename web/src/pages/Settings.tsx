@@ -1,13 +1,19 @@
 import { useState } from 'react';
-import { api, forgetGroup, setGroup, useGroup, type GroupDetail, type Member } from '../api.ts';
+import { api, forgetGroup, type GroupDetail, type Member, setGroup, useGroup } from '../api.ts';
 import { navigate } from '../router.ts';
-import { BackButton, alertDialog, confirmDialog, haptic, shareLink } from '../tg.tsx';
+import { alertDialog, BackButton, confirmDialog, haptic, shareLink } from '../tg.tsx';
 import { Avatar, ErrorView, Loading, Row, Section } from '../ui.tsx';
 
 export function Settings({ id }: { id: number }) {
   const { data: g, error } = useGroup(id);
   const back = <BackButton onClick={() => navigate(`/g/${id}`, { replace: true })} />;
-  if (!g) return <div className="page">{back}{error ? <ErrorView message={error} /> : <Loading />}</div>;
+  if (!g)
+    return (
+      <div className="page">
+        {back}
+        {error ? <ErrorView message={error} /> : <Loading />}
+      </div>
+    );
   return (
     <div className="page">
       {back}
@@ -102,7 +108,10 @@ function SettingsView({ g }: { g: GroupDetail }) {
         )}
       </Section>
 
-      <Section title={`Участники · ${g.members.length}`} footer="Участника без Telegram можно удалить, если у него нет трат.">
+      <Section
+        title={`Участники · ${g.members.length}`}
+        footer="Участника без Telegram можно удалить, если у него нет трат."
+      >
         {g.members.map((m) => (
           <MemberRow key={m.id} g={g} m={m} />
         ))}

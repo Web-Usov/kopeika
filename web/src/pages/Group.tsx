@@ -1,7 +1,7 @@
-import { useGroup, type Expense, type GroupDetail } from '../api.ts';
+import { type Expense, type GroupDetail, useGroup } from '../api.ts';
 import { navigate } from '../router.ts';
-import { BackButton, MainButton, haptic, shareLink } from '../tg.tsx';
-import { Avatar, ErrorView, Loading, Money, Row, Section, Segmented, formatDay } from '../ui.tsx';
+import { BackButton, haptic, MainButton, shareLink } from '../tg.tsx';
+import { Avatar, ErrorView, formatDay, Loading, Money, Row, Section, Segmented } from '../ui.tsx';
 
 type Tab = 'expenses' | 'balances';
 
@@ -9,7 +9,13 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
   const { data: g, error } = useGroup(id);
 
   const back = <BackButton onClick={() => navigate('/', { replace: true })} />;
-  if (!g) return <div className="page">{back}{error ? <ErrorView message={error} /> : <Loading />}</div>;
+  if (!g)
+    return (
+      <div className="page">
+        {back}
+        {error ? <ErrorView message={error} /> : <Loading />}
+      </div>
+    );
 
   const me = g.members.find((m) => m.id === g.meId)!;
 
@@ -25,9 +31,13 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
           {me.balance === 0 ? (
             'Вы в расчёте'
           ) : me.balance > 0 ? (
-            <>Вам должны <Money value={me.balance} currency={g.currency} /></>
+            <>
+              Вам должны <Money value={me.balance} currency={g.currency} />
+            </>
           ) : (
-            <>Вы должны <Money value={-me.balance} currency={g.currency} /></>
+            <>
+              Вы должны <Money value={-me.balance} currency={g.currency} />
+            </>
           )}
         </div>
         <div className="header-actions">
@@ -76,7 +86,7 @@ function ExpensesTab({ g }: { g: GroupDetail }) {
   }
   const byDay = new Map<string, Expense[]>();
   for (const e of g.expenses) byDay.set(e.spentOn, [...(byDay.get(e.spentOn) ?? []), e]);
-  const name = (id: number) => (id === g.meId ? 'Вы' : g.members.find((m) => m.id === id)?.name ?? '?');
+  const name = (id: number) => (id === g.meId ? 'Вы' : (g.members.find((m) => m.id === id)?.name ?? '?'));
 
   return (
     <>
@@ -110,7 +120,9 @@ function ExpensesTab({ g }: { g: GroupDetail }) {
                     <Money value={e.amount} currency={g.currency} />
                     <span className="hint small">
                       {myShare ? (
-                        <>ваша доля <Money value={myShare} currency={g.currency} /></>
+                        <>
+                          ваша доля <Money value={myShare} currency={g.currency} />
+                        </>
                       ) : (
                         'вы не участвуете'
                       )}
@@ -147,7 +159,13 @@ function BalancesTab({ g }: { g: GroupDetail }) {
                 />
               </span>
             }
-            right={m.balance === 0 ? <span className="hint">0</span> : <Money value={m.balance} currency={g.currency} signed />}
+            right={
+              m.balance === 0 ? (
+                <span className="hint">0</span>
+              ) : (
+                <Money value={m.balance} currency={g.currency} signed />
+              )
+            }
           />
         ))}
       </Section>
