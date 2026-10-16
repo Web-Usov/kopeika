@@ -10,6 +10,10 @@ export const config = {
   /** Short name given to the Mini App in @BotFather (/newapp); used for t.me/<bot>/<short> links. */
   appShortName: env.APP_SHORT_NAME ?? '',
   dbPath: env.DB_PATH ?? path.resolve('data/kopeika.db'),
+  /** Where daily SQLite backups go. Defaults to a "backups" folder next to the database file. */
+  backupDir: env.BACKUP_DIR ?? path.join(path.dirname(path.resolve(env.DB_PATH ?? 'data/kopeika.db')), 'backups'),
+  /** How many daily backups to keep. */
+  backupKeep: Math.max(1, Math.floor(Number(env.BACKUP_KEEP ?? 14)) || 14),
   staticDir: env.STATIC_DIR ?? path.resolve('web/dist'),
   /** Run the bot with long polling. Disable locally if the production bot uses the same token. */
   botPolling: (env.BOT_POLLING ?? '1') === '1',
