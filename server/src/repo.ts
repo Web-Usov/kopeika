@@ -24,6 +24,8 @@ export interface GroupRow {
   created_by: number;
   created_at: string;
   archived_at: string | null;
+  chat_id: number | null;
+  chat_title: string | null;
 }
 
 export interface MemberRow {
@@ -143,6 +145,8 @@ export function groupDetail(group: GroupRow, me: MemberRow, inviteLink: string |
     inviteLink,
     isOwner: group.created_by === me.user_id,
     archived: group.archived_at !== null,
+    // Only the title: the numeric chat id never leaves the server.
+    chat: group.chat_id === null ? null : { title: group.chat_title ?? '' },
     meId: me.id,
     totalSpent: expenses.filter((e) => e.kind === 'expense').reduce((a, e) => a + e.amount, 0),
     members: members.map((m) => ({

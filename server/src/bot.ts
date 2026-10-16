@@ -1,6 +1,14 @@
 import { Bot, GrammyError, InlineKeyboard, InputFile } from 'grammy';
 import { createT, type Lang, pickLang } from '../../shared/i18n/index.ts';
 import { formatMoney } from '../../shared/money.ts';
+import {
+  type ChatMessage,
+  createChatLink,
+  linkedMessage,
+  migrateChat,
+  unlinkChat,
+  welcomeMessage,
+} from './chatLink.ts';
 import { config } from './config.ts';
 import { all, one, run } from './db.ts';
 import { buildChangeMessage, buildRemindMessage, changeAudience, type ExpenseSnap } from './notify.ts';
@@ -69,6 +77,8 @@ async function connectBot(b: Bot) {
     await ctx.reply(t('bot.startText'), { reply_markup: keyboard });
   });
 
+  registerChatHandlers(b);
+
   b.catch((err) => console.error('Bot error', err.error));
 
   // Menu button and profile don't block polling; failures are only logged.
@@ -76,10 +86,66 @@ async function connectBot(b: Bot) {
 
   if (config.botPolling) {
     // Not awaited: bot.start() resolves only when polling stops.
+    // No allowed_updates: Telegram's default set includes my_chat_member, which chat linking relies on.
     b.start({ drop_pending_updates: true, onStart: () => console.log('Bot polling started') }).catch((e) =>
       console.error('Bot polling stopped', e),
     );
   }
+}
+
+const isGroupChat = (type: string) => type === 'group' || type === 'supergroup';
+
+function chatKeyboard(m: ChatMessage) {
+  return m.button ? new InlineKeyboard().url(m.button.text, m.button.url) : undefined;
+}
+
+/** Group chat events: bot added/removed, chat migrated to a supergroup, /unlink. Registered once, after init. */
+function registerChatHandlers(b: Bot) {
+  b.on('my_chat_member', async (ctx) => {
+    const { chat, new_chat_member: member, from } = ctx.myChatMember;
+    if (!isGroupChat(chat.type)) return;
+    upsertUser(from);
+    if (member.status === 'member' || member.status === 'administrator') {
+      // Promotion member -> administrator is not an "add": only react to a fresh arrival.
+      const was = ctx.myChatMember.old_chat_member.status;
+      if (was === 'member' || was === 'administrator' || was === 'creator') return;
+      const token = createChatLink(chat.id, chat.title ?? String(chat.id), from.id);
+      const url = appLink(`link_${token}`);
+      if (!url) console.warn('APP_SHORT_NAME is not set: the chat link button is not available');
+      const msg = welcomeMessage(pickLang(from.language_code), url);
+      await ctx.api
+        .sendMessage(chat.id, msg.text, { reply_markup: chatKeyboard(msg) })
+        .catch((e) => console.warn('chat welcome failed', e instanceof Error ? e.message : e));
+    } else if (member.status === 'left' || member.status === 'kicked') {
+      unlinkChat(chat.id, from.id);
+    }
+  });
+
+  b.on('message:migrate_to_chat_id', (ctx) => {
+    migrateChat(ctx.chat.id, ctx.message.migrate_to_chat_id);
+  });
+
+  b.command('unlink', async (ctx) => {
+    if (!ctx.from || !isGroupChat(ctx.chat.type)) return;
+    const t = createT(pickLang(ctx.from.language_code));
+    const who = await ctx.getChatMember(ctx.from.id).catch(() => null);
+    if (!who || (who.status !== 'creator' && who.status !== 'administrator')) {
+      await ctx.reply(t('bot.chatAdminOnly'));
+      return;
+    }
+    upsertUser(ctx.from);
+    const group = unlinkChat(ctx.chat.id, ctx.from.id);
+    await ctx.reply(t(group ? 'bot.chatUnlinked' : 'bot.chatNotLinked'));
+  });
+}
+
+/** After a successful link: confirmation in the chat in the linking user's language. Fire-and-forget. */
+export function notifyChatLinked(chatId: number, group: GroupRow, lang: Lang) {
+  if (!bot || !botReady) return;
+  const msg = linkedMessage(lang, group.name, appLink(group.invite_code));
+  bot.api
+    .sendMessage(chatId, msg.text, { reply_markup: chatKeyboard(msg) })
+    .catch((e) => console.warn('chat link confirmation failed', e instanceof Error ? e.message : e));
 }
 
 async function setupBotProfile(b: Bot) {

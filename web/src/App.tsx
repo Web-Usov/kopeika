@@ -4,6 +4,7 @@ import { ExpenseForm } from './pages/ExpenseForm.tsx';
 import { Group } from './pages/Group.tsx';
 import { Home } from './pages/Home.tsx';
 import { Join } from './pages/Join.tsx';
+import { Link } from './pages/Link.tsx';
 import { NewGroup } from './pages/NewGroup.tsx';
 import { Settings } from './pages/Settings.tsx';
 import { TransferForm } from './pages/TransferForm.tsx';
@@ -18,7 +19,8 @@ type Query = URLSearchParams;
 // Порядок важен: `/g/:id/expense/new` должен стоять раньше `/g/:id/expense/:eid`.
 const routes: [pattern: string, render: (p: Params, query: Query) => ReactElement][] = [
   ['/', () => <Home />],
-  ['/new', () => <NewGroup />],
+  ['/new', (_p, query) => <NewGroup linkToken={query.get('link')} />],
+  ['/link/:token', (p) => <Link key={p.token} token={p.token} />],
   ['/join/:code', (p) => <Join key={p.code} code={p.code} />],
   ['/g/:id', (p, query) => <Group key={p.id} id={Number(p.id)} tab={groupTab(query.get('tab'))} />],
   ['/g/:id/settings', (p) => <Settings id={Number(p.id)} />],
