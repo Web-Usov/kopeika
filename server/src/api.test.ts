@@ -242,7 +242,7 @@ test('API errors are in the request language: Russian by default, English with X
   assert.equal(ru.body.error, 'Сумма долей не совпадает с общей суммой');
   const en = await post('en');
   assert.equal(en.status, 400);
-  assert.equal(en.body.error, "The amounts don't add up to the total");
+  assert.equal(en.body.error, 'The amounts don’t add up to the total');
   assert.equal((await post('ru')).body.error, ru.body.error);
 
   // Other errors too: a missing group, invalid body.

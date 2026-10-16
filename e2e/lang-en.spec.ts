@@ -10,5 +10,5 @@ test('English interface with ?lang=en', async ({ page }) => {
   await page.getByPlaceholder('Trip to Georgia').fill('Cabin');
   await page.getByRole('button', { name: 'Create group' }).click();
   await expect(page.getByRole('heading', { name: 'Cabin' })).toBeVisible();
-  await expect(page.locator('.my-balance')).toHaveText("You're settled up");
+  await expect(page.locator('.my-balance')).toHaveText('You’re settled up');
 });

@@ -37,7 +37,7 @@ test('inline ru: article with card, description and open button', () => {
 
 test('inline en and settled description', () => {
   const [r] = buildInlineResults('en', [group(1, 'Trip', 0)], '', opts);
-  assert.match(r.description ?? '', /^Total .* · you're settled up$/);
+  assert.match(r.description ?? '', /^Total .* · you’re settled up$/);
   assert.equal((r.reply_markup as { inline_keyboard: { text: string }[][] }).inline_keyboard[0][0].text, 'Open group');
 });
 
