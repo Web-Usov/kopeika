@@ -1,4 +1,5 @@
 import { Bot, GrammyError, InlineKeyboard } from 'grammy';
+import { createT, type Lang, pickLang } from '../../shared/i18n/index.ts';
 import { formatMoney } from '../../shared/money.ts';
 import { config } from './config.ts';
 import { all, run } from './db.ts';
@@ -24,22 +25,22 @@ export async function startBot() {
 
   bot.command('start', async (ctx) => {
     if (ctx.from) upsertUser(ctx.from, { notify: true });
-    const keyboard = config.appUrl ? new InlineKeyboard().webApp('Открыть Копейку', config.appUrl) : undefined;
-    await ctx.reply(
-      'Привет! Копейка помогает делить общие траты с друзьями: в поездке, на даче или в общей квартире.\n\n' +
-        'Создайте группу, пригласите друзей ссылкой и записывайте, кто за что платил. ' +
-        'Я посчитаю, кто кому сколько должен, и буду присылать сюда уведомления о новых тратах.',
-      { reply_markup: keyboard },
-    );
+    const t = createT(pickLang(ctx.from?.language_code));
+    const keyboard = config.appUrl ? new InlineKeyboard().webApp(t('bot.openApp'), config.appUrl) : undefined;
+    await ctx.reply(t('bot.startText'), { reply_markup: keyboard });
   });
 
   bot.catch((err) => console.error('Bot error', err.error));
 
   if (config.appUrl) {
+    // The menu button text can't be localized per language, so it carries the brand name.
     await bot.api
-      .setChatMenuButton({ menu_button: { type: 'web_app', text: 'Копейка', web_app: { url: config.appUrl } } })
+      .setChatMenuButton({
+        menu_button: { type: 'web_app', text: createT('ru')('common.brand'), web_app: { url: config.appUrl } },
+      })
       .catch((e) => console.warn('setChatMenuButton failed', e));
   }
+  await setBotProfile();
 
   if (config.botPolling) {
     // Not awaited: bot.start() resolves only when polling stops.
@@ -49,12 +50,26 @@ export async function startBot() {
   }
 }
 
+/** Bot description and short description in both languages; no code = default for every other language. */
+async function setBotProfile() {
+  if (!bot) return;
+  const variants: [lang: Lang, code?: 'ru' | 'en'][] = [['ru', 'ru'], ['en', 'en'], ['en']];
+  for (const [lang, language_code] of variants) {
+    const t = createT(lang);
+    const opts = language_code ? { language_code } : {};
+    await bot.api.setMyDescription(t('bot.description'), opts).catch((e) => console.warn('setMyDescription failed', e));
+    await bot.api
+      .setMyShortDescription(t('bot.shortDescription'), opts)
+      .catch((e) => console.warn('setMyShortDescription failed', e));
+  }
+}
+
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-async function send(userId: number, text: string, group: GroupRow) {
+async function send(userId: number, text: string, group: GroupRow, lang: Lang) {
   if (!bot) return;
   const link = appLink(group.invite_code);
-  const reply_markup = link ? new InlineKeyboard().url('Открыть группу', link) : undefined;
+  const reply_markup = link ? new InlineKeyboard().url(createT(lang)('bot.openGroup'), link) : undefined;
   try {
     await bot.api.sendMessage(userId, text, {
       parse_mode: 'HTML',
@@ -71,8 +86,8 @@ async function send(userId: number, text: string, group: GroupRow) {
 /** Tells everyone involved in an expense (except the author) that it was added. Fire-and-forget. */
 export function notifyExpense(group: GroupRow, expense: ExpenseRow, authorUserId: number, authorName: string) {
   if (!bot) return;
-  const recipients = all<{ user_id: number; member_id: number; share: number | null }>(
-    `SELECT m.user_id, m.id AS member_id, s.amount AS share
+  const recipients = all<{ user_id: number; member_id: number; share: number | null; lang: string | null }>(
+    `SELECT m.user_id, m.id AS member_id, s.amount AS share, u.lang
      FROM members m
      JOIN users u ON u.id = m.user_id AND u.notify = 1
      LEFT JOIN expense_shares s ON s.member_id = m.id AND s.expense_id = ?
@@ -82,18 +97,21 @@ export function notifyExpense(group: GroupRow, expense: ExpenseRow, authorUserId
     authorUserId,
     expense.payer_id,
   );
-  const money = (v: number) => formatMoney(v, group.currency);
   for (const r of recipients) {
+    // Rendered in the recipient's language, not the author's. Values are HTML-escaped; tags stay out of the dictionary.
+    const lang = pickLang(r.lang);
+    const t = createT(lang);
+    const money = (v: number) => formatMoney(v, group.currency, lang);
+    const author = esc(authorName);
     let text: string;
     if (expense.kind === 'transfer') {
-      text =
-        r.member_id === expense.payer_id
-          ? `💸 <b>${esc(group.name)}</b>\n${esc(authorName)} записал(а) ваш перевод на ${money(expense.amount)}`
-          : `💸 <b>${esc(group.name)}</b>\n${esc(authorName)} отметил(а) перевод вам: ${money(expense.amount)}`;
+      const key = r.member_id === expense.payer_id ? 'bot.transferFromYou' : 'bot.transferToYou';
+      text = `💸 <b>${esc(group.name)}</b>\n${t(key, { author, amount: money(expense.amount) })}`;
     } else {
-      text = `🧾 <b>${esc(group.name)}</b>\n${esc(authorName)} добавил(а) «${esc(expense.title)}» на ${money(expense.amount)}`;
-      if (r.share) text += `\nВаша доля: ${money(r.share)}`;
+      const title = esc(expense.title);
+      text = `🧾 <b>${esc(group.name)}</b>\n${t('bot.expenseAdded', { author, title, amount: money(expense.amount) })}`;
+      if (r.share) text += `\n${t('bot.yourShare', { amount: money(r.share) })}`;
     }
-    void send(r.user_id, text, group);
+    void send(r.user_id, text, group, lang);
   }
 }

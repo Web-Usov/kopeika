@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
-import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
+import { createT, type Key, type Lang, type Params, pickLang, type TFn } from '../../shared/i18n/index.ts';
 import { CURRENCIES, computeShares, SplitError } from '../../shared/money.ts';
 import { type TelegramUser, validateInitData } from './auth.ts';
 import { appLink, notifyExpense } from './bot.ts';
@@ -20,18 +20,30 @@ import {
   upsertUser,
 } from './repo.ts';
 
-type Env = { Variables: { user: TelegramUser } };
+type Env = { Variables: { user: TelegramUser; lang: Lang } };
 
 export const api = new Hono<Env>();
 
-const fail = (status: 400 | 401 | 403 | 404 | 409 | 429, message: string) => new HTTPException(status, { message });
+/** An API error: carries a dictionary key, translated into the request user's language in `onError`. */
+class ApiError extends Error {
+  constructor(
+    readonly status: 400 | 401 | 403 | 404 | 409 | 429,
+    readonly key: Key,
+    readonly params?: Params,
+  ) {
+    super(key);
+  }
+}
+
+const fail = (status: ApiError['status'], key: Key, params?: Params) => new ApiError(status, key, params);
 
 api.onError((err, c) => {
-  if (err instanceof HTTPException) return c.json({ error: err.message }, err.status);
-  if (err instanceof SplitError) return c.json({ error: err.message }, 400);
-  if (err instanceof z.ZodError) return c.json({ error: 'Некорректные данные', issues: err.issues }, 400);
+  const t: TFn = createT(c.get('lang') ?? 'ru');
+  if (err instanceof ApiError) return c.json({ error: t(err.key, err.params) }, err.status);
+  if (err instanceof SplitError) return c.json({ error: t(err.key, err.params) }, 400);
+  if (err instanceof z.ZodError) return c.json({ error: t('errors.invalidData'), issues: err.issues }, 400);
   console.error(err);
-  return c.json({ error: 'Внутренняя ошибка сервера' }, 500);
+  return c.json({ error: t('errors.internal') }, 500);
 });
 
 // --- Auth: every /api request carries "Authorization: tma <initData>" ---
@@ -39,28 +51,33 @@ api.use('*', async (c, next) => {
   const header = c.req.header('authorization') ?? '';
   const [scheme, value = ''] = header.split(' ', 2) as [string, string?];
   let user: TelegramUser | undefined;
+  // Dev only: the web client says which language to use (there is no Telegram language_code).
+  const devLang = config.devAuth ? c.req.header('x-lang') : undefined;
+  c.set('lang', pickLang(devLang));
   if (scheme === 'tma') {
     user = validateInitData(value, config.botToken, config.initDataMaxAgeSec)?.user;
   } else if (scheme === 'dev' && config.devAuth) {
     const id = Number(value);
-    if (Number.isInteger(id) && id > 0) user = { id, first_name: `Тестер ${id}` };
+    if (Number.isInteger(id) && id > 0)
+      user = { id, first_name: createT(pickLang(devLang))('dev.userName', { id }), language_code: devLang };
   }
-  if (!user) throw fail(401, 'Откройте приложение из Telegram');
+  if (!user) throw fail(401, 'errors.unauthorized');
   upsertUser(user);
   c.set('user', user);
+  c.set('lang', pickLang(user.language_code));
   await next();
 });
 
 // --- Rate limit: per Telegram user, sliding one-minute window ---
 export const rateLimiter = createRateLimiter({ limit: config.rateLimitPerMin });
 api.use('*', async (c, next) => {
-  if (!rateLimiter.allow(c.get('user').id)) throw fail(429, 'Слишком много запросов, попробуйте через минуту');
+  if (!rateLimiter.allow(c.get('user').id)) throw fail(429, 'errors.tooMany');
   await next();
 });
 
 const idParam = (v: string | undefined) => {
   const n = Number(v);
-  if (!Number.isInteger(n) || n <= 0) throw fail(404, 'Не найдено');
+  if (!Number.isInteger(n) || n <= 0) throw fail(404, 'errors.notFound');
   return n;
 };
 
@@ -68,7 +85,7 @@ function loadGroupFor(groupIdRaw: string | undefined, userId: number) {
   const groupId = idParam(groupIdRaw);
   const group = one<GroupRow>('SELECT * FROM groups WHERE id = ?', groupId);
   const me = group && findMembership(groupId, userId);
-  if (!group || !me) throw fail(404, 'Группа не найдена');
+  if (!group || !me) throw fail(404, 'errors.groupNotFound');
   return { group, me };
 }
 
@@ -132,7 +149,7 @@ api.patch('/groups/:id', async (c) => {
 api.delete('/groups/:id', (c) => {
   const user = c.get('user');
   const { group } = loadGroupFor(c.req.param('id'), user.id);
-  if (group.created_by !== user.id) throw fail(403, 'Удалить группу может только её создатель');
+  if (group.created_by !== user.id) throw fail(403, 'errors.ownerOnlyDelete');
   tx(() => {
     run('DELETE FROM expense_shares WHERE expense_id IN (SELECT id FROM expenses WHERE group_id = ?)', group.id);
     run('DELETE FROM expenses WHERE group_id = ?', group.id);
@@ -159,7 +176,7 @@ api.patch('/groups/:id/members/:memberId', async (c) => {
     idParam(c.req.param('memberId')),
     group.id,
   );
-  if (res.changes === 0) throw fail(404, 'Участник не найден');
+  if (res.changes === 0) throw fail(404, 'errors.memberNotFound');
   return c.json(detail(group, me));
 });
 
@@ -167,14 +184,14 @@ api.delete('/groups/:id/members/:memberId', (c) => {
   const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
   const memberId = idParam(c.req.param('memberId'));
   const member = one<MemberRow>('SELECT * FROM members WHERE id = ? AND group_id = ?', memberId, group.id);
-  if (!member) throw fail(404, 'Участник не найден');
-  if (member.user_id !== null) throw fail(409, 'Нельзя удалить участника, который вошёл через Telegram');
+  if (!member) throw fail(404, 'errors.memberNotFound');
+  if (member.user_id !== null) throw fail(409, 'errors.memberHasTelegram');
   const used = one(
     'SELECT 1 FROM expenses WHERE payer_id = ? UNION SELECT 1 FROM expense_shares WHERE member_id = ? LIMIT 1',
     memberId,
     memberId,
   );
-  if (used) throw fail(409, 'У участника есть траты: сначала удалите или измените их');
+  if (used) throw fail(409, 'errors.memberHasExpenses');
   run('DELETE FROM members WHERE id = ?', memberId);
   return c.json(detail(group, me));
 });
@@ -182,7 +199,7 @@ api.delete('/groups/:id/members/:memberId', (c) => {
 // --- Invites ---
 api.get('/invite/:code', (c) => {
   const group = one<GroupRow>('SELECT * FROM groups WHERE invite_code = ?', c.req.param('code'));
-  if (!group) throw fail(404, 'Приглашение недействительно');
+  if (!group) throw fail(404, 'errors.inviteInvalid');
   const me = findMembership(group.id, c.get('user').id);
   const members = all<MemberRow>('SELECT * FROM members WHERE group_id = ? ORDER BY id', group.id);
   return c.json({
@@ -196,7 +213,7 @@ api.post('/invite/:code/join', async (c) => {
   const user = c.get('user');
   const body = z.object({ claimMemberId: z.number().int().positive().optional() }).parse(await c.req.json());
   const group = one<GroupRow>('SELECT * FROM groups WHERE invite_code = ?', c.req.param('code'));
-  if (!group) throw fail(404, 'Приглашение недействительно');
+  if (!group) throw fail(404, 'errors.inviteInvalid');
   if (!findMembership(group.id, user.id)) {
     if (body.claimMemberId) {
       // "I am this person": link a name-only member to the Telegram account, keeping their history.
@@ -206,7 +223,7 @@ api.post('/invite/:code/join', async (c) => {
         body.claimMemberId,
         group.id,
       );
-      if (res.changes === 0) throw fail(409, 'Этого участника уже заняли');
+      if (res.changes === 0) throw fail(409, 'errors.memberTaken');
     } else {
       run('INSERT INTO members (group_id, user_id, name) VALUES (?, ?, ?)', group.id, user.id, displayName(user));
     }
@@ -229,18 +246,18 @@ const expenseBody = z.object({
 });
 type ExpenseBody = z.infer<typeof expenseBody>;
 
-function validateExpense(groupId: number, body: ExpenseBody) {
+function validateExpense(groupId: number, body: ExpenseBody, lang: Lang) {
   const memberIds = new Set(all<{ id: number }>('SELECT id FROM members WHERE group_id = ?', groupId).map((m) => m.id));
   if (!memberIds.has(body.payerId) || body.shares.some((s) => !memberIds.has(s.memberId))) {
-    throw fail(400, 'Участник не из этой группы');
+    throw fail(400, 'errors.foreignMember');
   }
   if (body.kind === 'transfer') {
-    if (body.shares.length !== 1 || body.shares[0].memberId === body.payerId) throw fail(400, 'Некорректный перевод');
+    if (body.shares.length !== 1 || body.shares[0].memberId === body.payerId) throw fail(400, 'errors.badTransfer');
     body.splitMode = 'exact';
     body.shares[0].value = body.amount;
-    body.title ||= 'Перевод';
+    body.title ||= createT(lang)('transfer.defaultTitle');
   } else if (!body.title) {
-    throw fail(400, 'Введите название траты');
+    throw fail(400, 'errors.titleRequired');
   }
   return computeShares(body.amount, body.splitMode, body.shares);
 }
@@ -262,7 +279,7 @@ api.post('/groups/:id/expenses', async (c) => {
   const user = c.get('user');
   const { group, me } = loadGroupFor(c.req.param('id'), user.id);
   const body = expenseBody.parse(await c.req.json());
-  const computed = validateExpense(group.id, body);
+  const computed = validateExpense(group.id, body, c.get('lang'));
   const expense = tx(() => {
     const res = run(
       `INSERT INTO expenses (group_id, kind, title, amount, payer_id, split_mode, spent_on, created_by)
@@ -288,10 +305,10 @@ api.put('/groups/:id/expenses/:expenseId', async (c) => {
   const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
   const expenseId = idParam(c.req.param('expenseId'));
   const existing = one<ExpenseRow>('SELECT * FROM expenses WHERE id = ? AND group_id = ?', expenseId, group.id);
-  if (!existing) throw fail(404, 'Трата не найдена');
+  if (!existing) throw fail(404, 'errors.expenseNotFound');
   const body = expenseBody.parse(await c.req.json());
   body.kind = existing.kind;
-  const computed = validateExpense(group.id, body);
+  const computed = validateExpense(group.id, body, c.get('lang'));
   tx(() => {
     run(
       `UPDATE expenses SET title = ?, amount = ?, payer_id = ?, split_mode = ?, spent_on = ?, updated_at = datetime('now')
@@ -311,6 +328,6 @@ api.put('/groups/:id/expenses/:expenseId', async (c) => {
 api.delete('/groups/:id/expenses/:expenseId', (c) => {
   const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
   const res = run('DELETE FROM expenses WHERE id = ? AND group_id = ?', idParam(c.req.param('expenseId')), group.id);
-  if (res.changes === 0) throw fail(404, 'Трата не найдена');
+  if (res.changes === 0) throw fail(404, 'errors.expenseNotFound');
   return c.json(detail(group, me));
 });

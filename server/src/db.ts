@@ -60,6 +60,8 @@ const migrations = [
   );
   CREATE INDEX expense_shares_member ON expense_shares(member_id);
   `,
+  // Interface language of the user ('ru' | 'en'), for bot messages.
+  `ALTER TABLE users ADD COLUMN lang TEXT;`,
 ];
 
 const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
