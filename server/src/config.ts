@@ -43,4 +43,5 @@ export const config = {
   adminUserIds: parseAdminIds(env.ADMIN_USER_IDS),
   /** Max API requests per user per minute. */
   rateLimitPerMin: Number(env.RATE_LIMIT_PER_MIN ?? 120),
+  ratesLimitPerMin: Number(env.RATES_LIMIT_PER_MIN ?? 20),
 };

@@ -8,6 +8,7 @@ delete process.env.BOT_TOKEN;
 let rates: typeof import('./rates.ts');
 let db: typeof import('./db.ts');
 let api: typeof import('./api.ts').api;
+let ratesLimiter: typeof import('./api.ts').ratesLimiter;
 
 const table = (date: string, vals: Record<string, [number, number]>) => ({
   Date: `${date}T11:30:00+03:00`,
@@ -35,7 +36,8 @@ const SAMPLE: Record<string, [number, number]> = { GEL: [1, 34.5], USD: [1, 92],
 beforeEach(async () => {
   rates ??= await import('./rates.ts');
   db ??= await import('./db.ts');
-  ({ api } = await import('./api.ts'));
+  ({ api, ratesLimiter } = await import('./api.ts'));
+  ratesLimiter.reset();
   db.run('DELETE FROM rates');
   rates.setRatesTestHooks({ today: () => '2025-01-20' });
 });
@@ -135,4 +137,45 @@ test('GET /rates: rate for the group currency, validation and translated errors'
   const down = await get('base=RUB&currency=USD&date=2025-01-14', 'en');
   assert.equal(down.status, 503);
   assert.match(((await down.json()) as { error: string }).error, /manually/);
+});
+
+test("the in-memory 'today' tables never exceed the cap", async () => {
+  const cbr = fakeCbr({}, table('2025-01-20', SAMPLE));
+  rates.setRatesTestHooks({ fetcher: cbr.fetcher, today: () => '2025-01-20' });
+  for (let i = 0; i < 120; i++) {
+    const date = new Date(Date.UTC(2025, 0, 20 + i)).toISOString().slice(0, 10);
+    await rates.getRate('RUB', 'GEL', date);
+    assert.ok(rates.todayMemoSize() <= 50);
+  }
+  assert.equal(rates.todayMemoSize(), 50);
+});
+
+test('GET /rates: the 21st request in a minute gets 429, other routes still work', async () => {
+  const cbr = fakeCbr({ '2025-01-15': table('2025-01-15', SAMPLE) });
+  rates.setRatesTestHooks({ fetcher: cbr.fetcher, today: () => '2025-01-20' });
+  const get = (user: number, lang?: string) =>
+    api.request('/rates?base=RUB&currency=GEL&date=2025-01-15', {
+      headers: { Authorization: `dev ${user}`, ...(lang ? { 'X-Lang': lang } : {}) },
+    });
+  for (let i = 0; i < 20; i++) assert.equal((await get(8)).status, 200);
+  const blocked = await get(8, 'en');
+  assert.equal(blocked.status, 429);
+  assert.match(((await blocked.json()) as { error: string }).error, /rate requests/);
+  assert.equal((await get(9)).status, 200);
+  assert.equal((await api.request('/me', { headers: { Authorization: 'dev 8' } })).status, 200);
+});
+
+test('the rates limit is configurable', async () => {
+  const cbr = fakeCbr({ '2025-01-15': table('2025-01-15', SAMPLE) });
+  rates.setRatesTestHooks({ fetcher: cbr.fetcher, today: () => '2025-01-20' });
+  ratesLimiter.setLimit(2);
+  try {
+    const get = () =>
+      api.request('/rates?base=RUB&currency=GEL&date=2025-01-15', { headers: { Authorization: 'dev 10' } });
+    assert.equal((await get()).status, 200);
+    assert.equal((await get()).status, 200);
+    assert.equal((await get()).status, 429);
+  } finally {
+    ratesLimiter.setLimit(20);
+  }
 });

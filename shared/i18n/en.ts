@@ -498,6 +498,7 @@ export const en: Dict = {
       tooSmall: 'The amount is too small for this rate',
       sameCurrency: 'The currency must differ from the group currency',
       unknownCurrency: 'Unknown currency',
+      tooMany: 'Too many rate requests, please try again in a minute',
       unavailable: 'Rates are unavailable right now — enter the rate manually',
       notFound: 'No rate for this currency on that date — enter it manually',
     },
