@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
 import { DEFAULT_CATEGORY } from '../../shared/categories.ts';
 import { createT, type Lang, pickLang, type TFn } from '../../shared/i18n/index.ts';
@@ -62,6 +63,9 @@ api.onError((err, c) => {
   console.error(err);
   return c.json({ error: t('errors.internal') }, 500);
 });
+
+// Request bodies are small JSON; refuse anything bigger before it is read into memory.
+api.use('*', bodyLimit({ maxSize: 256 * 1024, onError: (c) => c.json({ error: 'Payload too large' }, 413) }));
 
 // --- Auth: every /api request carries "Authorization: tma <initData>" ---
 api.use('*', async (c, next) => {
@@ -416,7 +420,9 @@ api.get('/rates', async (c) => {
     })
     .parse(c.req.query());
   if (q.base === q.currency) throw fail(400, 'errors.rate.sameCurrency');
-  if (Number.isNaN(Date.parse(`${q.date}T00:00:00Z`))) throw fail(400, 'errors.invalidData');
+  const parsed = Date.parse(`${q.date}T00:00:00Z`);
+  // Not further than a couple of days ahead: every distinct future date would be a new upstream call and cache entry.
+  if (Number.isNaN(parsed) || parsed > Date.now() + 2 * 86_400_000) throw fail(400, 'errors.invalidData');
   return c.json(await getRate(q.base, q.currency, q.date));
 });
 
