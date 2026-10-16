@@ -13,6 +13,8 @@ export type ActivityAction =
   | 'member.claim'
   | 'member.payment_info'
   | 'member.leave'
+  | 'member.remove'
+  | 'group.invite_rotate'
   | 'group.archive'
   | 'group.unarchive'
   | 'expense.create'
@@ -82,6 +84,10 @@ export function activityText(lang: Lang, entry: ActivityEntry, currency: string)
       return t(lang, 'activity.memberJoin', { actor });
     case 'member.leave':
       return t(lang, 'activity.memberLeave', { actor });
+    case 'member.remove':
+      return t(lang, 'activity.memberRemove', { actor, name: p.name ?? '' });
+    case 'group.invite_rotate':
+      return t(lang, 'activity.inviteRotate', { actor });
     case 'group.archive':
       return t(lang, 'activity.groupArchive', { actor });
     case 'group.unarchive':
