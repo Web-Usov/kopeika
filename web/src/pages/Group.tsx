@@ -53,6 +53,9 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
           <button type="button" onClick={() => invite(g)}>
             {t('group.invite')}
           </button>
+          <button type="button" onClick={() => navigate(`/g/${g.id}/summary`)}>
+            {t('summary.open')}
+          </button>
           <button type="button" onClick={() => navigate(`/g/${g.id}/settings`)}>
             {t('group.settings')}
           </button>

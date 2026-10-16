@@ -1,16 +1,9 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { CATEGORY_IDS, DEFAULT_CATEGORY } from '../../shared/categories.ts';
-import { createT, type Key, type Lang, type Params, pickLang, type TFn } from '../../shared/i18n/index.ts';
-import {
-  CURRENCIES,
-  computeShares,
-  convertAmount,
-  convertExactShares,
-  normalizeRate,
-  SplitError,
-  type SplitInput,
-} from '../../shared/money.ts';
+import { DEFAULT_CATEGORY } from '../../shared/categories.ts';
+import { createT, type Lang, pickLang, type TFn } from '../../shared/i18n/index.ts';
+import { CURRENCIES, SplitError } from '../../shared/money.ts';
+import { firstOccurrence } from '../../shared/recurring.ts';
 import { expenseSnapshot, listActivity, logActivity } from './activity.ts';
 import { type TelegramUser, validateInitData } from './auth.ts';
 import {
@@ -25,10 +18,21 @@ import {
 import { attachChat, checkChatLink, groupOfChat, unlinkGroup } from './chatLink.ts';
 import { config } from './config.ts';
 import { all, one, run, tx } from './db.ts';
+import { ApiError, fail } from './errors.ts';
+import { createExpense, expenseBody, saveShares, validateExpense } from './expenses.ts';
 import { buildCsv, exportFileName } from './export.ts';
 import { deserialize, isEmpty, PaymentInfoError, parsePaymentInfo, serialize } from './paymentInfo.ts';
 import { createRateLimiter } from './rateLimit.ts';
 import { getRate, RatesError } from './rates.ts';
+import {
+  expenseFor,
+  isoDate,
+  localDate,
+  type RecurringRow,
+  recurringDto,
+  recurringShape,
+  scheduleOk,
+} from './recurring.ts';
 import {
   CHAT_FEEDS,
   type ChatFeed,
@@ -47,19 +51,6 @@ import {
 type Env = { Variables: { user: TelegramUser; lang: Lang } };
 
 export const api = new Hono<Env>();
-
-/** An API error: carries a dictionary key, translated into the request user's language in `onError`. */
-class ApiError extends Error {
-  constructor(
-    readonly status: 400 | 401 | 403 | 404 | 409 | 429 | 503,
-    readonly key: Key,
-    readonly params?: Params,
-  ) {
-    super(key);
-  }
-}
-
-const fail = (status: ApiError['status'], key: Key, params?: Params) => new ApiError(status, key, params);
 
 api.onError((err, c) => {
   const t: TFn = createT(c.get('lang') ?? 'ru');
@@ -430,106 +421,11 @@ api.get('/rates', async (c) => {
 });
 
 // --- Expenses ---
-const expenseBody = z.object({
-  kind: z.enum(['expense', 'transfer']).default('expense'),
-  title: z.string().trim().max(100).default(''),
-  // Ignored when originalAmount is given: the server computes it from the original amount and the rate.
-  amount: z.number().int().min(0).max(1e12).default(0),
-  // Foreign currency: all three or none. For splitMode "exact" the shares are then in the original currency.
-  originalAmount: z.number().int().positive().max(1e12).optional(),
-  originalCurrency: z.string().max(8).optional(),
-  rate: z.string().max(32).optional(),
-  payerId: z.number().int().positive(),
-  splitMode: z.enum(['equal', 'shares', 'exact']),
-  spentOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  category: z.enum(CATEGORY_IDS).optional(),
-  shares: z
-    .array(z.object({ memberId: z.number().int().positive(), value: z.number().int().min(0) }))
-    .min(1)
-    .max(100),
-});
-type ExpenseBody = z.infer<typeof expenseBody>;
-
-interface Validated {
-  computed: Map<number, number>;
-  /** Canonical rate string when the expense is in a foreign currency. */
-  rate: string | null;
-}
-
-function validateExpense(group: GroupRow, body: ExpenseBody, lang: Lang): Validated {
-  const groupId = group.id;
-  const memberIds = new Set(all<{ id: number }>('SELECT id FROM members WHERE group_id = ?', groupId).map((m) => m.id));
-  if (!memberIds.has(body.payerId) || body.shares.some((s) => !memberIds.has(s.memberId))) {
-    throw fail(400, 'errors.foreignMember');
-  }
-  if (body.kind === 'transfer') {
-    if (body.shares.length !== 1 || body.shares[0].memberId === body.payerId) throw fail(400, 'errors.badTransfer');
-    body.splitMode = 'exact';
-    body.shares[0].value = body.amount;
-    body.title ||= createT(lang)('transfer.defaultTitle');
-    body.category = DEFAULT_CATEGORY;
-  } else if (!body.title) {
-    throw fail(400, 'errors.titleRequired');
-  }
-  const foreign = [body.originalAmount, body.originalCurrency, body.rate].filter((v) => v !== undefined).length;
-  if (foreign === 0) return { computed: computeShares(body.amount, body.splitMode, body.shares), rate: null };
-  if (foreign !== 3 || body.kind === 'transfer') throw fail(400, 'errors.invalidData');
-  const original = body.originalCurrency as string;
-  if (!CURRENCIES.includes(original)) throw fail(400, 'errors.rate.unknownCurrency');
-  if (original === group.currency) throw fail(400, 'errors.rate.sameCurrency');
-  const rate = normalizeRate(body.rate as string);
-  if (!rate) throw fail(400, 'errors.rate.invalid');
-  const originalAmount = body.originalAmount as number;
-  body.amount = convertAmount(originalAmount, rate, original, group.currency);
-  if (body.splitMode !== 'exact') return { computed: computeShares(body.amount, body.splitMode, body.shares), rate };
-  // Exact shares come in the original currency: check they add up there, then convert without losing a unit.
-  computeShares(originalAmount, 'exact', body.shares);
-  const converted: SplitInput[] = convertExactShares(body.shares, rate, original, group.currency);
-  return { computed: computeShares(body.amount, 'exact', converted), rate };
-}
-
-function saveShares(expenseId: number, body: ExpenseBody, computed: Map<number, number>) {
-  run('DELETE FROM expense_shares WHERE expense_id = ?', expenseId);
-  for (const s of body.shares) {
-    run(
-      'INSERT INTO expense_shares (expense_id, member_id, input, amount) VALUES (?, ?, ?, ?)',
-      expenseId,
-      s.memberId,
-      body.splitMode === 'equal' ? 1 : s.value,
-      computed.get(s.memberId)!,
-    );
-  }
-}
-
 api.post('/groups/:id/expenses', async (c) => {
   const user = c.get('user');
   const { group, me } = loadGroupFor(c.req.param('id'), user.id);
   const body = expenseBody.parse(await c.req.json());
-  const { computed, rate } = validateExpense(group, body, c.get('lang'));
-  const expense = tx(() => {
-    const res = run(
-      `INSERT INTO expenses (group_id, kind, title, amount, payer_id, split_mode, spent_on, category, created_by,
-                             original_amount, original_currency, rate)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      group.id,
-      body.kind,
-      body.title,
-      body.amount,
-      body.payerId,
-      body.splitMode,
-      body.spentOn,
-      body.category ?? DEFAULT_CATEGORY,
-      user.id,
-      rate ? (body.originalAmount as number) : null,
-      rate ? (body.originalCurrency as string) : null,
-      rate,
-    );
-    const id = Number(res.lastInsertRowid);
-    saveShares(id, body, computed);
-    logActivity(group.id, user.id, 'expense.create', { expenseId: id, expense: expenseSnapshot(id)! });
-    run('UPDATE groups SET archived_at = NULL WHERE id = ?', group.id);
-    return one<ExpenseRow>('SELECT * FROM expenses WHERE id = ?', id)!;
-  });
+  const expense = tx(() => createExpense(group, user.id, body, c.get('lang')));
   notifyExpense(group, expense, user.id, me.name);
   return c.json(detail({ ...group, archived_at: null }, me), 201);
 });
@@ -586,6 +482,125 @@ api.delete('/groups/:id/expenses/:expenseId', (c) => {
   });
   if (before) notifyExpenseChange(group, before, null, c.get('user').id, me.name);
   return c.json(detail(group, me));
+});
+
+// --- Recurring expenses ---
+const recurringCreate = z
+  .object({ ...recurringShape, startDate: isoDate.optional() })
+  .refine(scheduleOk, { message: 'day' });
+const recurringPatch = z
+  .object({ ...recurringShape, active: z.boolean() })
+  .partial()
+  .refine((b) => Object.keys(b).length > 0);
+
+/** A template must pass the same checks as the expense it will produce (members, shares, sums). */
+function validateTemplate(group: GroupRow, r: RecurringRow, lang: Lang) {
+  validateExpense(group, expenseFor(r, r.next_date), lang);
+}
+
+function loadRecurring(group: GroupRow, ridRaw: string | undefined) {
+  const r = one<RecurringRow>('SELECT * FROM recurring WHERE id = ? AND group_id = ?', idParam(ridRaw), group.id);
+  if (!r) throw fail(404, 'errors.recurringNotFound');
+  return r;
+}
+
+api.get('/groups/:id/recurring', (c) => {
+  const { group } = loadGroupFor(c.req.param('id'), c.get('user').id);
+  const rows = all<RecurringRow>('SELECT * FROM recurring WHERE group_id = ? ORDER BY id', group.id);
+  return c.json(rows.map(recurringDto));
+});
+
+api.post('/groups/:id/recurring', async (c) => {
+  const user = c.get('user');
+  const { group } = loadGroupFor(c.req.param('id'), user.id);
+  const body = recurringCreate.parse(await c.req.json());
+  const today = localDate();
+  // Never earlier than today: a template does not back-fill the past.
+  const start = body.startDate && body.startDate > today ? body.startDate : today;
+  const row: RecurringRow = {
+    id: 0,
+    group_id: group.id,
+    created_by: user.id,
+    title: body.title,
+    category: body.category ?? DEFAULT_CATEGORY,
+    amount: body.amount,
+    payer_id: body.payerId,
+    split_mode: body.splitMode,
+    shares: JSON.stringify(body.shares),
+    period: body.period,
+    day: body.day,
+    start_date: start,
+    next_date: firstOccurrence(body.period, body.day, start),
+    active: 1,
+    created_at: '',
+  };
+  validateTemplate(group, row, c.get('lang'));
+  const res = run(
+    `INSERT INTO recurring (group_id, created_by, title, category, amount, payer_id, split_mode, shares, period, day,
+                            start_date, next_date)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    row.group_id,
+    row.created_by,
+    row.title,
+    row.category,
+    row.amount,
+    row.payer_id,
+    row.split_mode,
+    row.shares,
+    row.period,
+    row.day,
+    row.start_date,
+    row.next_date,
+  );
+  const created = one<RecurringRow>('SELECT * FROM recurring WHERE id = ?', Number(res.lastInsertRowid))!;
+  return c.json(recurringDto(created), 201);
+});
+
+api.patch('/groups/:id/recurring/:rid', async (c) => {
+  const { group } = loadGroupFor(c.req.param('id'), c.get('user').id);
+  const existing = loadRecurring(group, c.req.param('rid'));
+  const body = recurringPatch.parse(await c.req.json());
+  const next: RecurringRow = {
+    ...existing,
+    title: body.title ?? existing.title,
+    category: body.category ?? existing.category,
+    amount: body.amount ?? existing.amount,
+    payer_id: body.payerId ?? existing.payer_id,
+    split_mode: body.splitMode ?? existing.split_mode,
+    shares: body.shares ? JSON.stringify(body.shares) : existing.shares,
+    period: body.period ?? existing.period,
+    day: body.day ?? existing.day,
+    active: body.active === undefined ? existing.active : body.active ? 1 : 0,
+  };
+  if (!scheduleOk(next)) throw fail(400, 'errors.invalidData');
+  // A changed schedule or a resume starts from today: paused time is not made up.
+  const rescheduled =
+    next.period !== existing.period || next.day !== existing.day || (next.active === 1 && existing.active === 0);
+  if (rescheduled) next.next_date = firstOccurrence(next.period, next.day, localDate());
+  validateTemplate(group, next, c.get('lang'));
+  run(
+    `UPDATE recurring SET title = ?, category = ?, amount = ?, payer_id = ?, split_mode = ?, shares = ?, period = ?,
+       day = ?, active = ?, next_date = ? WHERE id = ?`,
+    next.title,
+    next.category,
+    next.amount,
+    next.payer_id,
+    next.split_mode,
+    next.shares,
+    next.period,
+    next.day,
+    next.active,
+    next.next_date,
+    existing.id,
+  );
+  return c.json(recurringDto(next));
+});
+
+api.delete('/groups/:id/recurring/:rid', (c) => {
+  const { group } = loadGroupFor(c.req.param('id'), c.get('user').id);
+  const r = loadRecurring(group, c.req.param('rid'));
+  run('DELETE FROM recurring WHERE id = ?', r.id);
+  return c.json({ ok: true });
 });
 
 // --- History ---

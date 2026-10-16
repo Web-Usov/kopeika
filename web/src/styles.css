@@ -724,6 +724,11 @@ select.field {
   opacity: 0.5;
 }
 
+/* Подзаголовок, который может переноситься (например, расписание регулярной траты). */
+.row.wrap .row-subtitle {
+  white-space: normal;
+}
+
 /* --- Celebration overlay ("all settled up") --- */
 .celebration {
   position: fixed;
@@ -795,4 +800,76 @@ select.field {
   .celebration {
     animation: none;
   }
+}
+
+/* --- Summary --- */
+.summary-card {
+  background: var(--section-bg);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.summary-hero {
+  background: var(--button);
+  color: var(--button-text);
+}
+
+.summary-big {
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.summary-grid .summary-card {
+  margin-bottom: 0;
+}
+
+.summary-grid + .summary-card {
+  margin-top: 12px;
+}
+
+.summary-emoji {
+  font-size: 32px;
+  line-height: 1.2;
+}
+
+.summary-label {
+  color: var(--hint);
+  font-size: 13px;
+}
+
+.summary-value {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 2px 0;
+  overflow-wrap: anywhere;
+}
+
+.title-chip {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  white-space: normal;
+  margin-bottom: 4px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: rgba(128, 128, 128, 0.15);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.summary-hero .summary-label {
+  color: inherit;
+  opacity: 0.85;
 }

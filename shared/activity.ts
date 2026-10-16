@@ -46,6 +46,8 @@ export interface ActivityPayload {
   before?: ExpenseSnapshot;
   after?: ExpenseSnapshot;
   expense?: ExpenseSnapshot;
+  /** The expense was created by a recurring template. */
+  recurring?: boolean;
 }
 
 export interface ActivityEntry {
@@ -100,7 +102,11 @@ export function activityText(lang: Lang, entry: ActivityEntry, currency: string)
           to: e.to?.name ?? '?',
           amount: money(e.amount),
         });
-      return t(lang, 'activity.expenseCreate', { actor, title: e.title, amount: money(e.amount) });
+      return t(lang, p.recurring ? 'activity.expenseCreateRecurring' : 'activity.expenseCreate', {
+        actor,
+        title: e.title,
+        amount: money(e.amount),
+      });
     }
     case 'expense.delete': {
       const e = p.expense;

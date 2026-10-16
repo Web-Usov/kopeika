@@ -4,6 +4,7 @@ import { startBackupSchedule } from './backup.ts';
 import { startBot } from './bot.ts';
 import { config } from './config.ts';
 import { startDigestSchedule } from './digest.ts';
+import { startRecurringSchedule } from './recurring.ts';
 import { version } from './version.ts';
 
 const app = createApp(config.staticDir);
@@ -18,3 +19,5 @@ startBot();
 
 startBackupSchedule();
 startDigestSchedule();
+
+startRecurringSchedule();

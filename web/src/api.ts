@@ -2,6 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { ActivityEntry } from '../../shared/activity.ts';
 import type { CategoryId } from '../../shared/categories.ts';
 import type { SplitMode } from '../../shared/money.ts';
+import type { Period } from '../../shared/recurring.ts';
 import { lang, t } from './i18n.ts';
 import { authHeader, inTelegram } from './tg.tsx';
 
@@ -100,6 +101,35 @@ export interface ExpenseInput {
   spentOn: string;
   category?: CategoryId;
   shares: { memberId: number; value: number }[];
+}
+
+export interface Recurring {
+  id: number;
+  title: string;
+  category: CategoryId;
+  /** In the group currency. */
+  amount: number;
+  payerId: number;
+  splitMode: SplitMode;
+  shares: { memberId: number; value: number }[];
+  period: Period;
+  /** Day of the month (1-31) for monthly, ISO weekday (1-7) for weekly. */
+  day: number;
+  nextDate: string;
+  active: boolean;
+}
+
+export interface RecurringInput {
+  title: string;
+  amount: number;
+  payerId: number;
+  splitMode: SplitMode;
+  category?: CategoryId;
+  shares: { memberId: number; value: number }[];
+  period: Period;
+  day: number;
+  /** The first occurrence is the first fitting date on or after this one. */
+  startDate?: string;
 }
 
 export class ApiError extends Error {
@@ -227,6 +257,11 @@ export const api = {
       `/groups/${id}/activity${before ? `?before=${before}` : ''}`,
     ),
   remind: (id: number, memberId: number) => request<{ ok: true }>('POST', `/groups/${id}/remind`, { memberId }),
+  recurring: (id: number) => request<Recurring[]>('GET', `/groups/${id}/recurring`),
+  addRecurring: (id: number, body: RecurringInput) => request<Recurring>('POST', `/groups/${id}/recurring`, body),
+  setRecurringActive: (id: number, rid: number, active: boolean) =>
+    request<Recurring>('PATCH', `/groups/${id}/recurring/${rid}`, { active }),
+  deleteRecurring: (id: number, rid: number) => request('DELETE', `/groups/${id}/recurring/${rid}`),
   deleteExpense: (id: number, expenseId: number) =>
     request<GroupDetail>('DELETE', `/groups/${id}/expenses/${expenseId}`),
 };
