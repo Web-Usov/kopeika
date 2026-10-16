@@ -19,7 +19,7 @@ import {
   type SplitMode,
 } from '../../../shared/money.ts';
 import { addDays, isoWeekday, nextOccurrence, type Period } from '../../../shared/recurring.ts';
-import { api, type Expense, type GroupDetail, useGroup } from '../api.ts';
+import { api, type Expense, type GroupDetail, useExpense, useGroup } from '../api.ts';
 import { applySavedGroup } from '../celebration.ts';
 import { dateLocale, errorText, lang, rich, t } from '../i18n.ts';
 import { scheduleText, shortDate } from '../recurring.ts';
@@ -29,8 +29,9 @@ import { Avatar, ErrorView, Loading, Money, Row, Section, Segmented, todayIso } 
 
 export function ExpenseForm({ groupId, expenseId }: { groupId: number; expenseId?: number }) {
   const { data: g, error } = useGroup(groupId);
+  const { expense: found, loading } = useExpense(groupId, expenseId, g);
   const back = <BackButton onClick={() => navigate(`/g/${groupId}`, { replace: true })} />;
-  if (!g)
+  if (!g || loading)
     return (
       <div className="page">
         {back}
@@ -38,7 +39,7 @@ export function ExpenseForm({ groupId, expenseId }: { groupId: number; expenseId
       </div>
     );
 
-  const expense = expenseId ? g.expenses.find((e) => e.id === expenseId && e.kind === 'expense') : undefined;
+  const expense = found?.kind === 'expense' ? found : undefined;
   if (expenseId && !expense)
     return (
       <div className="page">

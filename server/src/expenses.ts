@@ -12,6 +12,7 @@ import {
 import { expenseSnapshot, logActivity } from './activity.ts';
 import { all, one, run } from './db.ts';
 import { fail } from './errors.ts';
+import { assertRoomForExpense } from './quota.ts';
 import type { ExpenseRow, GroupRow } from './repo.ts';
 import { countEvent } from './stats.ts';
 
@@ -92,6 +93,7 @@ export function saveShares(expenseId: number, body: ExpenseBody, computed: Map<n
  */
 export function createExpense(group: GroupRow, userId: number, body: ExpenseBody, lang: Lang, recurring = false) {
   const { computed, rate } = validateExpense(group, body, lang);
+  assertRoomForExpense(group.id);
   const res = run(
     `INSERT INTO expenses (group_id, kind, title, amount, payer_id, split_mode, spent_on, category, created_by,
                            original_amount, original_currency, rate)

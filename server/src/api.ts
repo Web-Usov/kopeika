@@ -2,10 +2,11 @@ import { GrammyError, HttpError } from 'grammy';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
-import { DEFAULT_CATEGORY } from '../../shared/categories.ts';
+import { categoryTotals, DEFAULT_CATEGORY } from '../../shared/categories.ts';
 import { createT, type Lang, pickLang, type TFn } from '../../shared/i18n/index.ts';
 import { CURRENCIES, SplitError } from '../../shared/money.ts';
 import { firstOccurrence } from '../../shared/recurring.ts';
+import { groupSummary } from '../../shared/summary.ts';
 import { deleteAccount, eraseGroup, leaveGroup } from './account.ts';
 import { expenseSnapshot, listActivity, logActivity } from './activity.ts';
 import { type TelegramUser, validateInitData } from './auth.ts';
@@ -29,6 +30,7 @@ import { createExpense, expenseBody, saveShares, validateExpense } from './expen
 import { buildCsv, exportFileName } from './export.ts';
 import { logTelegramError } from './logging.ts';
 import { deserialize, isEmpty, PaymentInfoError, parsePaymentInfo, serialize } from './paymentInfo.ts';
+import { assertCanJoinMoreGroups, assertRoomForMembers, assertRoomForRecurring } from './quota.ts';
 import { createRateLimiter } from './rateLimit.ts';
 import { getRate, RatesError } from './rates.ts';
 import {
@@ -45,10 +47,13 @@ import {
   type ChatFeed,
   displayName,
   type ExpenseRow,
+  expensesPage,
   findMembership,
   type GroupRow,
+  getExpense,
   groupDetail,
   groupsForUser,
+  loadLedger,
   type MemberRow,
   newInviteCode,
   type UserRow,
@@ -122,7 +127,8 @@ function loadGroupFor(groupIdRaw: string | undefined, userId: number) {
   return { group, me };
 }
 
-const detail = (group: GroupRow, me: MemberRow) => groupDetail(group, me, appLink(group.invite_code));
+const detail = (group: GroupRow, me: MemberRow, all = false) =>
+  groupDetail(group, me, appLink(group.invite_code), { all });
 
 const name = z.string().trim().min(1).max(64);
 
@@ -176,6 +182,8 @@ api.post('/groups', async (c) => {
     })
     .parse(await c.req.json());
   const groupId = tx(() => {
+    assertCanJoinMoreGroups(user.id);
+    assertRoomForMembers(0, 1 + body.memberNames.length);
     const g = run(
       'INSERT INTO groups (name, currency, invite_code, created_by) VALUES (?, ?, ?, ?)',
       body.name,
@@ -226,12 +234,16 @@ api.delete('/groups/:id', (c) => {
   return c.json({ ok: true });
 });
 
+// One CSV a minute per user: each file is sent to their private chat through the shared bot.
+export const exportLimiter = createRateLimiter({ limit: 1 });
+
 // Not a data change, so it is not written to the activity log.
 api.post('/groups/:id/export', async (c) => {
   const user = c.get('user');
   const lang = c.get('lang');
   const { group, me } = loadGroupFor(c.req.param('id'), user.id);
-  const d = detail(group, me);
+  if (!exportLimiter.allow(user.id)) throw fail(429, 'errors.exportTooOften');
+  const d = detail(group, me, true);
   const t = createT(lang);
   const sent = await sendExportFile(
     user.id,
@@ -289,6 +301,7 @@ api.post('/groups/:id/members', async (c) => {
   const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
   const body = z.object({ name }).parse(await c.req.json());
   tx(() => {
+    assertRoomForMembers(group.id);
     const res = run('INSERT INTO members (group_id, name) VALUES (?, ?)', group.id, body.name);
     logActivity(group.id, c.get('user').id, 'member.add', { memberId: Number(res.lastInsertRowid), name: body.name });
   });
@@ -435,6 +448,7 @@ api.post('/invite/:code/join', async (c) => {
   if (!group) throw fail(404, 'errors.inviteInvalid');
   if (!findMembership(group.id, user.id)) {
     tx(() => {
+      assertCanJoinMoreGroups(user.id);
       if (body.claimMemberId) {
         // "I am this person": link a name-only member to the Telegram account, keeping their history.
         const res = run(
@@ -448,6 +462,7 @@ api.post('/invite/:code/join', async (c) => {
         logActivity(group.id, user.id, 'member.claim', { memberId: claimed.id, name: claimed.name });
         countEvent('member.claim');
       } else {
+        assertRoomForMembers(group.id);
         const res = run(
           'INSERT INTO members (group_id, user_id, name) VALUES (?, ?, ?)',
           group.id,
@@ -490,6 +505,43 @@ api.post('/groups/:id/expenses', async (c) => {
   const expense = tx(() => createExpense(group, user.id, body, c.get('lang')));
   notifyExpense(group, expense, user.id, me.name);
   return c.json(detail({ ...group, archived_at: null }, me), 201);
+});
+
+// Older expenses, newest first: `before` is the id of the last one the client has.
+api.get('/groups/:id/expenses', (c) => {
+  const { group } = loadGroupFor(c.req.param('id'), c.get('user').id);
+  const q = z
+    .object({
+      before: z.coerce.number().int().positive().optional(),
+      limit: z.coerce.number().int().min(1).max(500).optional(),
+    })
+    .parse(c.req.query());
+  const limit = q.limit ?? config.expensesPage;
+  const page = expensesPage(group.id, { before: q.before, limit });
+  if (!page) throw fail(404, 'errors.expenseNotFound');
+  return c.json({ items: page.items, hasMore: page.hasMore, nextBefore: page.hasMore ? page.items.at(-1)!.id : null });
+});
+
+// Aggregates over ALL expenses of the group (the group payload only carries the newest page).
+api.get('/groups/:id/summary', (c) => {
+  const { group } = loadGroupFor(c.req.param('id'), c.get('user').id);
+  const members = all<{ id: number; name: string }>(
+    'SELECT id, name FROM members WHERE group_id = ? ORDER BY id',
+    group.id,
+  );
+  return c.json(groupSummary({ members, expenses: loadLedger(group.id) }, c.get('lang')));
+});
+
+api.get('/groups/:id/stats', (c) => {
+  const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
+  return c.json(categoryTotals(loadLedger(group.id), me.id));
+});
+
+api.get('/groups/:id/expenses/:expenseId', (c) => {
+  const { group } = loadGroupFor(c.req.param('id'), c.get('user').id);
+  const e = getExpense(group.id, idParam(c.req.param('expenseId')));
+  if (!e) throw fail(404, 'errors.expenseNotFound');
+  return c.json(e);
 });
 
 api.put('/groups/:id/expenses/:expenseId', async (c) => {
@@ -576,6 +628,7 @@ api.post('/groups/:id/recurring', async (c) => {
   const user = c.get('user');
   const { group } = loadGroupFor(c.req.param('id'), user.id);
   if (group.is_demo) throw fail(409, 'errors.demoNotAllowed');
+  assertRoomForRecurring(group.id);
   const body = recurringCreate.parse(await c.req.json());
   const today = localDate();
   // Never earlier than today: a template does not back-fill the past.

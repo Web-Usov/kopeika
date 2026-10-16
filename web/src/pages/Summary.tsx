@@ -1,13 +1,9 @@
-import {
-  ACHIEVEMENT_EMOJI,
-  achievementTextKey,
-  achievementTitleKey,
-  groupAchievements,
-} from '../../../shared/achievements.ts';
+import { useEffect, useState } from 'react';
+import { ACHIEVEMENT_EMOJI, achievementTextKey, achievementTitleKey } from '../../../shared/achievements.ts';
 import { categoryEmoji, categoryKey } from '../../../shared/categories.ts';
 import { formatMoney } from '../../../shared/money.ts';
-import { groupSummary, periodText, shortDay, summaryShareText } from '../../../shared/summary.ts';
-import { useGroup } from '../api.ts';
+import { type GroupSummary, periodText, shortDay, summaryShareText } from '../../../shared/summary.ts';
+import { api, useGroup } from '../api.ts';
 import { lang, t } from '../i18n.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, copyText, haptic, MainButton, shareLink } from '../tg.tsx';
@@ -15,16 +11,23 @@ import { Avatar, ErrorView, Loading, Row, Section } from '../ui.tsx';
 
 export function Summary({ id }: { id: number }) {
   const { data: g, error } = useGroup(id);
+  // The group payload only carries the newest expenses, so the summary is computed by the server over all of them.
+  const [s, setS] = useState<GroupSummary>();
+  const [summaryError, setSummaryError] = useState<string>();
+  const stamp = g ? `${g.expensesTotal}:${g.totalSpent}` : '';
+  useEffect(() => {
+    if (!stamp) return;
+    api.summary(id).then(setS, (e: Error) => setSummaryError(e.message));
+  }, [id, stamp]);
   const back = <BackButton onClick={() => navigate(`/g/${id}`, { replace: true })} />;
-  if (!g)
+  if (!g || !s)
     return (
       <div className="page">
         {back}
-        {error ? <ErrorView message={error} /> : <Loading />}
+        {error || summaryError ? <ErrorView message={(error ?? summaryError)!} /> : <Loading />}
       </div>
     );
 
-  const s = groupSummary(g, lang);
   const money = (n: number) => formatMoney(n, g.currency, lang);
   const name = (memberId: number) => g.members.find((m) => m.id === memberId)?.name ?? t('common.unknownMember');
 
@@ -41,7 +44,7 @@ export function Summary({ id }: { id: number }) {
     );
   }
 
-  const achievements = groupAchievements(g);
+  const achievements = g.achievements;
 
   const share = async () => {
     const text = summaryShareText(g.name, g.currency, s, lang);
