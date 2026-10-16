@@ -6,9 +6,20 @@ import {
   DEFAULT_CATEGORY,
   suggestCategory,
 } from '../../../shared/categories.ts';
-import { amountToInput, computeShares, parseAmount, type SplitInput, type SplitMode } from '../../../shared/money.ts';
+import {
+  amountToInput,
+  CURRENCIES,
+  computeShares,
+  convertAmount,
+  convertExactShares,
+  formatMoney,
+  normalizeRate,
+  parseAmount,
+  type SplitInput,
+  type SplitMode,
+} from '../../../shared/money.ts';
 import { api, type Expense, type GroupDetail, setGroup, useGroup } from '../api.ts';
-import { errorText, lang, rich, t } from '../i18n.ts';
+import { dateLocale, errorText, lang, rich, t } from '../i18n.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, confirmDialog, haptic, MainButton } from '../tg.tsx';
 import { Avatar, ErrorView, Loading, Money, Row, Section, Segmented, todayIso } from '../ui.tsx';
@@ -59,9 +70,30 @@ function initialParticipants(g: GroupDetail, e?: Expense): Record<number, Partic
   return out;
 }
 
+/** "12 октября" (with the year if it is not the current one) for the rate caption. */
+function rateDay(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Intl.DateTimeFormat(dateLocale, {
+    day: 'numeric',
+    month: 'long',
+    ...(y !== new Date().getFullYear() ? { year: 'numeric' } : {}),
+  }).format(new Date(y, m - 1, d));
+}
+
+/** Rate for the input and the caption: a decimal comma in Russian. */
+const showRate = (rate: string) => (lang === 'ru' ? rate.replace('.', ',') : rate);
+
+type RateInfo = { status: 'idle' | 'loading' | 'ok' | 'error'; date?: string; error?: string };
+
 function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
   const [title, setTitle] = useState(expense?.title ?? '');
-  const [amountStr, setAmountStr] = useState(expense ? amountToInput(expense.amount) : '');
+  const [currency, setCurrency] = useState(expense?.originalCurrency ?? g.currency);
+  const foreign = currency !== g.currency;
+  // An existing foreign expense keeps its saved rate until the currency changes.
+  const [rateStr, setRateStr] = useState(expense?.rate ? showRate(expense.rate) : '');
+  const [rateManual, setRateManual] = useState(Boolean(expense?.rate));
+  const [rateInfo, setRateInfo] = useState<RateInfo>({ status: 'idle' });
+  const [amountStr, setAmountStr] = useState(expense ? amountToInput(expense.originalAmount ?? expense.amount) : '');
   const [payerId, setPayerId] = useState(expense?.payerId ?? g.meId);
   const [spentOn, setSpentOn] = useState(expense?.spentOn ?? todayIso());
   const [mode, setMode] = useState<SplitMode>(expense?.splitMode ?? 'equal');
@@ -92,7 +124,28 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
     if (left !== row.scrollLeft) row.scrollTo({ left, behavior: first ? 'auto' : 'smooth' });
   }, [category]);
 
+  // Suggested rate for the expense date; a rate typed by hand is never overwritten.
+  useEffect(() => {
+    if (!foreign || rateManual) return;
+    let cancelled = false;
+    setRateInfo({ status: 'loading' });
+    api
+      .rate(g.currency, currency, spentOn)
+      .then((r) => {
+        if (cancelled) return;
+        setRateStr(showRate(r.rate));
+        setRateInfo({ status: 'ok', date: r.date });
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setRateInfo({ status: 'error', error: e.message });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [foreign, rateManual, g.currency, currency, spentOn]);
+
   const amount = parseAmount(amountStr);
+  const rate = foreign ? normalizeRate(rateStr) : null;
   const update = (id: number, patch: Partial<Participant>) => setParts((p) => ({ ...p, [id]: { ...p[id], ...patch } }));
 
   const inputs: SplitInput[] = useMemo(() => {
@@ -111,9 +164,18 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
 
   let computed: Map<number, number> | null = null;
   let splitError: string | null = null;
-  if (amount) {
+  // The total in the group currency (what lands in the balances).
+  let converted: number | null = foreign ? null : amount;
+  if (amount && (!foreign || rate)) {
     try {
-      computed = computeShares(amount, mode, inputs);
+      if (!foreign || !rate) computed = computeShares(amount, mode, inputs);
+      else {
+        converted = convertAmount(amount, rate, currency, g.currency);
+        if (mode === 'exact') {
+          computeShares(amount, 'exact', inputs); // adds up in the entered currency
+          computed = computeShares(converted, 'exact', convertExactShares(inputs, rate, currency, g.currency));
+        } else computed = computeShares(converted, mode, inputs);
+      }
     } catch (e) {
       splitError = errorText(e);
     }
@@ -123,7 +185,16 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
   const save = async () => {
     if (!amount || !computed) return;
     setSaving(true);
-    const body = { title: title.trim(), amount, payerId, splitMode: mode, spentOn, category, shares: inputs };
+    const body = {
+      title: title.trim(),
+      amount: converted ?? amount,
+      ...(foreign && rate ? { originalAmount: amount, originalCurrency: currency, rate } : {}),
+      payerId,
+      splitMode: mode,
+      spentOn,
+      category,
+      shares: inputs,
+    };
     try {
       setGroup(expense ? await api.updateExpense(g.id, expense.id, body) : await api.addExpense(g.id, body));
       haptic.success();
@@ -170,9 +241,61 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
             value={amountStr}
             onChange={(e) => setAmountStr(e.target.value)}
           />
-          <span className="currency">{g.currency}</span>
+          <select
+            className="currency-select"
+            aria-label={t('expense.currencyLabel')}
+            value={currency}
+            onChange={(e) => {
+              setCurrency(e.target.value);
+              setRateManual(false);
+              setRateStr('');
+              setRateInfo({ status: 'idle' });
+            }}
+          >
+            {[g.currency, ...CURRENCIES.filter((c) => c !== g.currency)].map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
         </div>
         {amountStr && amount === null && <div className="field-error">{t('expense.amountError')}</div>}
+        {foreign && (
+          <>
+            <div className="amount-field rate-field">
+              <span className="rate-label">{t('expense.rateLabel')}</span>
+              <input
+                className="field rate"
+                inputMode="decimal"
+                placeholder={rateInfo.status === 'error' ? t('expense.rateEnter') : t('expense.ratePlaceholder')}
+                value={rateStr}
+                onChange={(e) => {
+                  setRateStr(e.target.value);
+                  setRateManual(true);
+                }}
+              />
+              <span className="currency">
+                {g.currency}/{currency}
+              </span>
+            </div>
+            {rateStr.trim() && !rate ? (
+              <div className="field-error">{t('expense.rateError')}</div>
+            ) : (
+              <div className="rate-hint hint">
+                {rateInfo.status === 'loading' && t('expense.rateLoading')}
+                {rateInfo.status === 'error' && !rate && rateInfo.error}
+                {rate &&
+                  converted &&
+                  t(rateInfo.status === 'ok' && !rateManual ? 'expense.rateApprox' : 'expense.rateApproxManual', {
+                    amount: formatMoney(converted, g.currency, lang),
+                    rate: showRate(rate),
+                    date: rateDay(rateInfo.date ?? spentOn),
+                  })}
+              </div>
+            )}
+            {mode === 'exact' && <div className="rate-hint hint">{t('expense.exactForeignHint', { currency })}</div>}
+          </>
+        )}
         <div className="chips-caption">{t('expense.categorySection')}</div>
         <div className="chips" ref={chipsRef}>
           {CATEGORIES.map((c) => (
@@ -236,10 +359,10 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
             exactSum === amount ? (
               <span className="pos">{t('expense.exactDone')}</span>
             ) : exactSum < amount ? (
-              rich('expense.exactLeft', { amount: <Money value={amount - exactSum} currency={g.currency} /> })
+              rich('expense.exactLeft', { amount: <Money value={amount - exactSum} currency={currency} /> })
             ) : (
               <span className="neg">
-                {rich('expense.exactOver', { amount: <Money value={exactSum - amount} currency={g.currency} /> })}
+                {rich('expense.exactOver', { amount: <Money value={exactSum - amount} currency={currency} /> })}
               </span>
             )
           ) : splitError && amount ? (
