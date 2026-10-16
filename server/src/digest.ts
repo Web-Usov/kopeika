@@ -81,7 +81,9 @@ export async function runDigests(
   link: (inviteCode: string) => string | null,
 ): Promise<number[]> {
   const handled: number[] = [];
-  const groups = all<GroupRow>("SELECT * FROM groups WHERE chat_feed = 'daily' AND chat_id IS NOT NULL");
+  const groups = all<GroupRow>(
+    "SELECT * FROM groups WHERE chat_feed = 'daily' AND chat_id IS NOT NULL AND is_demo = 0",
+  );
   for (const g of groups) {
     if (!isDigestDue(now, hour, g.last_digest_date)) continue;
     const since = digestSince(now, g.last_digest_at);

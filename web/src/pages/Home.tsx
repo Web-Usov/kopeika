@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, clearCache, type GroupSummary, hasPaymentInfo, type PaymentInfo, useGroups } from '../api.ts';
+import { api, clearCache, type GroupSummary, hasPaymentInfo, type PaymentInfo, setGroup, useGroups } from '../api.ts';
 import { rich, t } from '../i18n.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, closeApp, confirmDialog, haptic, inTelegram, MainButton, requestWriteAccess } from '../tg.tsx';
@@ -33,7 +33,15 @@ export function Home() {
     <Row
       key={g.id}
       onClick={() => navigate(`/g/${g.id}`)}
-      title={g.name}
+      title={
+        g.isDemo ? (
+          <>
+            {g.name} <span className="badge">{t('home.demoBadge')}</span>
+          </>
+        ) : (
+          g.name
+        )
+      }
       subtitle={rich('home.groupSubtitle', {
         members: t('common.members', { count: g.membersCount }),
         spent: <Money value={g.totalSpent} currency={g.currency} />,
@@ -63,10 +71,7 @@ export function Home() {
       ) : !groups ? (
         <Loading />
       ) : groups.length === 0 ? (
-        <div className="empty">
-          <p>{t('home.emptyTitle')}</p>
-          <p className="hint">{t('home.emptyHint')}</p>
-        </div>
+        <Welcome />
       ) : (
         <>
           {active.length > 0 && <Section title={t('home.myGroups')}>{active.map(groupRow)}</Section>}
@@ -95,6 +100,50 @@ export function Home() {
       <p className="app-version">{t('common.version', { version: __APP_VERSION__ })}</p>
 
       <MainButton text={t('home.createGroup')} onClick={() => navigate('/new')} />
+    </div>
+  );
+}
+
+const WELCOME_STEPS = [
+  ['👥', 'home.welcomeStep1Title', 'home.welcomeStep1Text'],
+  ['🔗', 'home.welcomeStep2Title', 'home.welcomeStep2Text'],
+  ['🧾', 'home.welcomeStep3Title', 'home.welcomeStep3Text'],
+] as const;
+
+/** First launch: how the app works in three steps, plus a ready-made example group to poke at. */
+function Welcome() {
+  const [busy, setBusy] = useState(false);
+  const openExample = async () => {
+    setBusy(true);
+    try {
+      const g = await api.createDemo();
+      setGroup(g);
+      navigate(`/g/${g.id}`);
+    } catch (e) {
+      await alertDialog((e as Error).message);
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="welcome">
+      <h2 className="welcome-title">{t('home.welcomeTitle')}</h2>
+      <ol className="steps">
+        {WELCOME_STEPS.map(([emoji, title, text], i) => (
+          <li key={title} className="step">
+            <span className="step-icon">{emoji}</span>
+            <span>
+              <b>
+                {i + 1}. {t(title)}
+              </b>
+              <br />
+              <span className="hint">{t(text)}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+      <button type="button" className="text-btn" disabled={busy} onClick={() => void openExample()}>
+        {t('home.seeExample')}
+      </button>
     </div>
   );
 }

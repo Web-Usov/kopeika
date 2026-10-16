@@ -898,3 +898,60 @@ select.field {
   color: inherit;
   opacity: 0.85;
 }
+
+/* --- First launch: three steps --- */
+.welcome-title {
+  margin: 0 4px 12px;
+  font-size: 20px;
+  text-align: center;
+}
+
+.steps {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+.step {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--section-bg);
+}
+
+.step-icon {
+  flex: none;
+  font-size: 28px;
+  line-height: 1;
+}
+
+/* --- Demo group --- */
+.banner {
+  margin: 0 0 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: var(--section-bg);
+  border: 1px dashed var(--accent);
+  font-size: 14px;
+}
+
+.link-btn {
+  color: var(--destructive);
+  font-size: inherit;
+  text-decoration: underline;
+}
+
+.badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+  vertical-align: middle;
+}

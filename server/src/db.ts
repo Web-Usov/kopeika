@@ -184,6 +184,9 @@ const migrations = [
     PRIMARY KEY (date, event)
   );
   `,
+  // Demo group ("Look at an example" on first launch): a sandbox with made-up people and expenses. Invites, the bot,
+  // chat links, recurring templates and the inline list ignore it; it is deleted like any other group.
+  `ALTER TABLE groups ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0;`,
 ];
 
 const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;

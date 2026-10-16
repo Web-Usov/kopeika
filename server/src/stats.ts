@@ -82,7 +82,7 @@ export function collectStats(now = new Date()): StatsSnapshot {
     events,
     active,
     users: one<{ n: number }>('SELECT COUNT(*) AS n FROM users WHERE id != ?', DELETED_USER_ID)?.n ?? 0,
-    groups: one<{ n: number }>('SELECT COUNT(*) AS n FROM groups')?.n ?? 0,
+    groups: one<{ n: number }>('SELECT COUNT(*) AS n FROM groups WHERE is_demo = 0')?.n ?? 0,
   };
 }
 

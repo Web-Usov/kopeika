@@ -116,7 +116,9 @@ export function createExpense(group: GroupRow, userId: number, body: ExpenseBody
     expense: expenseSnapshot(id)!,
     ...(recurring ? { recurring: true } : {}),
   });
-  countEvent(recurring ? 'expense.recurring' : body.kind === 'transfer' ? 'transfer.create' : 'expense.create');
+  // Demo play is not usage.
+  if (!group.is_demo)
+    countEvent(recurring ? 'expense.recurring' : body.kind === 'transfer' ? 'transfer.create' : 'expense.create');
   run('UPDATE groups SET archived_at = NULL WHERE id = ?', group.id);
   return one<ExpenseRow>('SELECT * FROM expenses WHERE id = ?', id)!;
 }

@@ -174,7 +174,7 @@ function registerChatHandlers(b: Bot) {
     const t = createT(lang);
     const html = { parse_mode: 'HTML' as const, link_preview_options: { is_disabled: true } };
     if (ctx.chat.type === 'private') {
-      const groups = groupsForUser(ctx.from.id).filter((g) => !g.archived);
+      const groups = groupsForUser(ctx.from.id).filter((g) => !g.archived && !g.isDemo);
       const keyboard = config.appUrl ? new InlineKeyboard().webApp(t('bot.openApp'), config.appUrl) : undefined;
       await ctx.reply(privateBalanceText(lang, groups), { ...html, reply_markup: keyboard });
       return;
@@ -244,7 +244,7 @@ function registerChatHandlers(b: Bot) {
 
 /** After a successful link: confirmation in the chat in the linking user's language. Fire-and-forget. */
 export function notifyChatLinked(chatId: number, group: GroupRow, lang: Lang) {
-  if (!bot || !botReady) return;
+  if (!bot || !botReady || group.is_demo) return;
   const msg = linkedMessage(lang, group.name, appLink(group.invite_code));
   bot.api
     .sendMessage(chatId, msg.text, { reply_markup: chatKeyboard(msg) })
@@ -310,7 +310,7 @@ async function setBotProfile() {
 }
 
 async function send(userId: number, text: string, group: GroupRow, lang: Lang) {
-  if (!bot || !botReady) return;
+  if (!bot || !botReady || group.is_demo) return;
   const link = appLink(group.invite_code);
   const reply_markup = link ? new InlineKeyboard().url(createT(lang)('bot.openGroup'), link) : undefined;
   try {
@@ -379,7 +379,7 @@ function postEach(
   authorUserId: number,
   build: (lang: Lang, names: Map<number, string>) => string | null,
 ) {
-  if (group.chat_id === null || group.chat_feed !== 'each') return;
+  if (group.is_demo || group.chat_id === null || group.chat_feed !== 'each') return;
   try {
     const lang = pickLang(one<{ lang: string | null }>('SELECT lang FROM users WHERE id = ?', authorUserId)?.lang);
     const names = new Map(
@@ -399,7 +399,7 @@ function postEach(
 
 /** Tells everyone involved in an expense (except the author) that it was added. Fire-and-forget. */
 export function notifyExpense(group: GroupRow, expense: ExpenseRow, authorUserId: number, authorName: string) {
-  if (!bot || !botReady) return;
+  if (!bot || !botReady || group.is_demo) return;
   const snap = loadExpenseSnap(expense.id);
   if (snap) {
     postEach(group, authorUserId, (lang, memberNames) =>
@@ -462,7 +462,7 @@ export function notifyExpenseChange(
   authorUserId: number,
   authorName: string,
 ) {
-  if (!bot || !botReady) return;
+  if (!bot || !botReady || group.is_demo) return;
   postEach(group, authorUserId, (lang, memberNames) =>
     buildChangeMessage({
       before,
@@ -528,7 +528,7 @@ export function notifyRemind(
   amount: number,
   hasPaymentInfo: boolean,
 ) {
-  if (!bot || !botReady) return;
+  if (!bot || !botReady || group.is_demo) return;
   const lang = pickLang(one<{ lang: string | null }>('SELECT lang FROM users WHERE id = ?', debtorUserId)?.lang);
   const text = buildRemindMessage({
     lang,
