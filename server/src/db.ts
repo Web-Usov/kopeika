@@ -80,6 +80,8 @@ const migrations = [
   );
   CREATE INDEX activity_group ON activity(group_id, id);
   `,
+  // Archived groups are hidden from the home screen (a new expense brings the group back).
+  `ALTER TABLE groups ADD COLUMN archived_at TEXT;`,
 ];
 
 const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;

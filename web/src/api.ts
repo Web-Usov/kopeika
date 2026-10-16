@@ -46,6 +46,7 @@ export interface GroupDetail {
   inviteCode: string;
   inviteLink: string | null;
   isOwner: boolean;
+  archived: boolean;
   meId: number;
   totalSpent: number;
   members: Member[];
@@ -60,6 +61,7 @@ export interface GroupSummary {
   membersCount: number;
   totalSpent: number;
   myBalance: number;
+  archived: boolean;
 }
 
 export interface InvitePreview {
@@ -162,6 +164,9 @@ export const api = {
     request<GroupDetail>('POST', '/groups', body),
   renameGroup: (id: number, name: string) => request<GroupDetail>('PATCH', `/groups/${id}`, { name }),
   deleteGroup: (id: number) => request('DELETE', `/groups/${id}`),
+  archiveGroup: (id: number) => request<GroupDetail>('POST', `/groups/${id}/archive`),
+  unarchiveGroup: (id: number) => request<GroupDetail>('POST', `/groups/${id}/unarchive`),
+  leaveGroup: (id: number) => request('POST', `/groups/${id}/leave`),
   addMember: (id: number, name: string) => request<GroupDetail>('POST', `/groups/${id}/members`, { name }),
   renameMember: (id: number, memberId: number, name: string) =>
     request<GroupDetail>('PATCH', `/groups/${id}/members/${memberId}`, { name }),

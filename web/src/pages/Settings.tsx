@@ -69,6 +69,24 @@ function SettingsView({ g }: { g: GroupDetail }) {
     }
   };
 
+  const toggleArchive = async () => {
+    if (!g.archived && !(await confirmDialog(t('settings.confirmArchive', { name: g.name })))) return;
+    if (await run(() => (g.archived ? api.unarchiveGroup(g.id) : api.archiveGroup(g.id)))) {
+      if (!g.archived) navigate('/', { replace: true });
+    }
+  };
+
+  const leaveGroup = async () => {
+    if (!(await confirmDialog(t('settings.confirmLeave', { name: g.name })))) return;
+    try {
+      await api.leaveGroup(g.id);
+      forgetGroup(g.id);
+      navigate('/', { replace: true });
+    } catch (e) {
+      await alertDialog((e as Error).message);
+    }
+  };
+
   return (
     <>
       <h2 className="page-title">{t('settings.title')}</h2>
@@ -124,6 +142,14 @@ function SettingsView({ g }: { g: GroupDetail }) {
           </button>
         </div>
       </Section>
+
+      <Section footer={t('settings.archiveFooter')}>
+        <Row title={g.archived ? t('settings.unarchiveGroup') : t('settings.archiveGroup')} onClick={toggleArchive} />
+      </Section>
+
+      <button type="button" className="danger-btn" onClick={leaveGroup}>
+        {t('settings.leaveGroup')}
+      </button>
 
       {g.isOwner && (
         <button type="button" className="danger-btn" onClick={deleteGroup}>
