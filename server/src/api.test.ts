@@ -593,3 +593,119 @@ test('remind: non-member gets 404, anonymous 401, canNotify follows notify', asy
   const full = (await call(owner, 'GET', `/groups/${g.id}`)).body as Json;
   assert.equal(full.members.find((m: Json) => m.id === guestMember.id).canNotify, true);
 });
+
+async function joinGroup(user: number, g: Json, claimMemberId?: number) {
+  const res = await call(user, 'POST', `/invite/${g.inviteCode}/join`, { claimMemberId });
+  assert.equal(res.status, 200);
+}
+
+test('leaving: the member becomes name-only, history is kept, access is gone', async () => {
+  const owner = newUser();
+  const guest = newUser();
+  const g = await createGroup(owner);
+  await joinGroup(guest, g);
+  const full = (await call(owner, 'GET', `/groups/${g.id}`)).body;
+  const guestMember = full.members.find((m: Json) => m.userId === guest);
+  await call(owner, 'POST', `/groups/${g.id}/expenses`, expense(full));
+  const before = balances((await call(owner, 'GET', `/groups/${g.id}`)).body);
+
+  assert.equal((await call(guest, 'POST', `/groups/${g.id}/leave`)).status, 200);
+  assert.equal((await call(guest, 'GET', `/groups/${g.id}`)).status, 404);
+  assert.deepEqual((await call(guest, 'GET', '/groups')).body, []);
+
+  const after = (await call(owner, 'GET', `/groups/${g.id}`)).body;
+  const left = after.members.find((m: Json) => m.id === guestMember.id);
+  assert.equal(left.userId, null);
+  assert.equal(left.name, guestMember.name);
+  assert.equal(after.expenses.length, 1);
+  assert.deepEqual(balances(after), before);
+  assert.equal(after.isOwner, true);
+});
+
+test('leaving: ownership passes to the earliest Telegram member', async () => {
+  const owner = newUser();
+  const second = newUser();
+  const third = newUser();
+  const g = await createGroup(owner, ['Без телеги']);
+  await joinGroup(second, g);
+  await joinGroup(third, g);
+  assert.equal((await call(owner, 'POST', `/groups/${g.id}/leave`)).status, 200);
+  assert.equal((await call(second, 'GET', `/groups/${g.id}`)).body.isOwner, true);
+  assert.equal((await call(third, 'GET', `/groups/${g.id}`)).body.isOwner, false);
+  assert.equal((await call(third, 'DELETE', `/groups/${g.id}`)).status, 403);
+  assert.equal((await call(second, 'DELETE', `/groups/${g.id}`)).status, 200);
+});
+
+test('leaving: the last Telegram member cannot leave', async () => {
+  const owner = newUser();
+  const g = await createGroup(owner, ['Маша']);
+  const res = await call(owner, 'POST', `/groups/${g.id}/leave`);
+  assert.equal(res.status, 409);
+  assert.equal((await call(owner, 'GET', `/groups/${g.id}`)).status, 200);
+  assert.equal((await call(newUser(), 'POST', `/groups/${g.id}/leave`)).status, 404);
+});
+
+test('after leaving one can return via the invite and claim the old member', async () => {
+  const owner = newUser();
+  const guest = newUser();
+  const g = await createGroup(owner);
+  await joinGroup(guest, g);
+  const full = (await call(owner, 'GET', `/groups/${g.id}`)).body;
+  const old = full.members.find((m: Json) => m.userId === guest);
+  await call(owner, 'POST', `/groups/${g.id}/expenses`, expense(full, { payerId: old.id }));
+  await call(guest, 'POST', `/groups/${g.id}/leave`);
+
+  const preview = (await call(guest, 'GET', `/invite/${g.inviteCode}`)).body;
+  assert.equal(preview.isMember, false);
+  assert.deepEqual(
+    preview.unclaimed.map((m: Json) => m.id),
+    [old.id],
+  );
+  await joinGroup(guest, g, old.id);
+  const back = (await call(guest, 'GET', `/groups/${g.id}`)).body;
+  assert.equal(back.meId, old.id);
+  assert.equal(back.members.length, 2);
+  assert.equal(back.expenses.length, 1);
+});
+
+test('archive and unarchive: flag in the list and detail, any member, non-members get 404', async () => {
+  const owner = newUser();
+  const guest = newUser();
+  const g = await createGroup(owner);
+  await joinGroup(guest, g);
+  assert.equal(g.archived, false);
+
+  const res = await call(guest, 'POST', `/groups/${g.id}/archive`);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.archived, true);
+  assert.equal((await call(owner, 'GET', '/groups')).body[0].archived, true);
+  assert.equal((await call(newUser(), 'POST', `/groups/${g.id}/archive`)).status, 404);
+
+  const back = await call(owner, 'POST', `/groups/${g.id}/unarchive`);
+  assert.equal(back.body.archived, false);
+  assert.equal((await call(owner, 'GET', '/groups')).body[0].archived, false);
+});
+
+test('a new expense unarchives the group', async () => {
+  const owner = newUser();
+  const g = await createGroup(owner);
+  await call(owner, 'POST', `/groups/${g.id}/archive`);
+  const res = await call(owner, 'POST', `/groups/${g.id}/expenses`, expense(g));
+  assert.equal(res.status, 201);
+  assert.equal(res.body.archived, false);
+  assert.equal((await call(owner, 'GET', '/groups')).body[0].archived, false);
+});
+
+test('leaving and archiving are written to the group history', async () => {
+  const owner = newUser();
+  const guest = newUser();
+  const g = await createGroup(owner);
+  await joinGroup(guest, g);
+  await call(owner, 'POST', `/groups/${g.id}/archive`);
+  await call(owner, 'POST', `/groups/${g.id}/unarchive`);
+  await call(guest, 'POST', `/groups/${g.id}/leave`);
+  const res = await call(owner, 'GET', `/groups/${g.id}/activity`);
+  const actions = res.body.items.map((i: Json) => i.action);
+  assert.deepEqual(actions.slice(0, 3), ['member.leave', 'group.unarchive', 'group.archive']);
+  assert.ok(res.body.items[0].actor.name);
+});

@@ -119,6 +119,7 @@ jobs:
           [ "$ok" = 1 ] || fail "/healthz did not return ok within 30s"
           code=$(curl -s -o /dev/null -w '%{http_code}' localhost:3000/)
           [ "$code" = 200 ] || fail "GET / returned $code, expected 200"
+          curl -sI localhost:3000/ | grep -qi '^cache-control: no-cache' || fail "GET / has no Cache-Control: no-cache"
           body=$(curl -fs localhost:3000/version) || fail "GET /version failed"
           echo "GET /version: $body"
           echo "Image label version: $(docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.version" }}' kopeika:ci)"

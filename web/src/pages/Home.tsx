@@ -1,13 +1,51 @@
 import { useEffect, useState } from 'react';
-import { api, hasPaymentInfo, type PaymentInfo, useGroups } from '../api.ts';
+import { api, type GroupSummary, hasPaymentInfo, type PaymentInfo, useGroups } from '../api.ts';
 import { rich, t } from '../i18n.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, inTelegram, MainButton, requestWriteAccess } from '../tg.tsx';
 import { ErrorView, Loading, Money, Row, Section } from '../ui.tsx';
 import { PaymentForm } from './PaymentForm.tsx';
 
+const ARCHIVE_KEY = 'kopeika.archiveOpen';
+function readArchiveOpen() {
+  try {
+    return localStorage.getItem(ARCHIVE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 export function Home() {
   const { data: groups, error } = useGroups();
+
+  const [archiveOpen, setArchiveOpen] = useState(readArchiveOpen);
+  const toggleArchive = () => {
+    setArchiveOpen(!archiveOpen);
+    try {
+      localStorage.setItem(ARCHIVE_KEY, archiveOpen ? '0' : '1');
+    } catch {}
+  };
+  const active = groups?.filter((g) => !g.archived) ?? [];
+  const archived = groups?.filter((g) => g.archived) ?? [];
+
+  const groupRow = (g: GroupSummary) => (
+    <Row
+      key={g.id}
+      onClick={() => navigate(`/g/${g.id}`)}
+      title={g.name}
+      subtitle={rich('home.groupSubtitle', {
+        members: t('common.members', { count: g.membersCount }),
+        spent: <Money value={g.totalSpent} currency={g.currency} />,
+      })}
+      right={
+        g.myBalance === 0 ? (
+          <span className="hint">{t('home.settled')}</span>
+        ) : (
+          <Money value={g.myBalance} currency={g.currency} signed />
+        )
+      }
+    />
+  );
 
   return (
     <div className="page">
@@ -27,26 +65,19 @@ export function Home() {
           <p className="hint">{t('home.emptyHint')}</p>
         </div>
       ) : (
-        <Section title={t('home.myGroups')}>
-          {groups.map((g) => (
-            <Row
-              key={g.id}
-              onClick={() => navigate(`/g/${g.id}`)}
-              title={g.name}
-              subtitle={rich('home.groupSubtitle', {
-                members: t('common.members', { count: g.membersCount }),
-                spent: <Money value={g.totalSpent} currency={g.currency} />,
-              })}
-              right={
-                g.myBalance === 0 ? (
-                  <span className="hint">{t('home.settled')}</span>
-                ) : (
-                  <Money value={g.myBalance} currency={g.currency} signed />
-                )
-              }
-            />
-          ))}
-        </Section>
+        <>
+          {active.length > 0 && <Section title={t('home.myGroups')}>{active.map(groupRow)}</Section>}
+          {archived.length > 0 && (
+            <Section>
+              <Row
+                title={t('home.archive', { count: archived.length })}
+                onClick={toggleArchive}
+                right={<span className="hint">{archiveOpen ? '⌃' : '⌄'}</span>}
+              />
+              {archiveOpen && archived.map(groupRow)}
+            </Section>
+          )}
+        </>
       )}
 
       {groups && <MyPaymentInfo />}

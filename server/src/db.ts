@@ -80,6 +80,8 @@ const migrations = [
   );
   CREATE INDEX activity_group ON activity(group_id, id);
   `,
+  // Archived groups are hidden from the home screen (a new expense brings the group back).
+  `ALTER TABLE groups ADD COLUMN archived_at TEXT;`,
   // Debt reminders ("Remind" button): at most one per (group, from, to) per 24 hours. created_at is UTC.
   `
   CREATE TABLE reminders (

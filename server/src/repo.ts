@@ -23,6 +23,7 @@ export interface GroupRow {
   invite_code: string;
   created_by: number;
   created_at: string;
+  archived_at: string | null;
 }
 
 export interface MemberRow {
@@ -138,6 +139,7 @@ export function groupDetail(group: GroupRow, me: MemberRow, inviteLink: string |
     inviteCode: group.invite_code,
     inviteLink,
     isOwner: group.created_by === me.user_id,
+    archived: group.archived_at !== null,
     meId: me.id,
     totalSpent: expenses.filter((e) => e.kind === 'expense').reduce((a, e) => a + e.amount, 0),
     members: members.map((m) => ({
@@ -187,6 +189,7 @@ export function groupsForUser(userId: number) {
       membersCount: members.length,
       totalSpent: expenses.filter((e) => e.kind === 'expense').reduce((a, e) => a + e.amount, 0),
       myBalance: balances.get(g.member_id) ?? 0,
+      archived: g.archived_at !== null,
     };
   });
 }

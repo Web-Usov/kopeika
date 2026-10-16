@@ -12,6 +12,9 @@ export type ActivityAction =
   | 'member.join'
   | 'member.claim'
   | 'member.payment_info'
+  | 'member.leave'
+  | 'group.archive'
+  | 'group.unarchive'
   | 'expense.create'
   | 'expense.update'
   | 'expense.delete'
@@ -69,6 +72,12 @@ export function activityText(lang: Lang, entry: ActivityEntry, currency: string)
       return t(lang, 'activity.memberDelete', { actor, name: p.name ?? '' });
     case 'member.join':
       return t(lang, 'activity.memberJoin', { actor });
+    case 'member.leave':
+      return t(lang, 'activity.memberLeave', { actor });
+    case 'group.archive':
+      return t(lang, 'activity.groupArchive', { actor });
+    case 'group.unarchive':
+      return t(lang, 'activity.groupUnarchive', { actor });
     case 'member.claim':
       return t(lang, 'activity.memberClaim', { actor, name: p.name ?? '' });
     case 'member.payment_info':
