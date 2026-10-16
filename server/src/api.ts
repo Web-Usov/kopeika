@@ -101,6 +101,9 @@ api.use('*', async (c, next) => {
   await next();
 });
 
+// Exchange rates hit an external service, so they get a stricter limit of their own.
+export const ratesLimiter = createRateLimiter({ limit: config.ratesLimitPerMin });
+
 const idParam = (v: string | undefined) => {
   const n = Number(v);
   if (!Number.isInteger(n) || n <= 0) throw fail(404, 'errors.notFound');
@@ -459,6 +462,7 @@ api.post('/invite/:code/join', async (c) => {
 
 // --- Exchange rates: suggested rate for a foreign-currency expense (the user can still edit it) ---
 api.get('/rates', async (c) => {
+  if (!ratesLimiter.allow(c.get('user').id)) throw fail(429, 'errors.rate.tooMany');
   const q = z
     .object({
       base: z.enum(CURRENCIES as [string, ...string[]]),
