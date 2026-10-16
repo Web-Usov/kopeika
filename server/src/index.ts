@@ -3,6 +3,7 @@ import { createApp } from './app.ts';
 import { startBackupSchedule } from './backup.ts';
 import { startBot } from './bot.ts';
 import { config } from './config.ts';
+import { sha, version } from './version.ts';
 
 const app = createApp(config.staticDir);
 
@@ -12,4 +13,4 @@ await startBot().catch((e) => console.error('Bot failed to start', e));
 
 startBackupSchedule();
 
-serve({ fetch: app.fetch, port: config.port }, (info) => console.log(`Kopeika listening on :${info.port}`));
+serve({ fetch: app.fetch, port: config.port }, (info) => console.log(`Kopeika ${version} listening on :${info.port}`));

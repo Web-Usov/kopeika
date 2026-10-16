@@ -3,12 +3,14 @@ import path from 'node:path';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
 import { api } from './api.ts';
+import { sha, version } from './version.ts';
 
 /** The whole HTTP app: API plus (if the folder exists) the built Mini App from `staticDir`. */
 export function createApp(staticDir: string) {
   const app = new Hono();
 
   app.get('/healthz', (c) => c.text('ok'));
+  app.get('/version', (c) => c.json({ version, sha }));
   app.route('/api', api);
 
   if (fs.existsSync(staticDir)) {
