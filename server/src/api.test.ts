@@ -1,0 +1,199 @@
+import assert from 'node:assert/strict';
+import { before, test } from 'node:test';
+
+// config.ts and db.ts read env at import time, so set it before the dynamic import.
+process.env.DB_PATH = ':memory:';
+process.env.DEV_AUTH = '1';
+delete process.env.BOT_TOKEN;
+
+let api: typeof import('./api.ts').api;
+before(async () => {
+  ({ api } = await import('./api.ts'));
+});
+
+// Every test uses its own users so tests do not depend on order.
+let nextUser = 1000;
+const newUser = () => nextUser++;
+
+// biome-ignore lint/suspicious/noExplicitAny: test helper over untyped JSON
+type Json = any;
+
+async function call(user: number | null, method: string, path: string, body?: unknown) {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (user !== null) headers.Authorization = `dev ${user}`;
+  const res = await api.request(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  return { status: res.status, body: (await res.json()) as Json };
+}
+
+async function createGroup(user: number, memberNames: string[] = []) {
+  const res = await call(user, 'POST', '/groups', { name: 'Поездка', currency: 'RUB', memberNames });
+  assert.equal(res.status, 201);
+  return res.body as Json;
+}
+
+const expense = (g: Json, over: Json = {}) => ({
+  title: 'Ужин',
+  amount: 10000,
+  payerId: g.meId,
+  splitMode: 'equal',
+  spentOn: '2025-01-15',
+  shares: g.members.map((m: Json) => ({ memberId: m.id, value: 1 })),
+  ...over,
+});
+
+const balances = (g: Json) => g.members.map((m: Json) => m.balance);
+
+test('request without Authorization is rejected with 401', async () => {
+  assert.equal((await call(null, 'GET', '/groups')).status, 401);
+});
+
+test('creating a group makes the creator an owner member', async () => {
+  const u = newUser();
+  const res = await call(u, 'POST', '/groups', { name: 'Дача', currency: 'RUB', memberNames: ['Маша', 'Петя'] });
+  assert.equal(res.status, 201);
+  assert.equal(res.body.isOwner, true);
+  assert.equal(res.body.members.length, 3);
+  const mine = res.body.members.find((m: Json) => m.id === res.body.meId);
+  assert.equal(mine.userId, u);
+  assert.deepEqual(res.body.members.map((m: Json) => m.name).slice(1), ['Маша', 'Петя']);
+});
+
+test('non-member gets 404 on a group', async () => {
+  const g = await createGroup(newUser());
+  assert.equal((await call(newUser(), 'GET', `/groups/${g.id}`)).status, 404);
+});
+
+test('invite preview and joining as a new member', async () => {
+  const g = await createGroup(newUser(), ['Маша']);
+  const guest = newUser();
+  const preview = await call(guest, 'GET', `/invite/${g.inviteCode}`);
+  assert.equal(preview.status, 200);
+  assert.equal(preview.body.group.membersCount, 2);
+  assert.equal(preview.body.isMember, false);
+  assert.equal(preview.body.unclaimed.length, 1);
+
+  const join = await call(guest, 'POST', `/invite/${g.inviteCode}/join`, {});
+  assert.equal(join.status, 200);
+  assert.equal(join.body.groupId, g.id);
+  const after = await call(guest, 'GET', `/groups/${g.id}`);
+  assert.equal(after.status, 200);
+  assert.equal(after.body.members.length, 3);
+  assert.equal(after.body.isOwner, false);
+});
+
+test('claiming a member links it; a second claim gives 409', async () => {
+  const g = await createGroup(newUser(), ['Маша']);
+  const masha = g.members.find((m: Json) => m.name === 'Маша');
+  const first = newUser();
+  const claim = await call(first, 'POST', `/invite/${g.inviteCode}/join`, { claimMemberId: masha.id });
+  assert.equal(claim.status, 200);
+  const detail = await call(first, 'GET', `/groups/${g.id}`);
+  assert.equal(detail.body.meId, masha.id);
+  assert.equal(detail.body.members.length, 2);
+
+  const second = await call(newUser(), 'POST', `/invite/${g.inviteCode}/join`, { claimMemberId: masha.id });
+  assert.equal(second.status, 409);
+});
+
+test('equal split of 100.00 between three is 33.34 / 33.33 / 33.33', async () => {
+  const u = newUser();
+  const g = await createGroup(u, ['Маша', 'Петя']);
+  const res = await call(u, 'POST', `/groups/${g.id}/expenses`, expense(g));
+  assert.equal(res.status, 201);
+  const amounts = res.body.expenses[0].shares.map((s: Json) => s.amount);
+  assert.deepEqual([...amounts].sort(), [3333, 3333, 3334]);
+  assert.equal(
+    amounts.reduce((a: number, b: number) => a + b, 0),
+    10000,
+  );
+  assert.equal(res.body.totalSpent, 10000);
+});
+
+test('exact split that does not add up is rejected with 400', async () => {
+  const u = newUser();
+  const g = await createGroup(u, ['Маша']);
+  const bad = expense(g, {
+    splitMode: 'exact',
+    shares: [
+      { memberId: g.members[0].id, value: 3000 },
+      { memberId: g.members[1].id, value: 3000 },
+    ],
+  });
+  assert.equal((await call(u, 'POST', `/groups/${g.id}/expenses`, bad)).status, 400);
+});
+
+test('member of another group in an expense gives 400', async () => {
+  const u = newUser();
+  const g = await createGroup(u);
+  const other = await createGroup(newUser());
+  const res = await call(
+    u,
+    'POST',
+    `/groups/${g.id}/expenses`,
+    expense(g, { shares: [{ memberId: other.members[0].id, value: 1 }] }),
+  );
+  assert.equal(res.status, 400);
+});
+
+test('a transfer after expenses zeroes balances and empties settlements', async () => {
+  const u = newUser();
+  const g = await createGroup(u, ['Маша']);
+  const [me, masha] = g.members;
+  const added = await call(u, 'POST', `/groups/${g.id}/expenses`, expense(g, { amount: 10000 }));
+  assert.equal(added.body.settlements.length, 1);
+  assert.deepEqual(balances(added.body), [5000, -5000]);
+
+  const transfer = await call(u, 'POST', `/groups/${g.id}/expenses`, {
+    kind: 'transfer',
+    amount: 5000,
+    payerId: masha.id,
+    splitMode: 'exact',
+    spentOn: '2025-01-16',
+    shares: [{ memberId: me.id, value: 5000 }],
+  });
+  assert.equal(transfer.status, 201);
+  assert.deepEqual(balances(transfer.body), [0, 0]);
+  assert.deepEqual(transfer.body.settlements, []);
+  assert.equal(transfer.body.totalSpent, 10000);
+});
+
+test('deleting a member: 409 with expenses, 200 without', async () => {
+  const u = newUser();
+  const g = await createGroup(u, ['Маша', 'Петя']);
+  const [me, masha, petya] = g.members;
+  await call(u, 'POST', `/groups/${g.id}/expenses`, {
+    ...expense(g),
+    shares: [me, masha].map((m) => ({ memberId: m.id, value: 1 })),
+  });
+  assert.equal((await call(u, 'DELETE', `/groups/${g.id}/members/${masha.id}`)).status, 409);
+  const ok = await call(u, 'DELETE', `/groups/${g.id}/members/${petya.id}`);
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.members.length, 2);
+});
+
+test('only the owner can delete a group', async () => {
+  const owner = newUser();
+  const g = await createGroup(owner);
+  const guest = newUser();
+  await call(guest, 'POST', `/invite/${g.inviteCode}/join`, {});
+  assert.equal((await call(guest, 'DELETE', `/groups/${g.id}`)).status, 403);
+  assert.equal((await call(owner, 'DELETE', `/groups/${g.id}`)).status, 200);
+  assert.equal((await call(owner, 'GET', `/groups/${g.id}`)).status, 404);
+});
+
+test('PUT on an expense recalculates shares and balances', async () => {
+  const u = newUser();
+  const g = await createGroup(u, ['Маша']);
+  const created = await call(u, 'POST', `/groups/${g.id}/expenses`, expense(g, { amount: 10000 }));
+  assert.deepEqual(balances(created.body), [5000, -5000]);
+  const id = created.body.expenses[0].id;
+
+  const updated = await call(u, 'PUT', `/groups/${g.id}/expenses/${id}`, expense(g, { amount: 20000 }));
+  assert.equal(updated.status, 200);
+  assert.deepEqual(
+    updated.body.expenses[0].shares.map((s: Json) => s.amount),
+    [10000, 10000],
+  );
+  assert.deepEqual(balances(updated.body), [10000, -10000]);
+  assert.equal(updated.body.totalSpent, 20000);
+});
