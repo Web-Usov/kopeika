@@ -164,6 +164,9 @@ const migrations = [
   ALTER TABLE groups ADD COLUMN last_digest_date TEXT;
   ALTER TABLE groups ADD COLUMN last_digest_at TEXT;
   `,
+  // Placeholder "deleted user" (id 0 never collides with a Telegram id). Account deletion points expenses.created_by,
+  // activity.user_id and recurring.created_by of the removed user here, so history stays but is anonymous.
+  `INSERT INTO users (id, first_name) VALUES (0, '');`,
 ];
 
 const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;

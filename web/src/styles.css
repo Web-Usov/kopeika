@@ -639,6 +639,31 @@ select.field {
   font-weight: 600;
 }
 
+.section-body > .danger-btn {
+  margin-bottom: 0;
+}
+
+.policy h2 {
+  font-size: 17px;
+  margin: 24px 0 8px;
+}
+
+.policy ul {
+  padding-left: 20px;
+}
+
+.policy li {
+  margin: 6px 0;
+}
+
+.footer-link {
+  display: block;
+  margin: 16px auto 0;
+  color: var(--hint);
+  font-size: 13px;
+  text-decoration: underline;
+}
+
 .app-version {
   color: var(--hint);
   font-size: 12px;

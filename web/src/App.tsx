@@ -6,6 +6,7 @@ import { Home } from './pages/Home.tsx';
 import { Join } from './pages/Join.tsx';
 import { Link } from './pages/Link.tsx';
 import { NewGroup } from './pages/NewGroup.tsx';
+import { Privacy } from './pages/Privacy.tsx';
 import { Settings } from './pages/Settings.tsx';
 import { Summary } from './pages/Summary.tsx';
 import { TransferForm } from './pages/TransferForm.tsx';
@@ -20,6 +21,7 @@ type Query = URLSearchParams;
 // Порядок важен: `/g/:id/expense/new` должен стоять раньше `/g/:id/expense/:eid`.
 const routes: [pattern: string, render: (p: Params, query: Query) => ReactElement][] = [
   ['/', () => <Home />],
+  ['/privacy', () => <Privacy />],
   ['/new', (_p, query) => <NewGroup linkToken={query.get('link')} />],
   ['/link/:token', (p) => <Link key={p.token} token={p.token} />],
   ['/join/:code', (p) => <Join key={p.code} code={p.code} />],
