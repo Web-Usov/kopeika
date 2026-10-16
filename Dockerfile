@@ -7,12 +7,22 @@ COPY server/package.json server/
 COPY web/package.json web/
 RUN npm ci
 COPY . .
+# Version info comes from CI (git describe / commit SHA); local builds fall back to dev / unknown.
+ARG APP_VERSION=dev
+ARG GIT_SHA=unknown
+ENV APP_VERSION=$APP_VERSION GIT_SHA=$GIT_SHA
 RUN npm run build
 
 # --- Runtime: no node_modules needed, everything is bundled; SQLite is built into Node ---
 FROM node:24-slim
+ARG APP_VERSION=dev
+ARG GIT_SHA=unknown
+LABEL org.opencontainers.image.version=$APP_VERSION \
+      org.opencontainers.image.revision=$GIT_SHA
 WORKDIR /app
-ENV NODE_ENV=production \
+ENV APP_VERSION=$APP_VERSION \
+    GIT_SHA=$GIT_SHA \
+    NODE_ENV=production \
     PORT=3000 \
     DB_PATH=/data/kopeika.db \
     STATIC_DIR=/app/web/dist

@@ -56,3 +56,11 @@ npm run dev:web      # Vite :5173, проксирует /api
 - Одна задача — одна ветка (`feat/…`, `fix/…`, `chore/…`) и один PR с `Closes #N`. В `main` напрямую не пушить: он защищён, слияние — squash после зелёного CI.
 - CI (`.github/workflows/docker.yml`): `npm run check` (Biome + typecheck + тесты), затем сборка образа. Пуш в `main` публикует `ghcr.io/web-usov/kopeika:latest` — это продакшен.
 - Перед PR: `npm run check`; если менялся UI — проверить в браузере по инструкции выше.
+
+## Версии и релизы
+
+- Версия — это git: `git describe --tags --always` (`v0.1.0` на теге, `v0.1.0-3-gabc1234` между релизами). Вручную номер нигде не поднимается; без тегов и вне CI версия `dev`.
+- Этап (milestone) = минорная версия: v0.1 «Фундамент», v0.2 «Повседневное» и т.д. Задачи привязываются к этапу-версии через milestone.
+- Когда этап закрыт — GitHub Release с тегом `vX.Y.0` и автоматическими заметками (Generate release notes).
+- Срочные исправления — патч-релиз `vX.Y.Z`.
+- Версия видна в подвале главного экрана, в логе старта сервера, в `GET /version` (`{ version, sha }`) и в метке образа `org.opencontainers.image.version`. CI передаёт её в сборку как build-arg `APP_VERSION` / `GIT_SHA`.

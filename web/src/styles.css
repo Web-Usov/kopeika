@@ -610,6 +610,13 @@ select.field {
   font-weight: 600;
 }
 
+.app-version {
+  color: var(--hint);
+  font-size: 12px;
+  text-align: center;
+  margin: 24px 0 8px;
+}
+
 /* --- Categories --- */
 .chips {
   display: flex;
