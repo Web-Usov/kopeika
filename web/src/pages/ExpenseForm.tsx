@@ -74,7 +74,6 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
   const chipsRef = useRef<HTMLDivElement>(null);
   // Keep the selected chip visible in the scrollable row. A new expense starts at the beginning of the row.
   const firstRun = useRef(true);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the category changes
   useEffect(() => {
     const row = chipsRef.current;
     const first = firstRun.current;

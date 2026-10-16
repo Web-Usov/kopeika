@@ -180,7 +180,6 @@ function HistoryTab({ g }: { g: GroupDetail }) {
     }
   };
   // Reload when the group changes under us (e.g. a rename), so fresh entries show up.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `load` is recreated every render
   useEffect(() => {
     load();
   }, [g.id, g.expenses.length, g.name, g.members.length]);
