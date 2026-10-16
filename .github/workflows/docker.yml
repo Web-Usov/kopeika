@@ -134,6 +134,31 @@ jobs:
           echo "Smoke test passed"
           docker rm -f kopeika-ci
 
+      # Telegram unreachable: the HTTP server must still come up and the bot must keep retrying.
+      - name: Smoke test image without Telegram
+        run: |
+          docker run -d --name kopeika-ci-tg -e DEV_AUTH=1 -e BOT_TOKEN=123:fake -e BOT_POLLING=1 \
+            -e TELEGRAM_API_ROOT=http://10.255.255.1 -e TELEGRAM_TIMEOUT_SEC=3 -p 3001:3000 kopeika:ci
+          fail() {
+            echo "::error::$1"
+            docker logs kopeika-ci-tg
+            exit 1
+          }
+          ok=0
+          for _ in $(seq 1 15); do
+            if [ "$(curl -fs localhost:3001/healthz)" = "ok" ]; then ok=1; break; fi
+            sleep 1
+          done
+          [ "$ok" = 1 ] || fail "/healthz did not return ok within 15s with Telegram unreachable"
+          ok=0
+          for _ in $(seq 1 20); do
+            if docker logs kopeika-ci-tg 2>&1 | grep -q "Telegram unavailable"; then ok=1; break; fi
+            sleep 1
+          done
+          [ "$ok" = 1 ] || fail "no 'Telegram unavailable' retry line in logs"
+          docker logs kopeika-ci-tg 2>&1 | grep -E "listening|Telegram unavailable"
+          docker rm -f kopeika-ci-tg
+
       - uses: docker/build-push-action@v7
         with:
           context: .

@@ -9,6 +9,10 @@ export const config = {
   appUrl: env.APP_URL ?? '',
   /** Short name given to the Mini App in @BotFather (/newapp); used for t.me/<bot>/<short> links. */
   appShortName: env.APP_SHORT_NAME ?? '',
+  /** Timeout of every Telegram Bot API request, seconds. grammY's default is 500. */
+  telegramTimeoutSec: Math.max(1, Number(env.TELEGRAM_TIMEOUT_SEC ?? 20) || 20),
+  /** Custom Bot API address (proxy or self-hosted Bot API server); empty = https://api.telegram.org */
+  telegramApiRoot: env.TELEGRAM_API_ROOT ?? '',
   dbPath: env.DB_PATH ?? path.resolve('data/kopeika.db'),
   /** Where daily SQLite backups go. Defaults to a "backups" folder next to the database file. */
   backupDir: env.BACKUP_DIR ?? path.join(path.dirname(path.resolve(env.DB_PATH ?? 'data/kopeika.db')), 'backups'),

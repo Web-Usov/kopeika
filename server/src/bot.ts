@@ -6,54 +6,92 @@ import { all, one, run } from './db.ts';
 import { buildChangeMessage, buildRemindMessage, changeAudience, type ExpenseSnap } from './notify.ts';
 import { type ExpenseRow, type GroupRow, upsertUser } from './repo.ts';
 
-export const bot = config.botToken ? new Bot(config.botToken) : null;
+export const bot = config.botToken
+  ? new Bot(config.botToken, {
+      client: {
+        timeoutSeconds: config.telegramTimeoutSec,
+        ...(config.telegramApiRoot && { apiRoot: config.telegramApiRoot }),
+      },
+    })
+  : null;
 let botUsername = '';
+/** True only after bot.init() succeeded; until then everything behaves as if the bot isn't configured. */
+let botReady = false;
+
+const RETRY_DELAYS_SEC = [5, 10, 30, 60];
+
+/** Pause before retry number `attempt` (1-based): 5, 10, 30, 60 s, then every 60 s. */
+export function retryDelaySec(attempt: number): number {
+  return RETRY_DELAYS_SEC[Math.min(Math.max(attempt, 1), RETRY_DELAYS_SEC.length) - 1];
+}
 
 export function appLink(startParam?: string): string | null {
-  if (!botUsername || !config.appShortName) return null;
+  if (!botReady || !botUsername || !config.appShortName) return null;
   const base = `https://t.me/${botUsername}/${config.appShortName}`;
   return startParam ? `${base}?startapp=${startParam}` : base;
 }
 
-export async function startBot() {
+/** Starts the bot in the background: retries init() until Telegram answers, never throws and never blocks. */
+export function startBot() {
   if (!bot) {
     console.warn('BOT_TOKEN is not set: bot and Telegram auth are disabled');
     return;
   }
-  await bot.init();
-  botUsername = bot.botInfo.username;
+  void connectBot(bot);
+}
+
+async function connectBot(b: Bot) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      // Not b.init(): grammY retries that silently and forever. One getMe per attempt, so failures are logged here.
+      b.botInfo = await b.api.getMe();
+      break;
+    } catch (e) {
+      const delay = retryDelaySec(attempt);
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`Telegram unavailable (${msg}), retrying in ${delay}s (attempt ${attempt})`);
+      await new Promise((r) => setTimeout(r, delay * 1000));
+    }
+  }
+  botUsername = b.botInfo.username;
+  botReady = true;
   console.log(`Bot @${botUsername} ready`);
 
-  bot.command('start', async (ctx) => {
+  b.command('start', async (ctx) => {
     if (ctx.from) upsertUser(ctx.from, { notify: true });
     const t = createT(pickLang(ctx.from?.language_code));
     const keyboard = config.appUrl ? new InlineKeyboard().webApp(t('bot.openApp'), config.appUrl) : undefined;
     await ctx.reply(t('bot.startText'), { reply_markup: keyboard });
   });
 
-  bot.catch((err) => console.error('Bot error', err.error));
+  b.catch((err) => console.error('Bot error', err.error));
 
-  if (config.appUrl) {
-    // The menu button text can't be localized per language, so it carries the brand name.
-    await bot.api
-      .setChatMenuButton({
-        menu_button: { type: 'web_app', text: createT('ru')('common.brand'), web_app: { url: config.appUrl } },
-      })
-      .catch((e) => console.warn('setChatMenuButton failed', e));
-  }
-  await setBotProfile();
+  // Menu button and profile don't block polling; failures are only logged.
+  void setupBotProfile(b);
 
   if (config.botPolling) {
     // Not awaited: bot.start() resolves only when polling stops.
-    bot
-      .start({ drop_pending_updates: true, onStart: () => console.log('Bot polling started') })
-      .catch((e) => console.error('Bot polling stopped', e));
+    b.start({ drop_pending_updates: true, onStart: () => console.log('Bot polling started') }).catch((e) =>
+      console.error('Bot polling stopped', e),
+    );
   }
+}
+
+async function setupBotProfile(b: Bot) {
+  if (config.appUrl) {
+    // The menu button text can't be localized per language, so it carries the brand name.
+    await b.api
+      .setChatMenuButton({
+        menu_button: { type: 'web_app', text: createT('ru')('common.brand'), web_app: { url: config.appUrl } },
+      })
+      .catch((e) => console.warn('setChatMenuButton failed', e instanceof Error ? e.message : e));
+  }
+  await setBotProfile();
 }
 
 /** Bot description and short description in both languages; no code = default for every other language. */
 async function setBotProfile() {
-  if (!bot) return;
+  if (!bot || !botReady) return;
   const variants: [lang: Lang, code?: 'ru' | 'en'][] = [['ru', 'ru'], ['en', 'en'], ['en']];
   for (const [lang, language_code] of variants) {
     const t = createT(lang);
@@ -68,7 +106,7 @@ async function setBotProfile() {
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 async function send(userId: number, text: string, group: GroupRow, lang: Lang) {
-  if (!bot) return;
+  if (!bot || !botReady) return;
   const link = appLink(group.invite_code);
   const reply_markup = link ? new InlineKeyboard().url(createT(lang)('bot.openGroup'), link) : undefined;
   try {
@@ -86,7 +124,7 @@ async function send(userId: number, text: string, group: GroupRow, lang: Lang) {
 
 /** Sends a CSV file to the user's private chat. Returns false when the bot can't write to them (not configured, blocked, never started). */
 export async function sendExportFile(userId: number, csv: string, fileName: string, caption: string) {
-  if (!bot) return false;
+  if (!bot || !botReady) return false;
   try {
     await bot.api.sendDocument(userId, new InputFile(Buffer.from(csv, 'utf8'), fileName), { caption });
     return true;
@@ -101,7 +139,7 @@ export async function sendExportFile(userId: number, csv: string, fileName: stri
 
 /** Tells everyone involved in an expense (except the author) that it was added. Fire-and-forget. */
 export function notifyExpense(group: GroupRow, expense: ExpenseRow, authorUserId: number, authorName: string) {
-  if (!bot) return;
+  if (!bot || !botReady) return;
   const recipients = all<{ user_id: number; member_id: number; share: number | null; lang: string | null }>(
     `SELECT m.user_id, m.id AS member_id, s.amount AS share, u.lang
      FROM members m
@@ -158,7 +196,7 @@ export function notifyExpenseChange(
   authorUserId: number,
   authorName: string,
 ) {
-  if (!bot) return;
+  if (!bot || !botReady) return;
   try {
     const memberNames = new Map(
       all<{ id: number; name: string }>('SELECT id, name FROM members WHERE group_id = ?', group.id).map((m) => [
@@ -201,7 +239,7 @@ export function notifyRemind(
   amount: number,
   hasPaymentInfo: boolean,
 ) {
-  if (!bot) return;
+  if (!bot || !botReady) return;
   const lang = pickLang(one<{ lang: string | null }>('SELECT lang FROM users WHERE id = ?', debtorUserId)?.lang);
   const text = buildRemindMessage({
     lang,

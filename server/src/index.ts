@@ -9,8 +9,10 @@ const app = createApp(config.staticDir);
 
 if (config.devAuth) console.warn('DEV_AUTH=1: accepting fake users. Never enable this in production!');
 
-await startBot().catch((e) => console.error('Bot failed to start', e));
+// The HTTP server comes first: /healthz and the API must work even if Telegram is unreachable.
+serve({ fetch: app.fetch, port: config.port }, (info) => console.log(`Kopeika ${version} listening on :${info.port}`));
+
+// The bot connects in the background and retries on its own.
+startBot();
 
 startBackupSchedule();
-
-serve({ fetch: app.fetch, port: config.port }, (info) => console.log(`Kopeika ${version} listening on :${info.port}`));
