@@ -172,6 +172,15 @@ const migrations = [
   DROP INDEX expense_shares_member;
   CREATE INDEX expense_shares_member_amount ON expense_shares(member_id, amount);
   `,
+  // Anonymous daily usage counters (server-local day). No user or group ids: only how often something happened.
+  `
+  CREATE TABLE stats_daily (
+    date   TEXT NOT NULL,      -- YYYY-MM-DD
+    event  TEXT NOT NULL,
+    count  INTEGER NOT NULL,
+    PRIMARY KEY (date, event)
+  );
+  `,
 ];
 
 const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;

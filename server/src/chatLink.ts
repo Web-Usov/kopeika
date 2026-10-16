@@ -3,6 +3,7 @@ import { createT, type Lang } from '../../shared/i18n/index.ts';
 import { logActivity } from './activity.ts';
 import { one, run, tx } from './db.ts';
 import type { GroupRow } from './repo.ts';
+import { countEvent } from './stats.ts';
 
 const TOKEN_TTL_HOURS = 24;
 
@@ -77,6 +78,7 @@ export function attachChat(link: ChatLinkRow, group: GroupRow, userId: number) {
     );
     run("UPDATE chat_links SET used_at = datetime('now') WHERE token = ?", link.token);
     logActivity(group.id, userId, 'group.chat_link', { name: link.chat_title });
+    countEvent('chat.link');
   });
 }
 

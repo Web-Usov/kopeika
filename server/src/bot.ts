@@ -29,6 +29,7 @@ import {
   inlineGroupsForUser,
   upsertUser,
 } from './repo.ts';
+import { buildStatsReport, canSeeStats, collectStats, countEventSafe } from './stats.ts';
 
 export const bot = config.botToken
   ? new Bot(config.botToken, {
@@ -88,6 +89,7 @@ async function connectBot(b: Bot) {
 
   b.command('start', async (ctx) => {
     if (ctx.from) upsertUser(ctx.from, { notify: true });
+    countEventSafe('bot.start');
     const t = createT(pickLang(ctx.from?.language_code));
     const keyboard = config.appUrl ? new InlineKeyboard().webApp(t('bot.openApp'), config.appUrl) : undefined;
     await ctx.reply(t('bot.startText'), { reply_markup: keyboard });
@@ -191,6 +193,7 @@ function registerChatHandlers(b: Bot) {
   b.on('inline_query', async (ctx) => {
     const from = ctx.inlineQuery.from;
     upsertUser(from);
+    countEventSafe('inline.query');
     const results = buildInlineResults(
       pickLang(from.language_code),
       inlineGroupsForUser(from.id),
@@ -198,6 +201,12 @@ function registerChatHandlers(b: Bot) {
       { groupLink: (code) => appLink(code), botLink: botUsername ? `https://t.me/${botUsername}` : null },
     );
     await ctx.answerInlineQuery(results, { cache_time: 10, is_personal: true });
+  });
+
+  // Owner only, private chat only. Everyone else gets no reply at all, so the command stays invisible.
+  b.command('stats', async (ctx) => {
+    if (!canSeeStats(ctx.from?.id, ctx.chat.type)) return;
+    await ctx.reply(buildStatsReport(pickLang(ctx.from?.language_code), collectStats()));
   });
 
   b.command('unlink', async (ctx) => {
