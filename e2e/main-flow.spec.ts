@@ -62,5 +62,10 @@ test('создать группу, добавить трату, присоеди
   await page2.locator('.row', { hasText: /^Вы →/ }).getByRole('button', { name: 'Вернул' }).click();
   await page2.getByRole('button', { name: 'Сохранить перевод' }).click();
   await expect.poll(async () => text(await page2.locator('.my-balance').textContent())).toBe('Вы в расчёте');
+  // Долги закрылись — праздничный оверлей; закрывается тапом и не возвращается.
+  const celebration = page2.getByRole('dialog');
+  await expect(celebration).toContainText('в расчёте');
+  await celebration.getByRole('button', { name: 'Отлично' }).click();
+  await expect(celebration).toBeHidden();
   await ctx2.close();
 });

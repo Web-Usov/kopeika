@@ -12,6 +12,7 @@ import {
   type PaymentInfo,
   useGroup,
 } from '../api.ts';
+import { Celebration } from '../Celebration.tsx';
 import { dateLocale, lang, rich, t } from '../i18n.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, copyText, haptic, MainButton, openLink, shareLink } from '../tg.tsx';
@@ -74,6 +75,7 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
       {tab === 'expenses' ? <ExpensesTab g={g} /> : tab === 'balances' ? <BalancesTab g={g} /> : <HistoryTab g={g} />}
 
       <MainButton text={t('group.addExpense')} onClick={() => navigate(`/g/${g.id}/expense/new`)} />
+      <Celebration groupId={g.id} />
     </div>
   );
 }

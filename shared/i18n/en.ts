@@ -63,6 +63,13 @@ export const en: Dict = {
     noGroups: "You don't have any groups yet — create a new one.",
     willReplace: 'The chat is currently linked to “{name}”. The link will be replaced.',
   },
+  celebrate: {
+    groupTitle: 'Not a kopeck owed!',
+    groupText: 'Everyone is settled up. Nobody owes anybody anything.',
+    meTitle: "You're settled up!",
+    meText: 'You have no debts left.',
+    close: 'Great',
+  },
   group: {
     totalSpent: 'Total spent {amount}',
     settled: "You're settled up",
