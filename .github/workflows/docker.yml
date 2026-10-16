@@ -104,6 +104,7 @@ jobs:
           [ "$ok" = 1 ] || fail "/healthz did not return ok within 30s"
           code=$(curl -s -o /dev/null -w '%{http_code}' localhost:3000/)
           [ "$code" = 200 ] || fail "GET / returned $code, expected 200"
+          curl -sI localhost:3000/ | grep -qi '^cache-control: no-cache' || fail "GET / has no Cache-Control: no-cache"
           code=$(curl -s -o /dev/null -w '%{http_code}' -X POST localhost:3000/api/groups \
             -H 'Authorization: dev 1' -H 'Content-Type: application/json' \
             -d '{"name":"CI","currency":"RUB"}')

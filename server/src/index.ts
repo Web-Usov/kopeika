@@ -1,31 +1,10 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import { serve } from '@hono/node-server';
-import { serveStatic } from '@hono/node-server/serve-static';
-import { Hono } from 'hono';
-import { api } from './api.ts';
+import { createApp } from './app.ts';
 import { startBackupSchedule } from './backup.ts';
 import { startBot } from './bot.ts';
 import { config } from './config.ts';
 
-const app = new Hono();
-
-app.get('/healthz', (c) => c.text('ok'));
-app.route('/api', api);
-
-if (fs.existsSync(config.staticDir)) {
-  const root = path.relative(process.cwd(), config.staticDir);
-  app.use('/assets/*', async (c, next) => {
-    await next();
-    c.header('Cache-Control', 'public, max-age=31536000, immutable');
-  });
-  app.use('*', serveStatic({ root }));
-  // Single-page app: anything else gets index.html, never cached so new deploys show up immediately.
-  app.get(
-    '*',
-    serveStatic({ root, path: 'index.html', onFound: (_p, c) => void c.header('Cache-Control', 'no-cache') }),
-  );
-}
+const app = createApp(config.staticDir);
 
 if (config.devAuth) console.warn('DEV_AUTH=1: accepting fake users. Never enable this in production!');
 
