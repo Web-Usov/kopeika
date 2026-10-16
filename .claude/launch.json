@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "kopeika-local",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["DEV_AUTH=1", "BOT_POLLING=0", "DB_PATH=data/dev.db", "node", "server/dist/index.js"],
+      "port": 3000
+    }
+  ]
+}

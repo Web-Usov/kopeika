@@ -1,0 +1,14 @@
+services:
+  kopeika:
+    build: .
+    image: kopeika:latest
+    container_name: kopeika
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - kopeika-data:/data
+    # The app listens on port 3000 inside the container. Put it behind your reverse proxy (Traefik)
+    # for https://kopeika.usov-home.ru, e.g. by adding Traefik labels and its network here.
+
+volumes:
+  kopeika-data:

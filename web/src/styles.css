@@ -1,0 +1,579 @@
+/* Colors come from Telegram's theme (telegram-web-app.js sets --tg-theme-* on <html>).
+   The fallbacks only matter in a regular browser during development. */
+:root {
+  --bg: var(--tg-theme-secondary-bg-color, #efeff4);
+  --section-bg: var(--tg-theme-section-bg-color, var(--tg-theme-bg-color, #ffffff));
+  --text: var(--tg-theme-text-color, #000000);
+  --hint: var(--tg-theme-hint-color, #8e8e93);
+  --subtitle: var(--tg-theme-subtitle-text-color, var(--hint));
+  --link: var(--tg-theme-link-color, #2481cc);
+  --accent: var(--tg-theme-accent-text-color, var(--link));
+  --button: var(--tg-theme-button-color, #2481cc);
+  --button-text: var(--tg-theme-button-text-color, #ffffff);
+  --section-header: var(--tg-theme-section-header-text-color, #6d6d72);
+  --destructive: var(--tg-theme-destructive-text-color, #e53935);
+  --separator: var(--tg-theme-section-separator-color, rgba(128, 128, 128, 0.2));
+  --pos: #31a24c;
+  --neg: var(--destructive);
+  --radius: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([style*='--tg-theme']) {
+    --bg: #000000;
+    --section-bg: #1c1c1d;
+    --text: #ffffff;
+    --hint: #98989e;
+    --section-header: #8d8e93;
+    --link: #3e88f7;
+    --button: #3e88f7;
+  }
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.35 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 12px 16px calc(96px + env(safe-area-inset-bottom));
+}
+
+.page-title {
+  margin: 8px 4px 16px;
+  font-size: 24px;
+}
+
+.page-subtitle {
+  margin: -8px 4px 16px;
+}
+
+.hint {
+  color: var(--hint);
+}
+
+.small {
+  font-size: 13px;
+}
+
+.pos {
+  color: var(--pos);
+}
+
+.neg {
+  color: var(--neg);
+}
+
+.money {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.center {
+  text-align: center;
+  padding: 48px 16px;
+}
+
+/* --- Hero / headers --- */
+.hero {
+  text-align: center;
+  padding: 16px 0 20px;
+}
+
+.hero h1 {
+  margin: 4px 0;
+  font-size: 26px;
+}
+
+.hero p {
+  margin: 0;
+}
+
+.hero-emoji,
+.empty-emoji {
+  font-size: 56px;
+  line-height: 1.1;
+}
+
+.empty {
+  text-align: center;
+  padding: 24px 16px;
+}
+
+.empty p {
+  margin: 6px 0;
+}
+
+.group-header {
+  text-align: center;
+  padding: 8px 0 16px;
+}
+
+.group-header h2 {
+  margin: 0 0 4px;
+  font-size: 24px;
+}
+
+.my-balance {
+  margin: 12px auto 0;
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: 20px;
+  background: var(--section-bg);
+  font-weight: 600;
+}
+
+.header-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.header-actions button {
+  background: var(--section-bg);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 14px;
+  color: var(--link);
+}
+
+.dev-back {
+  color: var(--link);
+  padding: 4px 0 8px;
+}
+
+/* --- Sections and rows (Telegram settings style) --- */
+.section {
+  margin-bottom: 20px;
+}
+
+.section-title {
+  color: var(--section-header);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 0 16px 6px;
+}
+
+.section-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.section-body {
+  background: var(--section-bg);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.section-footer {
+  color: var(--hint);
+  font-size: 13px;
+  padding: 6px 16px 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 16px;
+  text-align: left;
+  position: relative;
+}
+
+.row + .row::before,
+.segmented + .row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 0;
+  border-top: 0.5px solid var(--separator);
+}
+
+.row.clickable:active {
+  background: rgba(128, 128, 128, 0.12);
+}
+
+.row.link {
+  color: var(--link);
+}
+
+.row-left {
+  flex: none;
+  display: flex;
+}
+
+.row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.row-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-subtitle {
+  color: var(--subtitle);
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-right {
+  flex: none;
+  text-align: right;
+}
+
+.stack-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.expense-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 600;
+  overflow: hidden;
+  flex: none;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bar {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg);
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.bar span {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.invite-link {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.row.buttons {
+  justify-content: flex-end;
+}
+
+/* --- Inputs --- */
+.field {
+  display: block;
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 14px 16px;
+  min-height: 48px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.field::placeholder {
+  color: var(--hint);
+}
+
+.field + .field,
+.field + .amount-field {
+  border-top: 0.5px solid var(--separator);
+}
+
+select.field {
+  background-image: linear-gradient(45deg, transparent 50%, var(--hint) 50%), linear-gradient(135deg, var(--hint) 50%, transparent 50%);
+  background-position: calc(100% - 22px) 50%, calc(100% - 17px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.field.inline {
+  padding: 0;
+  min-height: 32px;
+  flex: 1;
+}
+
+.amount-field {
+  display: flex;
+  align-items: center;
+  padding-right: 16px;
+}
+
+.field.amount {
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.currency {
+  color: var(--hint);
+  font-weight: 600;
+}
+
+.field.exact {
+  width: 110px;
+  min-height: 36px;
+  padding: 6px 10px;
+  text-align: right;
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.field.invalid,
+.field-error {
+  color: var(--neg);
+}
+
+.field-error {
+  font-size: 13px;
+  padding: 0 16px 10px;
+}
+
+/* --- Controls --- */
+.segmented {
+  display: flex;
+  gap: 2px;
+  margin: 10px 12px;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--bg);
+}
+
+.page > .segmented {
+  margin: 0 0 16px;
+  background: rgba(128, 128, 128, 0.15);
+}
+
+.segmented button {
+  flex: 1;
+  padding: 7px 0;
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.segmented button.active {
+  background: var(--section-bg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.check,
+.radio {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--hint);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.check.on,
+.radio.on {
+  border-color: var(--button);
+  background: var(--button);
+}
+
+.check.on::after {
+  content: '✓';
+  color: var(--button-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.radio.on {
+  background: var(--section-bg);
+  box-shadow: inset 0 0 0 4px var(--section-bg), inset 0 0 0 12px var(--button);
+}
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg);
+  border-radius: 8px;
+}
+
+.stepper button {
+  width: 34px;
+  height: 32px;
+  font-size: 20px;
+  color: var(--link);
+}
+
+.stepper span {
+  min-width: 20px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.switch {
+  display: inline-block;
+  width: 46px;
+  height: 28px;
+  border-radius: 14px;
+  background: rgba(128, 128, 128, 0.3);
+  position: relative;
+  transition: background 0.2s;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s;
+}
+
+.switch.on {
+  background: var(--pos);
+}
+
+.switch.on::after {
+  transform: translateX(18px);
+}
+
+.small-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--link);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.small-btn.primary {
+  background: var(--button);
+  color: var(--button-text);
+}
+
+.row.buttons .small-btn + .small-btn {
+  margin-left: 8px;
+}
+
+.icon-btn {
+  color: var(--hint);
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.text-btn {
+  display: block;
+  margin: 0 auto 16px;
+  color: var(--link);
+  padding: 8px;
+}
+
+.text-btn.small {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.danger-btn {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  border-radius: var(--radius);
+  background: var(--section-bg);
+  color: var(--destructive);
+  margin-bottom: 20px;
+}
+
+/* Browser-only stand-in for Telegram's MainButton */
+.main-button-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
+  background: var(--section-bg);
+  border-top: 0.5px solid var(--separator);
+}
+
+.main-button {
+  display: block;
+  width: 100%;
+  max-width: 608px;
+  margin: 0 auto;
+  padding: 14px;
+  border-radius: 10px;
+  background: var(--button);
+  color: var(--button-text);
+  font-weight: 600;
+}

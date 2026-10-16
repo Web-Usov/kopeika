@@ -1,0 +1,20 @@
+import path from 'node:path';
+
+const env = process.env;
+
+export const config = {
+  port: Number(env.PORT ?? 3000),
+  botToken: env.BOT_TOKEN ?? '',
+  /** Public HTTPS URL of the Mini App, e.g. https://kopeika.usov-home.ru */
+  appUrl: env.APP_URL ?? '',
+  /** Short name given to the Mini App in @BotFather (/newapp); used for t.me/<bot>/<short> links. */
+  appShortName: env.APP_SHORT_NAME ?? '',
+  dbPath: env.DB_PATH ?? path.resolve('data/kopeika.db'),
+  staticDir: env.STATIC_DIR ?? path.resolve('web/dist'),
+  /** Run the bot with long polling. Disable locally if the production bot uses the same token. */
+  botPolling: (env.BOT_POLLING ?? '1') === '1',
+  /** Accept "Authorization: dev <userId>" to test in a regular browser. Never enable in production. */
+  devAuth: env.DEV_AUTH === '1',
+  /** How long a Telegram initData signature stays valid. */
+  initDataMaxAgeSec: Number(env.INIT_DATA_MAX_AGE ?? 24 * 60 * 60),
+};
