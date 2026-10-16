@@ -80,6 +80,16 @@ export const config = {
   /** Max API requests per user per minute. */
   rateLimitPerMin: parseNumber('RATE_LIMIT_PER_MIN', env.RATE_LIMIT_PER_MIN, { default: 120, max: 1_000_000 }),
   ratesLimitPerMin: parseNumber('RATES_LIMIT_PER_MIN', env.RATES_LIMIT_PER_MIN, { default: 20, max: 1_000_000 }),
+  /** Anthropic API key for receipt recognition. Empty = the feature is off. Never logged or returned to clients. */
+  anthropicApiKey: env.ANTHROPIC_API_KEY ?? '',
+  /** Optional gateway/proxy address for the Anthropic API; empty = the SDK default. */
+  anthropicBaseUrl: env.ANTHROPIC_BASE_URL ?? '',
+  /** Model that reads receipt photos. */
+  receiptsModel: env.RECEIPTS_MODEL?.trim() || 'claude-haiku-5-5',
+  /** Stronger model tried once when the sum of the lines does not match the total. Empty (default) = no cascade. */
+  receiptsFallbackModel: env.RECEIPTS_FALLBACK_MODEL?.trim() ?? '',
+  /** Timeout of one recognition request to the provider, seconds. */
+  receiptsTimeoutSec: parseNumber('RECEIPTS_TIMEOUT_SEC', env.RECEIPTS_TIMEOUT_SEC, { default: 30, max: 300 }),
   /** Quotas, so one account cannot grow the database without bound. */
   maxGroupsPerUser: parseNumber('MAX_GROUPS_PER_USER', env.MAX_GROUPS_PER_USER, { default: 100, max: 1_000_000 }),
   maxMembersPerGroup: parseNumber('MAX_MEMBERS_PER_GROUP', env.MAX_MEMBERS_PER_GROUP, { default: 100, max: 1_000_000 }),

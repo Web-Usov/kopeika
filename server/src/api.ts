@@ -33,6 +33,8 @@ import { deserialize, isEmpty, PaymentInfoError, parsePaymentInfo, serialize } f
 import { assertCanJoinMoreGroups, assertRoomForMembers, assertRoomForRecurring } from './quota.ts';
 import { createRateLimiter } from './rateLimit.ts';
 import { getRate, RatesError } from './rates.ts';
+import { receiptsEnabled } from './receipts/provider.ts';
+import { MEDIA_TYPES, matchesSignature, recordReceiptUsage, scanReceipt } from './receipts/service.ts';
 import {
   expenseFor,
   isoDate,
@@ -79,7 +81,10 @@ api.onError((err, c) => {
 });
 
 // Request bodies are small JSON; refuse anything bigger before it is read into memory.
-api.use('*', bodyLimit({ maxSize: 256 * 1024, onError: (c) => c.json({ error: 'Payload too large' }, 413) }));
+// The receipt photo route has a bigger limit of its own (see below), so it skips this one.
+const smallBodyLimit = bodyLimit({ maxSize: 256 * 1024, onError: (c) => c.json({ error: 'Payload too large' }, 413) });
+const RECEIPT_PARSE_PATH = /\/groups\/[^/]+\/receipts\/parse$/;
+api.use('*', (c, next) => (RECEIPT_PARSE_PATH.test(c.req.path) ? next() : smallBodyLimit(c, next)));
 
 // --- Auth: every /api request carries "Authorization: tma <initData>" ---
 api.use('*', async (c, next) => {
@@ -136,7 +141,7 @@ const name = z.string().trim().min(1).max(64);
 api.get('/me', (c) => {
   const u = one<UserRow>('SELECT * FROM users WHERE id = ?', c.get('user').id)!;
   // No Telegram id: the client identifies itself through `meId` of the group.
-  return c.json({ name: displayName(u), notify: u.notify === 1 });
+  return c.json({ name: displayName(u), notify: u.notify === 1, receiptsEnabled: receiptsEnabled() });
 });
 
 api.put('/me', async (c) => {
@@ -496,6 +501,36 @@ api.get('/rates', async (c) => {
   if (Number.isNaN(parsed) || parsed > Date.now() + 2 * 86_400_000) throw fail(400, 'errors.invalidData');
   return c.json(await getRate(q.base, q.currency, q.date));
 });
+
+// --- Receipts: photo -> draft with items (the photo lives in memory for this request only) ---
+// base64 of a photo shrunk by the client: ~3 MB of JSON is about 2.2 MB of image.
+const RECEIPT_BODY_LIMIT = 3 * 1024 * 1024;
+const receiptBody = z.object({
+  image: z.string().min(1).max(RECEIPT_BODY_LIMIT),
+  mediaType: z.enum(MEDIA_TYPES as [string, ...string[]]),
+});
+
+api.post(
+  '/groups/:id/receipts/parse',
+  bodyLimit({
+    maxSize: RECEIPT_BODY_LIMIT,
+    onError: (c) => c.json({ error: createT(c.get('lang') ?? 'ru')('errors.receipt.tooLarge') }, 413),
+  }),
+  async (c) => {
+    const user = c.get('user');
+    const { group } = loadGroupFor(c.req.param('id'), user.id);
+    if (!receiptsEnabled()) throw fail(503, 'errors.receipt.disabled');
+    const body = receiptBody.parse(await c.req.json());
+    const mediaType = body.mediaType as (typeof MEDIA_TYPES)[number];
+    const bytes = Buffer.from(body.image, 'base64');
+    if (bytes.length === 0 || !matchesSignature(bytes, mediaType)) throw fail(400, 'errors.invalidData');
+    const draft = await scanReceipt({ mediaType, base64: body.image }, group.currency, (usage) =>
+      recordReceiptUsage(user.id, group.id, usage),
+    );
+    c.header('Cache-Control', 'no-store');
+    return c.json(draft);
+  },
+);
 
 // --- Expenses ---
 api.post('/groups/:id/expenses', async (c) => {

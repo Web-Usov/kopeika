@@ -564,6 +564,11 @@ export const en: Dict = {
       sharesMissing: 'Set the shares',
     },
     receipt: {
+      disabled: 'Receipt scanning is not available right now. Enter the expenses manually.',
+      notReceipt: "This doesn't look like a receipt. Take a straighter photo or enter the items manually.",
+      unreadable: "Couldn't read the receipt. Try a photo in better light or enter it manually.",
+      providerFailed: "Couldn't process the receipt. Try again or enter it manually.",
+      tooLarge: 'The photo is too large',
       unassigned: 'Nobody is picked for these items: {ids}',
       discountTooBig: 'The discount is bigger than the items total',
       badItem: 'Invalid receipt item',
