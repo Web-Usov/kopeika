@@ -35,6 +35,13 @@ test('создать группу, добавить трату, присоеди
   const { inviteCode } = await res.json();
   expect(inviteCode).toBeTruthy();
 
+  // Пользователь 1 указал реквизиты — должник их увидит.
+  const put = await request.put('/api/me/payment-info', {
+    headers: { Authorization: 'dev 1' },
+    data: { phone: '8 900 123-45-67', bank: 'Т-Банк' },
+  });
+  expect(put.ok()).toBeTruthy();
+
   // 3. Пользователь 2 открывает приглашение и выбирает «Маша».
   const ctx2 = await browser.newContext({ viewport: { width: 375, height: 812 } });
   const page2 = await ctx2.newPage();
@@ -45,6 +52,8 @@ test('создать группу, добавить трату, присоеди
 
   // 4. Вкладка «Балансы»: «Вернул» у своего долга.
   await page2.getByRole('button', { name: 'Балансы' }).click();
+  await expect(page2.getByText('+79001234567 · Т-Банк')).toBeVisible();
+  await expect(page2.getByRole('button', { name: 'Скопировать номер' })).toBeVisible();
   await page2.locator('.row', { hasText: /^Вы →/ }).getByRole('button', { name: 'Вернул' }).click();
   await page2.getByRole('button', { name: 'Сохранить перевод' }).click();
   await expect.poll(async () => text(await page2.locator('.my-balance').textContent())).toBe('Вы в расчёте');
