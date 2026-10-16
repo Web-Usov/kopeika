@@ -23,4 +23,4 @@ USER node
 VOLUME /data
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s CMD node -e "fetch('http://localhost:3000/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
-CMD ["node", "--disable-warning=ExperimentalWarning", "--disable-warning=DEP0040", "server/dist/index.js"]
+CMD ["node", "--disable-warning=ExperimentalWarning", "--disable-warning=DEP0040", "--disable-warning=DEP0169","server/dist/index.js"]
