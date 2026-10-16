@@ -1,6 +1,10 @@
+# Base image is pinned by digest (the multi-arch index, so amd64 and arm64 both work).
+# To update: `docker buildx imagetools inspect node:24-slim`, put the new Digest below, open a PR.
+ARG NODE_IMAGE=node:24-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5
+
 # --- Build: the Mini App (static files) and the server (one bundled JS file) ---
 # The output is plain JS/HTML, so this stage always runs natively, even for multi-arch builds.
-FROM --platform=$BUILDPLATFORM node:24-slim AS build
+FROM --platform=$BUILDPLATFORM ${NODE_IMAGE} AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY server/package.json server/
@@ -14,7 +18,7 @@ ENV APP_VERSION=$APP_VERSION GIT_SHA=$GIT_SHA
 RUN npm run build
 
 # --- Runtime: no node_modules needed, everything is bundled; SQLite is built into Node ---
-FROM node:24-slim
+FROM ${NODE_IMAGE}
 ARG APP_VERSION=dev
 ARG GIT_SHA=unknown
 LABEL org.opencontainers.image.version=$APP_VERSION \

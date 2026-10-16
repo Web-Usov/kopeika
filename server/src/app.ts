@@ -7,6 +7,18 @@ import { privacyLang, renderPrivacyHtml } from './privacy.ts';
 import { sha, version } from './version.ts';
 
 /** The whole HTTP app: API plus (if the folder exists) the built Mini App from `staticDir`. */
+/** Content-Security-Policy for HTML pages. telegram.org serves telegram-web-app.js; avatars come from Telegram over https. */
+export const CSP = [
+  "default-src 'self'",
+  "script-src 'self' https://telegram.org",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' https: data:",
+  "connect-src 'self'",
+  'frame-ancestors https://web.telegram.org https://*.telegram.org',
+  "base-uri 'none'",
+  "form-action 'self'",
+].join('; ');
+
 export function createApp(staticDir: string) {
   const app = new Hono();
 
@@ -14,6 +26,7 @@ export function createApp(staticDir: string) {
     await next();
     c.header('X-Content-Type-Options', 'nosniff');
     c.header('Referrer-Policy', 'no-referrer');
+    if (c.res.headers.get('Content-Type')?.startsWith('text/html')) c.header('Content-Security-Policy', CSP);
   });
 
   app.get('/healthz', (c) => c.text('ok'));

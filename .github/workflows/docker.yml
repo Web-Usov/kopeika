@@ -105,7 +105,7 @@ jobs:
 
       - name: Smoke test image
         run: |
-          docker run -d --name kopeika-ci -e DEV_AUTH=1 -e BOT_POLLING=0 -p 3000:3000 kopeika:ci
+          docker run -d --name kopeika-ci -e DEV_AUTH=1 -e ALLOW_DEV_AUTH_IN_PRODUCTION=1 -e BOT_POLLING=0 -p 3000:3000 kopeika:ci
           fail() {
             echo "::error::$1"
             docker logs kopeika-ci
@@ -137,7 +137,7 @@ jobs:
       # Telegram unreachable: the HTTP server must still come up and the bot must keep retrying.
       - name: Smoke test image without Telegram
         run: |
-          docker run -d --name kopeika-ci-tg -e DEV_AUTH=1 -e BOT_TOKEN=123:fake -e BOT_POLLING=1 \
+          docker run -d --name kopeika-ci-tg -e DEV_AUTH=1 -e ALLOW_DEV_AUTH_IN_PRODUCTION=1 -e BOT_TOKEN=123:fake -e BOT_POLLING=1 \
             -e TELEGRAM_API_ROOT=http://10.255.255.1 -e TELEGRAM_TIMEOUT_SEC=3 -p 3001:3000 kopeika:ci
           fail() {
             echo "::error::$1"
