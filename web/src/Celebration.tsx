@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { SettledKind } from '../../shared/settled.ts';
-import { takeCelebration } from './celebration.ts';
+import { ACHIEVEMENT_EMOJI, achievementTitleKey } from '../../shared/achievements.ts';
+import { type Pending, takeCelebration } from './celebration.ts';
 import { t } from './i18n.ts';
 import { haptic } from './tg.tsx';
 
@@ -54,7 +54,7 @@ function confetti(canvas: HTMLCanvasElement) {
 
 /** Оверлей «всё в расчёте»: показывается один раз после сохранения, закрывается тапом или через ~4 с. */
 export function Celebration({ groupId }: { groupId: number }) {
-  const [kind, setKind] = useState<SettledKind | null>(null);
+  const [kind, setKind] = useState<Pending | null>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -74,15 +74,27 @@ export function Celebration({ groupId }: { groupId: number }) {
   }, [kind]);
 
   if (!kind) return null;
+  // Закрытие всех долгов важнее; иначе — новое достижение.
+  const view = kind.kind
+    ? {
+        emoji: '🪙',
+        title: t(kind.kind === 'group' ? 'celebrate.groupTitle' : 'celebrate.meTitle'),
+        text: t(kind.kind === 'group' ? 'celebrate.groupText' : 'celebrate.meText'),
+      }
+    : {
+        emoji: ACHIEVEMENT_EMOJI[kind.achievements[0]],
+        title: t('achievements.newTitle'),
+        text: kind.achievements.map((id) => t(achievementTitleKey(id))).join(', '),
+      };
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: закрывается и кнопкой внутри
     <div className="celebration" role="dialog" aria-modal="true" onClick={() => setKind(null)}>
       <canvas ref={canvas} className="celebration-canvas" />
       <div className="celebration-card">
         {/* Временно эмодзи; позже заменим на маскота (#20). */}
-        <div className="celebration-emoji">🪙</div>
-        <h2>{t(kind === 'group' ? 'celebrate.groupTitle' : 'celebrate.meTitle')}</h2>
-        <p>{t(kind === 'group' ? 'celebrate.groupText' : 'celebrate.meText')}</p>
+        <div className="celebration-emoji">{view.emoji}</div>
+        <h2>{view.title}</h2>
+        <p>{view.text}</p>
         <button type="button" className="small-btn">
           {t('celebrate.close')}
         </button>

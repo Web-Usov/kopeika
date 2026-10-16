@@ -1,3 +1,9 @@
+import {
+  ACHIEVEMENT_EMOJI,
+  achievementTextKey,
+  achievementTitleKey,
+  groupAchievements,
+} from '../../../shared/achievements.ts';
 import { categoryEmoji, categoryKey } from '../../../shared/categories.ts';
 import { formatMoney } from '../../../shared/money.ts';
 import { groupSummary, periodText, shortDay, summaryShareText } from '../../../shared/summary.ts';
@@ -34,6 +40,8 @@ export function Summary({ id }: { id: number }) {
       </div>
     );
   }
+
+  const achievements = groupAchievements(g);
 
   const share = async () => {
     const text = summaryShareText(g.name, g.currency, s, lang);
@@ -114,6 +122,23 @@ export function Summary({ id }: { id: number }) {
               </span>
             }
           />
+        ))}
+      </Section>
+
+      <Section title={t('achievements.title')}>
+        {achievements.map((a) => (
+          <div key={a.id} className={`achievement ${a.unlocked ? 'unlocked' : 'locked'}`}>
+            <div className="achievement-emoji">{ACHIEVEMENT_EMOJI[a.id]}</div>
+            <div className="achievement-body">
+              <div className="achievement-title">{t(achievementTitleKey(a.id))}</div>
+              <div className="hint small">{t(achievementTextKey(a.id))}</div>
+            </div>
+            {a.progress && (
+              <div className="achievement-progress hint small">
+                {t('achievements.progress', { current: a.progress.current, target: a.progress.target })}
+              </div>
+            )}
+          </div>
         ))}
       </Section>
 

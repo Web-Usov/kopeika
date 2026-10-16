@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState } from 'react';
+import { groupAchievements } from '../../../shared/achievements.ts';
 import { type ActivityEntry, activityText } from '../../../shared/activity.ts';
 import { type CategoryId, categoryEmoji, categoryKey, categoryTotals } from '../../../shared/categories.ts';
 import { formatMoney } from '../../../shared/money.ts';
@@ -34,6 +35,8 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
     );
 
   const me = g.members.find((m) => m.id === g.meId)!;
+  const achievementList = groupAchievements(g);
+  const unlockedCount = achievementList.filter((a) => a.unlocked).length;
 
   return (
     <div className="page">
@@ -57,6 +60,10 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
           </button>
           <button type="button" onClick={() => navigate(`/g/${g.id}/summary`)}>
             {t('summary.open')}
+            <span className="hint small">
+              {' '}
+              {t('achievements.counter', { done: unlockedCount, total: achievementList.length })}
+            </span>
           </button>
           <button type="button" onClick={() => navigate(`/g/${g.id}/settings`)}>
             {t('group.settings')}
