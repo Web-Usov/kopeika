@@ -535,6 +535,13 @@ export const en: Dict = {
     internal: 'Internal server error',
     exportBotUnavailable:
       'The bot can’t message you. Open the chat with the bot, press Start and turn on notifications.',
+    receipt: {
+      disabled: 'Receipt scanning is not available right now. Enter the expenses manually.',
+      notReceipt: "This doesn't look like a receipt. Take a straighter photo or enter the items manually.",
+      unreadable: "Couldn't read the receipt. Try a photo in better light or enter it manually.",
+      providerFailed: "Couldn't process the receipt. Try again or enter it manually.",
+      tooLarge: 'The photo is too large',
+    },
     rate: {
       invalid: 'The rate is not valid',
       tooSmall: 'The amount is too small for this rate',
