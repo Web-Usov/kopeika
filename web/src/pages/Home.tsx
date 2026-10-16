@@ -84,6 +84,8 @@ export function Home() {
 
       {groups && <NotifySetting />}
 
+      <p className="app-version">{t('common.version', { version: __APP_VERSION__ })}</p>
+
       <MainButton text={t('home.createGroup')} onClick={() => navigate('/new')} />
     </div>
   );

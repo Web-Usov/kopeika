@@ -7,10 +7,12 @@ import { api } from './api.ts';
 import { startBackupSchedule } from './backup.ts';
 import { startBot } from './bot.ts';
 import { config } from './config.ts';
+import { sha, version } from './version.ts';
 
 const app = new Hono();
 
 app.get('/healthz', (c) => c.text('ok'));
+app.get('/version', (c) => c.json({ version, sha }));
 app.route('/api', api);
 
 if (fs.existsSync(config.staticDir)) {
@@ -33,4 +35,4 @@ await startBot().catch((e) => console.error('Bot failed to start', e));
 
 startBackupSchedule();
 
-serve({ fetch: app.fetch, port: config.port }, (info) => console.log(`Kopeika listening on :${info.port}`));
+serve({ fetch: app.fetch, port: config.port }, (info) => console.log(`Kopeika ${version} listening on :${info.port}`));

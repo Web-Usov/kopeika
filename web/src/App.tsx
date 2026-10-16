@@ -10,6 +10,8 @@ import { TransferForm } from './pages/TransferForm.tsx';
 import { match, useLocation } from './router.ts';
 import { ErrorView } from './ui.tsx';
 
+const groupTab = (v: string | null) => (v === 'balances' || v === 'history' ? v : 'expenses');
+
 type Params = Record<string, string>;
 type Query = URLSearchParams;
 
@@ -18,12 +20,7 @@ const routes: [pattern: string, render: (p: Params, query: Query) => ReactElemen
   ['/', () => <Home />],
   ['/new', () => <NewGroup />],
   ['/join/:code', (p) => <Join key={p.code} code={p.code} />],
-  [
-    '/g/:id',
-    (p, query) => (
-      <Group key={p.id} id={Number(p.id)} tab={query.get('tab') === 'balances' ? 'balances' : 'expenses'} />
-    ),
-  ],
+  ['/g/:id', (p, query) => <Group key={p.id} id={Number(p.id)} tab={groupTab(query.get('tab'))} />],
   ['/g/:id/settings', (p) => <Settings id={Number(p.id)} />],
   ['/g/:id/expense/new', (p) => <ExpenseForm groupId={Number(p.id)} />],
   ['/g/:id/expense/:eid', (p) => <ExpenseForm key={p.eid} groupId={Number(p.id)} expenseId={Number(p.eid)} />],

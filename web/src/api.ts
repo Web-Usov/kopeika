@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import type { ActivityEntry } from '../../shared/activity.ts';
 import type { CategoryId } from '../../shared/categories.ts';
 import type { SplitMode } from '../../shared/money.ts';
 import { lang, t } from './i18n.ts';
@@ -176,6 +177,11 @@ export const api = {
   addExpense: (id: number, body: ExpenseInput) => request<GroupDetail>('POST', `/groups/${id}/expenses`, body),
   updateExpense: (id: number, expenseId: number, body: ExpenseInput) =>
     request<GroupDetail>('PUT', `/groups/${id}/expenses/${expenseId}`, body),
+  activity: (id: number, before?: number) =>
+    request<{ items: ActivityEntry[]; nextBefore: number | null }>(
+      'GET',
+      `/groups/${id}/activity${before ? `?before=${before}` : ''}`,
+    ),
   deleteExpense: (id: number, expenseId: number) =>
     request<GroupDetail>('DELETE', `/groups/${id}/expenses/${expenseId}`),
 };

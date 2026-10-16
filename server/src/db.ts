@@ -67,6 +67,19 @@ const migrations = [
   `ALTER TABLE users ADD COLUMN payment_info TEXT; ALTER TABLE members ADD COLUMN payment_info TEXT;`,
   // Expense category id (see shared/categories.ts); transfers keep 'other' and never show it.
   `ALTER TABLE expenses ADD COLUMN category TEXT NOT NULL DEFAULT 'other';`,
+  // Group change log ("History" tab): written in the same transaction as the change itself.
+  // payload is JSON with snapshots (titles, amounts, names at that moment) so the text can be rendered later.
+  `
+  CREATE TABLE activity (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id    INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    user_id     INTEGER NOT NULL REFERENCES users(id),   -- who did it
+    action      TEXT NOT NULL,
+    payload     TEXT NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX activity_group ON activity(group_id, id);
+  `,
   // Archived groups are hidden from the home screen (a new expense brings the group back).
   `ALTER TABLE groups ADD COLUMN archived_at TEXT;`,
 ];

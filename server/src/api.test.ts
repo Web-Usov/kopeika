@@ -403,6 +403,113 @@ test('payment details cannot be set through the group for a member with Telegram
   assert.deepEqual((await call(owner, 'GET', '/me/payment-info')).body, {});
 });
 
+// --- History ---
+const history = async (user: number, g: Json, query = '') => {
+  const res = await call(user, 'GET', `/groups/${g.id}/activity${query}`);
+  assert.equal(res.status, 200);
+  return res.body as { items: Json[]; nextBefore: number | null };
+};
+
+test('history records every kind of change, newest first', async () => {
+  const owner = newUser();
+  let g = await createGroup(owner, ['Маша']);
+  const masha = g.members.find((m: Json) => m.name === 'Маша');
+  const base = `/groups/${g.id}`;
+
+  await call(owner, 'PATCH', base, { name: 'Дача' });
+  await call(owner, 'POST', `${base}/members`, { name: 'Коля' });
+  g = (await call(owner, 'GET', base)).body;
+  const kolya = g.members.find((m: Json) => m.name === 'Коля');
+  await call(owner, 'PATCH', `${base}/members/${kolya.id}`, { name: 'Николай' });
+  await call(owner, 'PATCH', `${base}/members/${masha.id}`, { paymentInfo: { card: '1234567812345678' } });
+  await call(owner, 'DELETE', `${base}/members/${kolya.id}`);
+
+  const two = [
+    { memberId: g.meId, value: 1 },
+    { memberId: masha.id, value: 1 },
+  ];
+  const created = await call(owner, 'POST', `${base}/expenses`, expense(g, { shares: two }));
+  const e = created.body.expenses[0];
+  await call(owner, 'PUT', `${base}/expenses/${e.id}`, expense(g, { amount: 12000, shares: two }));
+  await call(owner, 'DELETE', `${base}/expenses/${e.id}`);
+  const tr = await call(owner, 'POST', `${base}/expenses`, {
+    kind: 'transfer',
+    amount: 500,
+    payerId: masha.id,
+    splitMode: 'equal',
+    spentOn: '2025-01-15',
+    shares: [{ memberId: g.meId, value: 1 }],
+  });
+  await call(owner, 'DELETE', `${base}/expenses/${tr.body.expenses[0].id}`);
+
+  const claimer = newUser();
+  await call(claimer, 'POST', `/invite/${g.inviteCode}/join`, { claimMemberId: masha.id });
+  await call(newUser(), 'POST', `/invite/${g.inviteCode}/join`, {});
+
+  const { items, nextBefore } = await history(owner, g);
+  assert.equal(nextBefore, null);
+  assert.deepEqual(items.map((i) => i.action).reverse(), [
+    'group.create',
+    'group.rename',
+    'member.add',
+    'member.rename',
+    'member.payment_info',
+    'member.delete',
+    'expense.create',
+    'expense.update',
+    'expense.delete',
+    'expense.create',
+    'expense.delete',
+    'member.claim',
+    'member.join',
+  ]);
+  const by = (action: string) => items.filter((i) => i.action === action);
+  assert.equal(by('group.rename')[0].payload.from, 'Поездка');
+  assert.equal(by('member.rename')[0].payload.to, 'Николай');
+  assert.equal(by('expense.update')[0].payload.before.amount, 10000);
+  assert.equal(by('expense.update')[0].payload.after.amount, 12000);
+  assert.equal(by('expense.update')[0].payload.after.title, 'Ужин');
+  const transfer = by('expense.create')[0].payload.expense;
+  assert.equal(transfer.kind, 'transfer');
+  assert.equal(transfer.to.id, g.meId);
+  // Requisites themselves never reach the log.
+  assert.ok(!JSON.stringify(items).includes('1234567812345678'));
+  // The actor is the member of the person who did it.
+  assert.equal(by('group.create')[0].actor.memberId, g.meId);
+  assert.equal(by('member.claim')[0].actor.memberId, masha.id);
+  assert.match(items[0].createdAt, /^\d{4}-\d\d-\d\dT[\d:]+Z$/);
+});
+
+test('a failed change leaves no history entry', async () => {
+  const owner = newUser();
+  const g = await createGroup(owner);
+  const before = (await history(owner, g)).items.length;
+  const res = await call(owner, 'DELETE', `/groups/${g.id}/expenses/999999`);
+  assert.equal(res.status, 404);
+  assert.equal((await history(owner, g)).items.length, before);
+});
+
+test('history paginates with before and limit', async () => {
+  const owner = newUser();
+  const g = await createGroup(owner);
+  for (let i = 0; i < 5; i++) await call(owner, 'POST', `/groups/${g.id}/members`, { name: `Гость ${i}` });
+  const first = await history(owner, g, '?limit=4');
+  assert.equal(first.items.length, 4);
+  assert.equal(first.nextBefore, first.items[3].id);
+  const second = await history(owner, g, `?limit=4&before=${first.nextBefore}`);
+  assert.equal(second.items.length, 2); // 6 entries in total: group.create + 5 members
+  assert.equal(second.nextBefore, null);
+  assert.ok(second.items[0].id < first.items[3].id);
+  assert.equal((await call(owner, 'GET', `/groups/${g.id}/activity?limit=101`)).status, 400);
+});
+
+test('history is visible to members only', async () => {
+  const owner = newUser();
+  const g = await createGroup(owner);
+  assert.equal((await call(newUser(), 'GET', `/groups/${g.id}/activity`)).status, 404);
+  assert.equal((await call(null, 'GET', `/groups/${g.id}/activity`)).status, 401);
+});
+
 async function joinGroup(user: number, g: Json, claimMemberId?: number) {
   const res = await call(user, 'POST', `/invite/${g.inviteCode}/join`, { claimMemberId });
   assert.equal(res.status, 200);
@@ -503,4 +610,18 @@ test('a new expense unarchives the group', async () => {
   assert.equal(res.status, 201);
   assert.equal(res.body.archived, false);
   assert.equal((await call(owner, 'GET', '/groups')).body[0].archived, false);
+});
+
+test('leaving and archiving are written to the group history', async () => {
+  const owner = newUser();
+  const guest = newUser();
+  const g = await createGroup(owner);
+  await joinGroup(guest, g);
+  await call(owner, 'POST', `/groups/${g.id}/archive`);
+  await call(owner, 'POST', `/groups/${g.id}/unarchive`);
+  await call(guest, 'POST', `/groups/${g.id}/leave`);
+  const res = await call(owner, 'GET', `/groups/${g.id}/activity`);
+  const actions = res.body.items.map((i: Json) => i.action);
+  assert.deepEqual(actions.slice(0, 3), ['member.leave', 'group.unarchive', 'group.archive']);
+  assert.ok(res.body.items[0].actor.name);
 });
