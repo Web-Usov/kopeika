@@ -1,0 +1,52 @@
+import { expect, test } from '@playwright/test';
+
+// Intl puts non-breaking spaces into amounts; compare with them normalized.
+const text = (s: string | null) => (s ?? '').replace(/[\s  ]+/g, ' ').trim();
+
+test('создать группу, добавить трату, присоединиться по приглашению, рассчитаться', async ({
+  page,
+  browser,
+  request,
+}) => {
+  // 1. Пользователь 1 создаёт группу.
+  await page.goto('/?dev=1');
+  await page.getByRole('button', { name: 'Создать группу' }).click();
+  await page.getByPlaceholder('Поездка в Грузию').fill('Поездка');
+  for (const name of ['Маша', 'Петя']) {
+    await page.getByRole('button', { name: '+ Добавить участника' }).click();
+    await page.getByPlaceholder('Имя участника').last().fill(name);
+  }
+  await page.getByRole('button', { name: 'Создать группу' }).click();
+  await expect(page.getByRole('heading', { name: 'Поездка' })).toBeVisible();
+
+  // 2. Трата 1000 поровну.
+  await page.getByRole('button', { name: 'Добавить трату' }).click();
+  await page.getByPlaceholder('За что? Например, ужин').fill('Ужин');
+  await page.getByPlaceholder('0').fill('1000');
+  await page.getByRole('button', { name: 'Добавить трату' }).click();
+  const balance = page.locator('.my-balance');
+  await expect.poll(async () => text(await balance.textContent())).toBe('Вам должны 666,66 ₽');
+
+  // Код приглашения — из API.
+  const groupId = Number(new URL(page.url()).hash.match(/\/g\/(\d+)/)?.[1]);
+  expect(groupId).toBeGreaterThan(0);
+  const res = await request.get(`/api/groups/${groupId}`, { headers: { Authorization: 'dev 1' } });
+  expect(res.ok()).toBeTruthy();
+  const { inviteCode } = await res.json();
+  expect(inviteCode).toBeTruthy();
+
+  // 3. Пользователь 2 открывает приглашение и выбирает «Маша».
+  const ctx2 = await browser.newContext({ viewport: { width: 375, height: 812 } });
+  const page2 = await ctx2.newPage();
+  await page2.goto(`/?dev=2&startapp=${inviteCode}`);
+  await page2.getByText('Маша', { exact: true }).click();
+  await page2.getByRole('button', { name: 'Присоединиться' }).click();
+  await expect.poll(async () => text(await page2.locator('.my-balance').textContent())).toBe('Вы должны 333,33 ₽');
+
+  // 4. Вкладка «Балансы»: «Вернул» у своего долга.
+  await page2.getByRole('button', { name: 'Балансы' }).click();
+  await page2.locator('.row', { hasText: /^Вы →/ }).getByRole('button', { name: 'Вернул' }).click();
+  await page2.getByRole('button', { name: 'Сохранить перевод' }).click();
+  await expect.poll(async () => text(await page2.locator('.my-balance').textContent())).toBe('Вы в расчёте');
+  await ctx2.close();
+});
