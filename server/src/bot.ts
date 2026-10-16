@@ -47,6 +47,11 @@ async function connectBot(b: Bot) {
       b.botInfo = await b.api.getMe();
       break;
     } catch (e) {
+      if (e instanceof GrammyError && (e.error_code === 401 || e.error_code === 404)) {
+        // Telegram answered and rejected the token: retrying won't help.
+        console.error(`Invalid BOT_TOKEN: Telegram says ${e.error_code} ${e.description}. Bot is disabled`);
+        return;
+      }
       const delay = retryDelaySec(attempt);
       const msg = e instanceof Error ? e.message : String(e);
       console.warn(`Telegram unavailable (${msg}), retrying in ${delay}s (attempt ${attempt})`);

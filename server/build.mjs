@@ -7,6 +7,9 @@ await build({
   platform: 'node',
   target: 'node22',
   format: 'esm',
+  // Keep class/function names: node-fetch (grammY) checks signal.constructor.name === 'AbortSignal',
+  // and without this esbuild renames it to AbortSignal2 when a global of the same name is also used.
+  keepNames: true,
   outfile: 'dist/index.js',
   banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
   define: {

@@ -159,6 +159,23 @@ jobs:
           docker logs kopeika-ci-tg 2>&1 | grep -E "listening|Telegram unavailable"
           docker rm -f kopeika-ci-tg
 
+      # Regression: the bundled HTTP client must really reach Telegram (a fake token gets a 401 back).
+      - name: Smoke test image reaches Telegram API
+        run: |
+          docker run -d --name kopeika-ci-api -e BOT_TOKEN=123456:fake -e BOT_POLLING=0 kopeika:ci
+          ok=0
+          for _ in $(seq 1 20); do
+            if docker logs kopeika-ci-api 2>&1 | grep -q "Invalid BOT_TOKEN"; then ok=1; break; fi
+            sleep 1
+          done
+          if [ "$ok" != 1 ]; then
+            echo "::error::Telegram API was not reached: no 'Invalid BOT_TOKEN' (401) line in logs"
+            docker logs kopeika-ci-api
+            exit 1
+          fi
+          docker logs kopeika-ci-api 2>&1 | grep -E "listening|Invalid BOT_TOKEN"
+          docker rm -f kopeika-ci-api
+
       - uses: docker/build-push-action@v7
         with:
           context: .
