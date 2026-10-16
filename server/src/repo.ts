@@ -7,6 +7,8 @@ import type { TelegramUser } from './auth.ts';
 import { config } from './config.ts';
 import { all, one, run } from './db.ts';
 import { deserialize } from './paymentInfo.ts';
+import { budgetExhausted, scanQuota } from './receipts/limits.ts';
+import { receiptsEnabled } from './receipts/provider.ts';
 
 export interface UserRow {
   id: number;
@@ -16,6 +18,7 @@ export interface UserRow {
   photo_url: string | null;
   notify: number;
   lang: string | null;
+  receipt_consent_at: string | null;
   payment_info: string | null;
 }
 
@@ -324,6 +327,19 @@ export function groupDetail(group: GroupRow, me: MemberRow, inviteLink: string |
     expensesTotal,
     hasMoreExpenses: expenses.length < expensesTotal,
     settlements: settleUp(balances),
+    receipts: receiptsInfo(group),
+  };
+}
+
+/** What the client needs to show the receipt button and the quota. Disabled in the demo and when the budget is spent. */
+function receiptsInfo(group: GroupRow) {
+  const q = scanQuota(group.id);
+  return {
+    enabled: receiptsEnabled() && group.is_demo === 0 && !budgetExhausted(),
+    unlimited: q.unlimited,
+    used: q.used,
+    limit: q.limit,
+    resetsAt: q.resetsAt,
   };
 }
 
