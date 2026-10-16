@@ -19,7 +19,8 @@ import {
   type SplitMode,
 } from '../../../shared/money.ts';
 import { addDays, isoWeekday, nextOccurrence, type Period } from '../../../shared/recurring.ts';
-import { api, type Expense, type GroupDetail, setGroup, useGroup } from '../api.ts';
+import { api, type Expense, type GroupDetail, useGroup } from '../api.ts';
+import { applySavedGroup } from '../celebration.ts';
 import { dateLocale, errorText, lang, rich, t } from '../i18n.ts';
 import { scheduleText, shortDate } from '../recurring.ts';
 import { navigate } from '../router.ts';
@@ -200,7 +201,7 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
       shares: inputs,
     };
     try {
-      setGroup(expense ? await api.updateExpense(g.id, expense.id, body) : await api.addExpense(g.id, body));
+      const saved = expense ? await api.updateExpense(g.id, expense.id, body) : await api.addExpense(g.id, body);
       if (!expense && repeat !== 'none' && !foreign) {
         try {
           // The expense above is the first one; the template takes over from tomorrow.
@@ -220,6 +221,7 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
           await alertDialog((e as Error).message);
         }
       }
+      applySavedGroup(saved);
       haptic.success();
       navigate(`/g/${g.id}`, { replace: true });
     } catch (e) {
@@ -232,7 +234,7 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
   const remove = async () => {
     if (!expense || !(await confirmDialog(t('expense.confirmDelete', { title: expense.title })))) return;
     try {
-      setGroup(await api.deleteExpense(g.id, expense.id));
+      applySavedGroup(await api.deleteExpense(g.id, expense.id));
       navigate(`/g/${g.id}`, { replace: true });
     } catch (e) {
       await alertDialog((e as Error).message);

@@ -54,6 +54,13 @@ export const ru = {
     notInList: 'Меня нет в списке',
     join: 'Присоединиться',
   },
+  celebrate: {
+    groupTitle: 'Ни копейки долга!',
+    groupText: 'Все в расчёте — никто никому ничего не должен.',
+    meTitle: 'Вы в расчёте!',
+    meText: 'За вами больше нет долгов.',
+    close: 'Отлично',
+  },
   group: {
     totalSpent: 'Всего потрачено {amount}',
     settled: 'Вы в расчёте',

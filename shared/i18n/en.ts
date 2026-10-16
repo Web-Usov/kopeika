@@ -54,6 +54,13 @@ export const en: Dict = {
     notInList: "I'm not on the list",
     join: 'Join',
   },
+  celebrate: {
+    groupTitle: 'Not a kopeck owed!',
+    groupText: 'Everyone is settled up. Nobody owes anybody anything.',
+    meTitle: "You're settled up!",
+    meText: 'You have no debts left.',
+    close: 'Great',
+  },
   group: {
     totalSpent: 'Total spent {amount}',
     settled: "You're settled up",
