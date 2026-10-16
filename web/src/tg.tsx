@@ -34,6 +34,7 @@ interface WebApp {
   showConfirm(message: string, cb: (ok: boolean) => void): void;
   showAlert(message: string, cb?: () => void): void;
   openTelegramLink(url: string): void;
+  openLink(url: string): void;
   requestWriteAccess(cb: (allowed: boolean) => void): void;
 }
 
@@ -93,6 +94,24 @@ export function shareLink(url: string, text: string) {
   const share = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
   if (inTelegram) tg!.openTelegramLink(share);
   else window.open(share, '_blank');
+}
+
+/** Copies text to the clipboard; if that is blocked, shows the text in a dialog so it can be copied by hand. */
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    haptic.success();
+    return true;
+  } catch {
+    await alertDialog(text);
+    return false;
+  }
+}
+
+/** Opens an external https link: in Telegram's in-app browser, or a new tab outside Telegram. */
+export function openLink(url: string) {
+  if (inTelegram) tg!.openLink(url);
+  else window.open(url, '_blank', 'noopener');
 }
 
 /** Telegram's native bottom button; renders a regular button outside Telegram. */
