@@ -266,7 +266,7 @@ function MemberRow({ g, m }: { g: GroupDetail; m: Member }) {
             {t('common.done')}
           </button>
         </div>
-        {m.userId === null && (
+        {!m.hasTelegram && (
           <PaymentForm
             bare
             initial={m.paymentInfo}
@@ -295,11 +295,11 @@ function MemberRow({ g, m }: { g: GroupDetail; m: Member }) {
     <Row
       left={<Avatar member={m} />}
       title={m.id === g.meId ? t('common.youParen', { name: m.name }) : m.name}
-      subtitle={m.userId ? (m.username ? `@${m.username}` : t('settings.telegram')) : t('settings.noTelegram')}
+      subtitle={m.hasTelegram ? (m.username ? `@${m.username}` : t('settings.telegram')) : t('settings.noTelegram')}
       onClick={() => setEditing(true)}
-      right={m.userId === null ? undefined : <span className="hint">✎</span>}
+      right={!m.hasTelegram ? undefined : <span className="hint">✎</span>}
       action={
-        m.userId === null ? (
+        !m.hasTelegram ? (
           <button type="button" className="icon-btn" aria-label={t('common.delete')} onClick={() => void remove()}>
             ✕
           </button>

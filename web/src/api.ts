@@ -19,7 +19,7 @@ export const hasPaymentInfo = (p: PaymentInfo | undefined) => Boolean(p && Objec
 export interface Member {
   id: number;
   name: string;
-  userId: number | null;
+  hasTelegram: boolean;
   username: string | null;
   photoUrl: string | null;
   balance: number;
@@ -228,7 +228,7 @@ export function clearCache() {
 
 export const api = {
   deleteMe: () => request<{ ok: true; groupsDeleted: number; groupsLeft: number }>('DELETE', '/me'),
-  me: () => request<{ id: number; name: string; notify: boolean }>('GET', '/me'),
+  me: () => request<{ name: string; notify: boolean }>('GET', '/me'),
   myPaymentInfo: () => request<PaymentInfo>('GET', '/me/payment-info'),
   setMyPaymentInfo: (info: PaymentInfo) => request<PaymentInfo>('PUT', '/me/payment-info', info),
   setMemberPaymentInfo: (id: number, memberId: number, paymentInfo: PaymentInfo) =>

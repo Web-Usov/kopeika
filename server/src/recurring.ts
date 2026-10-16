@@ -7,6 +7,7 @@ import { config } from './config.ts';
 import { all, one, run, tx } from './db.ts';
 import { ApiError } from './errors.ts';
 import { createExpense, type ExpenseBody } from './expenses.ts';
+import { logTelegramError } from './logging.ts';
 import type { ExpenseRow, GroupRow } from './repo.ts';
 
 const CHECK_EVERY_MS = 60 * 60 * 1000;
@@ -103,8 +104,7 @@ function processTemplate(r: RecurringRow, today: string): ExpenseRow[] {
       r.next_date,
     );
     if (claimed.changes === 0) return []; // someone else got there first
-    if (skipped > 0)
-      console.warn(`Recurring #${r.id} "${r.title}": skipped ${skipped} missed occurrence(s) before ${due[0]}`);
+    if (skipped > 0) console.warn(`Recurring #${r.id}: skipped ${skipped} missed occurrence(s) before ${due[0]}`);
     const out: ExpenseRow[] = [];
     for (const date of due) {
       try {
@@ -113,7 +113,7 @@ function processTemplate(r: RecurringRow, today: string): ExpenseRow[] {
         // Validation runs before anything is written, so nothing half-done is left behind.
         if (!(e instanceof ApiError) && !(e instanceof SplitError)) throw e;
         run('UPDATE recurring SET active = 0 WHERE id = ?', r.id);
-        console.warn(`Recurring #${r.id} "${r.title}" switched off: ${e.message}`);
+        console.warn(`Recurring #${r.id} switched off: ${e.message}`);
         break;
       }
     }
@@ -136,7 +136,7 @@ export function runRecurring(today = localDate()): number {
     try {
       count += processTemplate(r, today).length;
     } catch (e) {
-      console.error(`Recurring #${r.id} failed`, e);
+      logTelegramError(`Recurring #${r.id} failed`, e);
     }
   }
   if (count > 0) console.log(`Recurring: created ${count} expense(s)`);

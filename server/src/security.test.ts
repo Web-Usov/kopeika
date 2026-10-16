@@ -165,7 +165,7 @@ test('claimMemberId of another group cannot be taken through this invite', async
   const res = await call(nextUser++, 'POST', `/invite/${ga.inviteCode}/join`, { claimMemberId: victim.id });
   assert.equal(res.status, 409);
   const after = (await call(owner, 'GET', `/groups/${gb.id}`)).body;
-  assert.equal(after.members.find((m: Json) => m.id === victim.id).userId, null);
+  assert.equal(after.members.find((m: Json) => m.id === victim.id).hasTelegram, false);
 });
 
 test('spare tokens of a chat die when one of them is used', async () => {
@@ -293,8 +293,8 @@ test('owner removes a Telegram member: they lose access, history stays, only the
   const g = await group(owner, ['Маша']);
   await call(guest, 'POST', `/invite/${g.inviteCode}/join`, {});
   const full = (await call(owner, 'GET', `/groups/${g.id}`)).body;
-  const guestMember = full.members.find((m: Json) => m.userId === guest);
-  const ownerMember = full.members.find((m: Json) => m.userId === owner);
+  const guestMember = full.members.filter((m: Json) => m.hasTelegram).at(-1);
+  const ownerMember = full.members.find((m: Json) => m.hasTelegram);
   const masha = full.members.find((m: Json) => m.name === 'Маша');
   await call(guest, 'POST', `/groups/${g.id}/expenses`, exp(full, { payerId: guestMember.id }));
   const url = (id: number) => `/groups/${g.id}/members/${id}/remove`;
@@ -308,7 +308,7 @@ test('owner removes a Telegram member: they lose access, history stays, only the
   const ok = await call(owner, 'POST', url(guestMember.id));
   assert.equal(ok.status, 200);
   const after = ok.body.members.find((m: Json) => m.id === guestMember.id);
-  assert.equal(after.userId, null);
+  assert.equal(after.hasTelegram, false);
   assert.equal(ok.body.expenses.length, 1);
   assert.equal((await call(guest, 'GET', `/groups/${g.id}`)).status, 404);
 

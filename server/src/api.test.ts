@@ -63,7 +63,7 @@ test('creating a group makes the creator an owner member', async () => {
   assert.equal(res.body.isOwner, true);
   assert.equal(res.body.members.length, 3);
   const mine = res.body.members.find((m: Json) => m.id === res.body.meId);
-  assert.equal(mine.userId, u);
+  assert.equal(mine.hasTelegram, true);
   assert.deepEqual(res.body.members.map((m: Json) => m.name).slice(1), ['Маша', 'Петя']);
 });
 
@@ -371,9 +371,9 @@ test('payment details are visible to co-members, not to outsiders or in the invi
 
   await call(friend, 'POST', `/invite/${g.inviteCode}/join`, {});
   const seen = (await call(friend, 'GET', `/groups/${g.id}`)).body;
-  const ownerMember = seen.members.find((m: Json) => m.userId === owner);
+  const ownerMember = seen.members.find((m: Json) => m.hasTelegram);
   assert.deepEqual(ownerMember.paymentInfo, { phone: '+79001234567', bank: 'Т-Банк' });
-  const friendMember = seen.members.find((m: Json) => m.userId === friend);
+  const friendMember = seen.members.filter((m: Json) => m.hasTelegram).at(-1);
   assert.deepEqual(friendMember.paymentInfo, {});
 
   assert.equal((await call(outsider, 'GET', `/groups/${g.id}`)).status, 404);
@@ -526,7 +526,7 @@ async function debtSetup(opts: { notify?: boolean } = {}) {
   await call(guest, 'POST', `/invite/${g.inviteCode}/join`, {});
   if (opts.notify !== false) await call(guest, 'PUT', '/me', { notify: true });
   const full = (await call(owner, 'GET', `/groups/${g.id}`)).body as Json;
-  const guestMember = full.members.find((m: Json) => m.userId === guest);
+  const guestMember = full.members.filter((m: Json) => m.hasTelegram).at(-1);
   // The owner paid for both: the guest owes the owner.
   const res = await call(owner, 'POST', `/groups/${g.id}/expenses`, expense(full));
   assert.equal(res.status, 201);
@@ -589,7 +589,7 @@ test('remind: debtor without notifications or without Telegram gets a clear erro
 
   const owner = newUser();
   const g = await createGroup(owner, ['Маша']);
-  const masha = g.members.find((m: Json) => m.userId === null);
+  const masha = g.members.find((m: Json) => !m.hasTelegram);
   await call(owner, 'POST', `/groups/${g.id}/expenses`, expense(g));
   assert.equal((await call(owner, 'POST', `/groups/${g.id}/remind`, { memberId: masha.id })).status, 409);
 });
@@ -613,7 +613,7 @@ test('leaving: the member becomes name-only, history is kept, access is gone', a
   const g = await createGroup(owner);
   await joinGroup(guest, g);
   const full = (await call(owner, 'GET', `/groups/${g.id}`)).body;
-  const guestMember = full.members.find((m: Json) => m.userId === guest);
+  const guestMember = full.members.filter((m: Json) => m.hasTelegram).at(-1);
   await call(owner, 'POST', `/groups/${g.id}/expenses`, expense(full));
   const before = balances((await call(owner, 'GET', `/groups/${g.id}`)).body);
 
@@ -623,7 +623,7 @@ test('leaving: the member becomes name-only, history is kept, access is gone', a
 
   const after = (await call(owner, 'GET', `/groups/${g.id}`)).body;
   const left = after.members.find((m: Json) => m.id === guestMember.id);
-  assert.equal(left.userId, null);
+  assert.equal(left.hasTelegram, false);
   assert.equal(left.name, guestMember.name);
   assert.equal(after.expenses.length, 1);
   assert.deepEqual(balances(after), before);
@@ -659,7 +659,7 @@ test('after leaving one can return via the invite and claim the old member', asy
   const g = await createGroup(owner);
   await joinGroup(guest, g);
   const full = (await call(owner, 'GET', `/groups/${g.id}`)).body;
-  const old = full.members.find((m: Json) => m.userId === guest);
+  const old = full.members.filter((m: Json) => m.hasTelegram).at(-1);
   await call(owner, 'POST', `/groups/${g.id}/expenses`, expense(full, { payerId: old.id }));
   await call(guest, 'POST', `/groups/${g.id}/leave`);
 
@@ -1050,4 +1050,49 @@ test('chat feed setting: members only, needs a linked chat, rejects garbage, res
   assert.equal((await call(u, 'GET', `/groups/${g.id}`)).body.chat.feed, 'daily');
   await call(u, 'POST', `/chat-links/${chatLink.createChatLink(newChat(), 'Другой', u)}/attach`, { groupId: g.id });
   assert.equal((await call(u, 'GET', `/groups/${g.id}`)).body.chat.feed, 'each');
+});
+
+test('data minimization: no Telegram or chat ids in any response, members carry hasTelegram instead of userId', async () => {
+  const owner = 4242001;
+  const friend = 4242002;
+  const g = await createGroup(owner, ['Маша']);
+  await call(friend, 'POST', `/invite/${g.inviteCode}/join`, {});
+  const chatId = -1004242003;
+  const token = chatLink.createChatLink(chatId, 'Друзья', owner);
+
+  const responses: [string, Json][] = [];
+  const grab = async (who: number, method: string, path: string, body?: unknown) => {
+    const res = await call(who, method, path, body);
+    assert.ok(res.status < 300, `${method} ${path} -> ${res.status}`);
+    responses.push([`${method} ${path}`, res.body]);
+    return res.body;
+  };
+  const full = await grab(friend, 'GET', `/groups/${g.id}`);
+  await grab(friend, 'GET', '/me');
+  await grab(friend, 'GET', '/groups');
+  await grab(friend, 'GET', `/invite/${g.inviteCode}`);
+  await grab(owner, 'GET', `/chat-links/${token}`);
+  await grab(owner, 'POST', `/chat-links/${token}/attach`, { groupId: g.id });
+  await grab(owner, 'POST', `/groups/${g.id}/expenses`, expense(full, { payerId: full.members[0].id }));
+  await grab(friend, 'GET', `/groups/${g.id}`);
+  await grab(friend, 'GET', `/groups/${g.id}/activity`);
+
+  for (const m of full.members) {
+    assert.equal('userId' in m, false);
+    assert.equal(typeof m.hasTelegram, 'boolean');
+  }
+  assert.deepEqual(
+    full.members.map((m: Json) => m.hasTelegram),
+    [true, false, true],
+  );
+  const devNames = full.members.filter((m: Json) => m.hasTelegram).map((m: Json) => m.name as string);
+  for (const [label, body] of responses) {
+    // DEV_AUTH display names embed the id ("User 4242001"); real Telegram names don't, so ignore them.
+    let text = JSON.stringify(body);
+    for (const name of devNames) text = text.replaceAll(name, '');
+    for (const id of [owner, friend, chatId, Math.abs(chatId)]) {
+      assert.ok(!new RegExp(`(?<!\\d)${id}(?!\\d)`).test(text), `${label} leaks ${id}`);
+    }
+    assert.ok(!/"userId"|"user_id"|"chatId"|"chat_id"/.test(text), `${label} has an id field`);
+  }
 });

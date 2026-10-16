@@ -5,6 +5,7 @@ import type { ChatMessage } from './chatLink.ts';
 import { balanceSections, esc } from './chatText.ts';
 import { config } from './config.ts';
 import { all, one, run } from './db.ts';
+import { logTelegramError } from './logging.ts';
 import { type GroupRow, groupBalanceSnapshot } from './repo.ts';
 
 const CHECK_EVERY_MS = 60 * 60 * 1000;
@@ -128,7 +129,7 @@ async function safeRun() {
   try {
     await runDigests(new Date(), config.chatDigestHour, sendToChat, appLink);
   } catch (e) {
-    console.error('Chat digest failed', e);
+    logTelegramError('Chat digest failed', e);
   }
 }
 
