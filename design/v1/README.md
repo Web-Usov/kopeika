@@ -150,7 +150,7 @@ API — для `web/src/ui.tsx`. Класс в скобках — как в `v1.
 **Строки и элементы**
 - `Row left title subtitle right chevron onClick tone` (`.row`) — строка списка. `tone`: `link` (синий текст, «Добавить…»), `danger` (красный). Длинный заголовок обрезается, с `wrap` — переносится (история). Правая колонка `RowValue amount caption` (`.rr`) — сумма и подпись 13 px.
 - `Tile icon|text tone size` (`.tile`) — плитка. `tone`: категория (`food`…`other`) — цветная иконка на фоне 15 %; `link`, `brand`, `pos`, `neg`; `solid-blue | orange | green | purple | gray | red` — белая иконка на цвете (настройки). Буква группы — `text` на цвете аватара.
-- `Avatar member size` (`.av`), `AvatarStack` (`.stack`) — с наложением 8 px и обводкой цветом секции.
+- `Avatar member size badge` (`.av`) — `badge`: значок действия малой плиткой 18 px в правом нижнем углу с обводкой цветом секции (история). `AvatarStack` (`.stack`) — с наложением 8 px и обводкой цветом секции.
 - `Badge tone` (`.badge`) — `link`, `brand` (титулы, «пример»), `gray`.
 - `Emblem icon tone size` (`.emb`) — круг 72 или 88 с иконкой: пустые состояния, приглашение, итоги, праздник.
 - `Money value currency signed` — без изменений, только с токенами цвета.
@@ -246,7 +246,7 @@ API — для `web/src/ui.tsx`. Класс в скобках — как в `v1.
 | `expenses`, `expenses-dark` | `DemoNote`, `GroupHeader`, `Segmented`, `QuickInput`, `DayHeader`, `ExpenseRow` |
 | `quick` | `QuickInput` в фокусе, `QuickPreview` |
 | `balances`, `balances-dark` | `DebtCard`, `Button ghost`, `BalanceTrack`, `Segmented` + `CategoryStat` |
-| `history` | `Row wrap` с `Avatar` и значком действия |
+| `history` | `DayHeader`, `Row wrap` с `Avatar badge` |
 | `summary` | `Emblem`, `StackBar`, `Fact`, `Row` с `Badge brand`, `Medal`, `MainButton` |
 | `celebration` | `CelebrationModal` |
 | `finish` | `FinishBanner`, `GroupHeader` в расчёте |
