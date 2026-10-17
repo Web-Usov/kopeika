@@ -19,6 +19,7 @@ export const STAT_EVENTS = [
   'bot.start',
   'user.delete',
   'receipt.scan',
+  'receipt.access',
 ] as const;
 export type StatEvent = (typeof STAT_EVENTS)[number];
 

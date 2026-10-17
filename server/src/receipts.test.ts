@@ -24,6 +24,7 @@ before(async () => {
   // These tests scan a lot with one user and group: the limits have their own file (receiptLimits.test.ts).
   api_.receiptsLimiter.setLimit(10_000);
   config.receiptsGroupTrialMonthly = 10_000;
+  config.receiptsBeta = false; // the closed beta has its own file (receiptBeta.test.ts)
 });
 after(() => providerModule.setReceiptProviderForTests());
 

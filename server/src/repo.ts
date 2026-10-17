@@ -7,6 +7,7 @@ import type { TelegramUser } from './auth.ts';
 import { config } from './config.ts';
 import { all, one, run } from './db.ts';
 import { deserialize } from './paymentInfo.ts';
+import { accessState } from './receipts/access.ts';
 import { budgetExhausted, scanQuota } from './receipts/limits.ts';
 import { receiptsEnabled } from './receipts/provider.ts';
 
@@ -331,11 +332,20 @@ export function groupDetail(group: GroupRow, me: MemberRow, inviteLink: string |
   };
 }
 
-/** What the client needs to show the receipt button and the quota. Disabled in the demo and when the budget is spent. */
+/**
+ * What the client needs to show the receipt button and the quota. `offered`: the feature exists for this group (the
+ * button is shown, in the beta also to groups that still have to ask); `enabled`: the group can scan right now.
+ * Both are off in the demo and when the budget is spent.
+ */
 function receiptsInfo(group: GroupRow) {
   const q = scanQuota(group.id);
+  const access = accessState(group.id);
+  const offered = receiptsEnabled() && group.is_demo === 0 && !budgetExhausted();
   return {
-    enabled: receiptsEnabled() && group.is_demo === 0 && !budgetExhausted(),
+    offered,
+    enabled: offered && access === 'approved',
+    beta: config.receiptsBeta,
+    access,
     unlimited: q.unlimited,
     used: q.used,
     limit: q.limit,

@@ -78,7 +78,13 @@ export interface GroupDetail {
 }
 
 export interface ReceiptQuota {
+  /** The feature exists for this group: show the button (in the closed beta also while access is still to be asked). */
+  offered?: boolean;
+  /** The group can scan right now. */
   enabled: boolean;
+  /** Closed beta: the owner has to approve each group. */
+  beta?: boolean;
+  access?: 'none' | 'pending' | 'approved' | 'rejected';
   unlimited: boolean;
   used: number;
   limit: number;
@@ -302,6 +308,8 @@ export const api = {
     request<{ name: string; notify: boolean; receiptsEnabled?: boolean; receiptConsent?: boolean }>('GET', '/me'),
   parseReceipt: (id: number, body: { image: string; mediaType: string }, signal?: AbortSignal) =>
     request<ParsedReceipt>('POST', `/groups/${id}/receipts/parse`, body, signal),
+  requestReceiptAccess: (id: number) =>
+    request<GroupDetail>('POST', `/groups/${id}/receipts/access-request`, {}).then((g) => setGroup(g)),
   giveReceiptConsent: () => request<unknown>('POST', '/me/receipt-consent', {}),
   myPaymentInfo: () => request<PaymentInfo>('GET', '/me/payment-info'),
   setMyPaymentInfo: (info: PaymentInfo) => request<PaymentInfo>('PUT', '/me/payment-info', info),

@@ -90,6 +90,8 @@ export const config = {
   receiptsFallbackModel: env.RECEIPTS_FALLBACK_MODEL?.trim() ?? '',
   /** Timeout of one recognition request to the provider, seconds. */
   receiptsTimeoutSec: parseNumber('RECEIPTS_TIMEOUT_SEC', env.RECEIPTS_TIMEOUT_SEC, { default: 30, max: 300 }),
+  /** Closed beta (default): receipt scanning works only for groups the owner has approved. RECEIPTS_BETA=0 opens it to all. */
+  receiptsBeta: (env.RECEIPTS_BETA ?? '1').trim() !== '0',
   /** Free scans per group per calendar month (server-local) while the group has no `receipts` entitlement. */
   receiptsGroupTrialMonthly: parseNumber('RECEIPTS_GROUP_TRIAL_MONTHLY', env.RECEIPTS_GROUP_TRIAL_MONTHLY, {
     default: 5,

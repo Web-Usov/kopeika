@@ -249,3 +249,60 @@ test('чек: чек в другой валюте идёт по курсу, до
   // 31,90 GEL = 957 ₽, my share 13,20 GEL = 396 ₽.
   await expect.poll(async () => text(await page.locator('.my-balance').textContent())).toBe('Вам должны 561 ₽');
 });
+
+test('бета: нет доступа → запрос → «запрос отправлен»; после одобрения обычный поток', async ({ page }) => {
+  let access: 'none' | 'pending' | 'approved' = 'none';
+  let requests = 0;
+  const receipts = () => ({
+    offered: true,
+    enabled: access === 'approved',
+    beta: true,
+    access,
+    unlimited: false,
+    used: 0,
+    limit: 5,
+    resetsAt: null,
+  });
+  await page.route('**/api/me', async (route) => {
+    if (route.request().method() !== 'GET') return route.continue();
+    const res = await route.fetch();
+    await route.fulfill({
+      response: res,
+      json: { ...(await res.json()), receiptsEnabled: true, receiptConsent: true },
+    });
+  });
+  await page.route(/\/api\/groups\/\d+$/, async (route) => {
+    if (route.request().method() !== 'GET') return route.continue();
+    const res = await route.fetch();
+    await route.fulfill({ response: res, json: { ...(await res.json()), receipts: receipts() } });
+  });
+  await page.route('**/api/groups/*/receipts/access-request', async (route) => {
+    requests++;
+    access = 'pending';
+    const res = await route.fetch({
+      url: route.request().url().replace('/receipts/access-request', ''),
+      method: 'GET',
+    });
+    await route.fulfill({ json: { ...(await res.json()), receipts: receipts() } });
+  });
+  await page.route('**/api/groups/*/receipts/parse', (route) => route.fulfill({ json: draft }));
+
+  await page.goto('/?dev=22');
+  await page.getByRole('button', { name: 'Создать группу' }).click();
+  await page.getByPlaceholder('Поездка в Грузию').fill('Бета');
+  await page.getByRole('button', { name: 'Создать группу' }).click();
+  await expect(page.getByRole('heading', { name: 'Бета' })).toBeVisible();
+  await page.getByRole('button', { name: 'Добавить трату' }).click();
+  await page.getByText('📷 Разобрать чек · бета').click();
+
+  await expect(page.getByText('Разбор чеков в бета-тесте. Запросите доступ')).toBeVisible();
+  await page.getByRole('button', { name: 'Запросить доступ' }).click();
+  await expect(page.getByText('Запрос отправлен, мы напишем в боте')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Запросить доступ' })).toHaveCount(0);
+  expect(requests).toBe(1);
+
+  // The owner approves; the next visit shows the usual flow.
+  access = 'approved';
+  await page.reload();
+  await expect(page.getByText('Сделать снимок')).toBeVisible();
+});
