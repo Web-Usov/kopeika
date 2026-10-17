@@ -1,10 +1,12 @@
-import { policies } from '../../../shared/privacy.ts';
+import { type Policy, policies } from '../../../shared/privacy.ts';
 import { lang } from '../i18n.ts';
 import { navigate } from '../router.ts';
 import { BackButton } from '../tg.tsx';
 
-export function Privacy() {
-  const p = policies[lang];
+export const Privacy = () => <LegalPage doc={policies[lang]} />;
+
+/** Shared by the privacy policy and the terms: a structured text with a back button. */
+export function LegalPage({ doc: p }: { doc: Policy }) {
   return (
     <div className="page policy">
       <BackButton onClick={() => navigate('/', { replace: true })} />

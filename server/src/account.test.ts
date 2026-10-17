@@ -250,6 +250,23 @@ test('delete: the same Telegram user can come back with a fresh account, and del
   await createGroup(u);
 });
 
+test('GET /terms: public HTML in both languages, not cached', async () => {
+  const app = createApp('/nonexistent-static-dir');
+  const ru = await app.request('/terms');
+  assert.equal(ru.status, 200);
+  assert.match(ru.headers.get('content-type') ?? '', /text\/html/);
+  assert.equal(ru.headers.get('cache-control'), 'no-cache');
+  const ruText = await ru.text();
+  assert.match(ruText, /<html lang="ru">/);
+  assert.match(ruText, /Условия использования/);
+  assert.match(ruText, /@kopeika_usov_bot/);
+  const en = await (await app.request('/terms?lang=en')).text();
+  assert.match(en, /<html lang="en">/);
+  assert.match(en, /Terms of Service/);
+  const byHeader = await (await app.request('/terms', { headers: { 'Accept-Language': 'en-US,en;q=0.9' } })).text();
+  assert.match(byHeader, /<html lang="en">/);
+});
+
 test('GET /privacy: public HTML in both languages, not cached', async () => {
   const app = createApp('/nonexistent-static-dir');
   const ru = await app.request('/privacy');

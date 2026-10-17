@@ -1,5 +1,6 @@
 import { type Lang, pickLang } from '../../shared/i18n/index.ts';
-import { policies } from '../../shared/privacy.ts';
+import { type Policy, policies } from '../../shared/privacy.ts';
+import { terms } from '../../shared/terms.ts';
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -11,8 +12,12 @@ export function privacyLang(query: string | undefined, acceptLanguage: string | 
 }
 
 /** A plain, self-contained page for the public policy URL (set in @BotFather). */
-export function renderPrivacyHtml(lang: Lang): string {
-  const p = policies[lang];
+export const renderPrivacyHtml = (lang: Lang): string => renderDocHtml(policies[lang], lang);
+
+/** The same for the public Terms of Service URL. */
+export const renderTermsHtml = (lang: Lang): string => renderDocHtml(terms[lang], lang);
+
+function renderDocHtml(p: Policy, lang: Lang): string {
   const other: Lang = lang === 'ru' ? 'en' : 'ru';
   const body = p.sections
     .map(

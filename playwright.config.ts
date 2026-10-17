@@ -7,6 +7,7 @@ const dbPath = join(tmpdir(), `kopeika-e2e-${process.pid}-${Date.now()}.db`);
 
 export default defineConfig({
   testDir: 'e2e',
+  testIgnore: 'storefront.spec.ts', // store screenshots: `npm run storefront:shots`
   fullyParallel: false,
   workers: 1,
   forbidOnly: Boolean(process.env.CI),

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
 import { api } from './api.ts';
-import { privacyLang, renderPrivacyHtml } from './privacy.ts';
+import { privacyLang, renderPrivacyHtml, renderTermsHtml } from './privacy.ts';
 import { sha, version } from './version.ts';
 
 /** The whole HTTP app: API plus (if the folder exists) the built Mini App from `staticDir`. */
@@ -36,6 +36,12 @@ export function createApp(staticDir: string) {
     const lang = privacyLang(c.req.query('lang'), c.req.header('accept-language'));
     c.header('Cache-Control', 'no-cache');
     return c.html(renderPrivacyHtml(lang));
+  });
+  // Public Terms of Service: same idea.
+  app.get('/terms', (c) => {
+    const lang = privacyLang(c.req.query('lang'), c.req.header('accept-language'));
+    c.header('Cache-Control', 'no-cache');
+    return c.html(renderTermsHtml(lang));
   });
   app.route('/api', api);
 

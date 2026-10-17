@@ -97,6 +97,9 @@ export function Home() {
       <button type="button" className="footer-link" onClick={() => navigate('/privacy')}>
         {t('account.privacy')}
       </button>
+      <button type="button" className="footer-link footer-link-next" onClick={() => navigate('/terms')}>
+        {t('account.terms')}
+      </button>
       <p className="app-version">{t('common.version', { version: __APP_VERSION__ })}</p>
 
       <MainButton text={t('home.createGroup')} onClick={() => navigate('/new')} />
