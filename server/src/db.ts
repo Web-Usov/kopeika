@@ -263,6 +263,8 @@ const migrations = [
   ALTER TABLE users ADD COLUMN receipt_consent_provider TEXT;
   UPDATE users SET receipt_consent_provider = 'anthropic' WHERE receipt_consent_at IS NOT NULL;
   `,
+  // Tiny key-value store for server state that must survive restarts (e.g. the week the stats report went out).
+  `CREATE TABLE app_state (key TEXT PRIMARY KEY, value TEXT NOT NULL);`,
   // Automatic debt reminders (#135): a group setting (off by default), and a mark on reminders that tells the bot's
   // own (auto = 1) from the ones a creditor pressed. Both kinds share the 7-day cooldown per debtor.
   `

@@ -13,6 +13,8 @@ export const STAT_EVENTS = [
   'transfer.create',
   'member.join',
   'member.claim',
+  'join.link',
+  'join.card',
   'chat.link',
   'debt.remind',
   'debt.autoremind',
@@ -57,10 +59,73 @@ export interface StatsSnapshot {
   active: Record<Period, number>;
   users: number;
   groups: number;
+  funnel: Funnel;
 }
 
 function toSqlUtc(d: Date): string {
   return d.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+export const FUNNEL_PERIODS = [7, 30] as const;
+export type FunnelPeriod = (typeof FUNNEL_PERIODS)[number];
+
+export interface FunnelRow {
+  /** Groups created in the period (demo groups excluded). */
+  created: number;
+  /** Of those: at least 2 members with Telegram and at least 3 expenses (transfers do not count). */
+  alive: number;
+  /** Groups created 14..14+N days ago (old enough to judge) ... */
+  returnedOf: number;
+  /** ... of which had an expense or a transfer 7..14 days after creation. */
+  returned: number;
+}
+export type Funnel = Record<FunnelPeriod, FunnelRow>;
+
+/**
+ * Group funnel by creation date, computed from groups / members / expenses; nothing is stored.
+ * created_at columns are UTC. "Returned" needs a group at least 14 days old, so its cohort is shifted back by 14 days:
+ * groups created between 14+N and 14 days ago.
+ */
+export function collectFunnel(now = new Date()): Funnel {
+  const at = toSqlUtc(now);
+  const funnel = {} as Funnel;
+  for (const days of FUNNEL_PERIODS) {
+    const since = `-${days} days`;
+    const cohort = one<{ created: number; alive: number }>(
+      `SELECT COUNT(*) AS created,
+              COALESCE(SUM(
+                (SELECT COUNT(*) FROM members m WHERE m.group_id = g.id AND m.user_id IS NOT NULL) >= 2
+                AND (SELECT COUNT(*) FROM expenses e WHERE e.group_id = g.id AND e.kind = 'expense') >= 3
+              ), 0) AS alive
+         FROM groups g
+        WHERE g.is_demo = 0 AND g.created_at > datetime(?, ?)`,
+      at,
+      since,
+    );
+    const ret = one<{ of: number; returned: number }>(
+      `SELECT COUNT(*) AS of,
+              COALESCE(SUM(EXISTS (
+                SELECT 1 FROM expenses e
+                 WHERE e.group_id = g.id
+                   AND e.created_at > datetime(g.created_at, '+7 days')
+                   AND e.created_at <= datetime(g.created_at, '+14 days')
+              )), 0) AS returned
+         FROM groups g
+        WHERE g.is_demo = 0
+          AND g.created_at <= datetime(?, '-14 days')
+          AND g.created_at > datetime(?, ?)`,
+      at,
+      at,
+      `-${14 + days} days`,
+    );
+    funnel[days] = {
+      created: cohort?.created ?? 0,
+      alive: cohort?.alive ?? 0,
+      returnedOf: ret?.of ?? 0,
+      returned: ret?.returned ?? 0,
+    };
+  }
+  return funnel;
 }
 
 export function collectStats(now = new Date()): StatsSnapshot {
@@ -87,8 +152,11 @@ export function collectStats(now = new Date()): StatsSnapshot {
     active,
     users: one<{ n: number }>('SELECT COUNT(*) AS n FROM users WHERE id != ?', DELETED_USER_ID)?.n ?? 0,
     groups: one<{ n: number }>('SELECT COUNT(*) AS n FROM groups WHERE is_demo = 0')?.n ?? 0,
+    funnel: collectFunnel(now),
   };
 }
+
+const percent = (n: number, of: number) => (of === 0 ? '—' : `${Math.round((n / of) * 100)}%`);
 
 /** Plain-text report for the owner: one line per event with today / 7 days / 30 days. */
 export function buildStatsReport(lang: Lang, s: StatsSnapshot): string {
@@ -99,6 +167,16 @@ export function buildStatsReport(lang: Lang, s: StatsSnapshot): string {
   for (const e of STAT_EVENTS)
     lines.push(row(t(`stats.event.${e.replace('.', '_')}` as Key), (p) => s.events[p][e] ?? 0));
   lines.push('', t('stats.totals', { users: s.users, groups: s.groups }));
+  const f = s.funnel;
+  const frow = (label: string, pick: (r: FunnelRow) => string) =>
+    `${label}: ${FUNNEL_PERIODS.map((p) => pick(f[p])).join(' · ')}`;
+  lines.push('', t('stats.funnel.title'), t('stats.funnel.periods'));
+  lines.push(frow(t('stats.funnel.created'), (r) => String(r.created)));
+  lines.push(frow(t('stats.funnel.alive'), (r) => `${r.alive} (${percent(r.alive, r.created)})`));
+  lines.push(
+    frow(t('stats.funnel.returned'), (r) => `${r.returned}/${r.returnedOf} (${percent(r.returned, r.returnedOf)})`),
+  );
+  lines.push(t('stats.funnel.footer'));
   return lines.join('\n');
 }
 
