@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { helpText } from './chatText.ts';
 import { buildInlineResults, type InlineGroup, MAX_INLINE_RESULTS } from './inline.ts';
+import { balanceShareText, buildShareResult } from './shareCard.ts';
 
 const opts = { groupLink: (c: string) => `https://t.me/bot/app?startapp=${c}`, botLink: 'https://t.me/bot' };
 
@@ -82,4 +83,27 @@ test('help private mentions inline usage when username known', () => {
   assert.match(helpText('ru', false, 'kopeika_bot'), /@kopeika_bot/);
   assert.match(helpText('en', false, 'kopeika_bot'), /@kopeika_bot/);
   assert.doesNotMatch(helpText('ru', false), /@/);
+});
+
+test('share card: balance is HTML with the open-group button, summary is plain text', () => {
+  const text = balanceShareText('en', {
+    groupName: 'A<B',
+    currency: 'RUB',
+    totalSpent: 1000,
+    members: [
+      { id: 1, name: 'Ann', balance: 500 },
+      { id: 2, name: 'Bob', balance: -500 },
+    ],
+    settlements: [{ from: 2, to: 1, amount: 500 }],
+  });
+  assert.match(text, /A&lt;B/);
+  assert.match(text, /Bob/);
+  const card = buildShareResult('en', 'balance', 'A<B', text, 'https://t.me/bot/app?startapp=x');
+  assert.equal((card.input_message_content as { parse_mode?: string }).parse_mode, 'HTML');
+  assert.deepEqual(card.reply_markup?.inline_keyboard, [
+    [{ text: 'Open group', url: 'https://t.me/bot/app?startapp=x' }],
+  ]);
+  const plain = buildShareResult('ru', 'summary', 'Г', 'текст', null);
+  assert.equal((plain.input_message_content as { parse_mode?: string }).parse_mode, undefined);
+  assert.equal(plain.reply_markup, undefined);
 });

@@ -6,12 +6,13 @@ import { categoryTotals, DEFAULT_CATEGORY } from '../../shared/categories.ts';
 import { createT, type Lang, pickLang, type TFn } from '../../shared/i18n/index.ts';
 import { CURRENCIES, SplitError } from '../../shared/money.ts';
 import { firstOccurrence } from '../../shared/recurring.ts';
-import { groupSummary } from '../../shared/summary.ts';
+import { groupSummary, summaryShareText } from '../../shared/summary.ts';
 import { deleteAccount, eraseGroup, leaveGroup } from './account.ts';
 import { expenseSnapshot, listActivity, logActivity } from './activity.ts';
 import { type TelegramUser, validateInitData } from './auth.ts';
 import {
   appLink,
+  canPrepareShare,
   chatMemberStatus,
   loadExpenseSnap,
   notifyChatLinked,
@@ -19,6 +20,7 @@ import {
   notifyExpenseChange,
   notifyMemberRemoved,
   notifyRemind,
+  prepareShare,
   sendExportFile,
 } from './bot.ts';
 import { attachChat, checkChatLink, groupOfChat, unlinkGroup } from './chatLink.ts';
@@ -62,6 +64,7 @@ import {
   findMembership,
   type GroupRow,
   getExpense,
+  groupBalanceSnapshot,
   groupDetail,
   groupsForUser,
   loadLedger,
@@ -70,6 +73,7 @@ import {
   type UserRow,
   upsertUser,
 } from './repo.ts';
+import { balanceShareText, buildShareResult, SHARE_TARGETS } from './shareCard.ts';
 import { countEvent, countEventSafe } from './stats.ts';
 
 type Env = { Variables: { user: TelegramUser; lang: Lang } };
@@ -612,6 +616,37 @@ api.get('/groups/:id/summary', (c) => {
     group.id,
   );
   return c.json(groupSummary({ members, expenses: loadLedger(group.id) }, c.get('lang')));
+});
+
+// Card for «share to any chat»: saved via the Bot API, the Mini App sends it with WebApp.shareMessage(id).
+api.post('/groups/:id/share', async (c) => {
+  const user = c.get('user');
+  const lang = c.get('lang');
+  const { group } = loadGroupFor(c.req.param('id'), user.id);
+  if (group.is_demo) throw fail(409, 'errors.demoNotAllowed');
+  const { kind } = z.object({ kind: z.enum(['balance', 'summary']) }).parse(await c.req.json());
+  if (!canPrepareShare()) throw fail(503, 'errors.shareUnavailable');
+  let text: string;
+  if (kind === 'balance') {
+    text = balanceShareText(lang, { groupName: group.name, currency: group.currency, ...groupBalanceSnapshot(group) });
+  } else {
+    const members = all<{ id: number; name: string }>(
+      'SELECT id, name FROM members WHERE group_id = ? ORDER BY id',
+      group.id,
+    );
+    const summary = groupSummary({ members, expenses: loadLedger(group.id) }, lang);
+    text = summaryShareText(group.name, group.currency, summary, lang);
+  }
+  let id: string | null;
+  try {
+    const result = buildShareResult(lang, kind, group.name, text, appLink(group.invite_code));
+    id = await prepareShare(user.id, result, SHARE_TARGETS);
+  } catch (e) {
+    logTelegramError('savePreparedInlineMessage failed', e);
+    throw fail(503, 'errors.shareUnavailable');
+  }
+  if (!id) throw fail(503, 'errors.shareUnavailable');
+  return c.json({ id });
 });
 
 api.get('/groups/:id/stats', (c) => {

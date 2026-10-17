@@ -6,7 +6,16 @@ import { type GroupSummary, periodText, shortDay, summaryShareText } from '../..
 import { api, useGroup } from '../api.ts';
 import { lang, t } from '../i18n.ts';
 import { navigate } from '../router.ts';
-import { alertDialog, BackButton, copyText, haptic, MainButton, shareLink } from '../tg.tsx';
+import {
+  alertDialog,
+  BackButton,
+  canShareMessage,
+  copyText,
+  haptic,
+  MainButton,
+  shareLink,
+  shareMessage,
+} from '../tg.tsx';
 import { Avatar, ErrorView, Loading, Row, Section } from '../ui.tsx';
 
 export function Summary({ id }: { id: number }) {
@@ -47,6 +56,15 @@ export function Summary({ id }: { id: number }) {
   const achievements = g.achievements;
 
   const share = async () => {
+    if (canShareMessage() && !g.isDemo) {
+      try {
+        const { id } = await api.prepareShare(g.id, 'summary');
+        await shareMessage(id);
+      } catch (e) {
+        await alertDialog((e as Error).message);
+      }
+      return;
+    }
     const text = summaryShareText(g.name, g.currency, s, lang);
     if (g.inviteLink) {
       shareLink(g.inviteLink, text);

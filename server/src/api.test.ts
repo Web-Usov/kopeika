@@ -1096,3 +1096,66 @@ test('data minimization: no Telegram or chat ids in any response, members carry 
     assert.ok(!/"userId"|"user_id"|"chatId"|"chat_id"/.test(text), `${label} has an id field`);
   }
 });
+
+// --- share to any chat (savePreparedInlineMessage) ---
+
+test('share: members get a prepared id; payload is the balance / summary card', async () => {
+  const u = newUser();
+  const g = await createGroup(u, ['Маша']);
+  assert.equal((await call(u, 'POST', `/groups/${g.id}/expenses`, expense(g))).status, 201);
+  const calls: { userId: number; result: Json; targets: Json }[] = [];
+  botModule.setBotTestHooks({
+    prepareShare: async (userId, result, targets) => {
+      calls.push({ userId, result, targets });
+      return `prep-${calls.length}`;
+    },
+  });
+  try {
+    const bal = await call(u, 'POST', `/groups/${g.id}/share`, { kind: 'balance' });
+    assert.equal(bal.status, 200);
+    assert.deepEqual(bal.body, { id: 'prep-1' });
+    const sum = await call(u, 'POST', `/groups/${g.id}/share`, { kind: 'summary' });
+    assert.deepEqual(sum.body, { id: 'prep-2' });
+
+    assert.equal(calls[0].userId, u);
+    assert.deepEqual(calls[0].targets, {
+      allow_user_chats: true,
+      allow_bot_chats: false,
+      allow_group_chats: true,
+      allow_channel_chats: false,
+    });
+    const content = calls[0].result.input_message_content;
+    assert.equal(calls[0].result.type, 'article');
+    assert.equal(content.parse_mode, 'HTML');
+    assert.match(content.message_text, /Поездка/);
+    assert.match(content.message_text, /Маша/);
+    assert.equal(calls[1].result.input_message_content.parse_mode, undefined);
+    assert.match(calls[1].result.input_message_content.message_text, /Итоги «Поездка»/);
+  } finally {
+    botModule.setBotTestHooks({ chatMember: async () => 'administrator' });
+  }
+});
+
+test('share: non-member 404, demo group 409, bad kind 400, bot unavailable 503, Bot API error 503', async () => {
+  const u = newUser();
+  const g = await createGroup(u);
+  botModule.setBotTestHooks({ prepareShare: async () => 'x' });
+  try {
+    assert.equal((await call(newUser(), 'POST', `/groups/${g.id}/share`, { kind: 'balance' })).status, 404);
+    const demo = await call(u, 'POST', '/demo');
+    assert.equal((await call(u, 'POST', `/groups/${demo.body.id}/share`, { kind: 'balance' })).status, 409);
+    assert.equal((await call(u, 'POST', `/groups/${g.id}/share`, { kind: 'nope' })).status, 400);
+    botModule.setBotTestHooks({
+      prepareShare: async () => {
+        throw new Error('boom');
+      },
+    });
+    assert.equal((await call(u, 'POST', `/groups/${g.id}/share`, { kind: 'balance' })).status, 503);
+    botModule.setBotTestHooks(); // no hook, no bot token
+    const res = await call(u, 'POST', `/groups/${g.id}/share`, { kind: 'balance' });
+    assert.equal(res.status, 503);
+    assert.match(res.body.error, /Бот/);
+  } finally {
+    botModule.setBotTestHooks({ chatMember: async () => 'administrator' });
+  }
+});

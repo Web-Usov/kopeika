@@ -286,6 +286,8 @@ export const api = {
   deleteGroup: (id: number) => request('DELETE', `/groups/${id}`),
   archiveGroup: (id: number) => request<GroupDetail>('POST', `/groups/${id}/archive`),
   unarchiveGroup: (id: number) => request<GroupDetail>('POST', `/groups/${id}/unarchive`),
+  prepareShare: (id: number, kind: 'balance' | 'summary') =>
+    request<{ id: string }>('POST', `/groups/${id}/share`, { kind }),
   exportGroup: (id: number) => request<{ ok: true }>('POST', `/groups/${id}/export`),
   rotateInvite: (id: number) => request<GroupDetail>('POST', `/groups/${id}/invite/rotate`),
   removeMember: (id: number, memberId: number) =>
