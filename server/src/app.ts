@@ -3,6 +3,7 @@ import path from 'node:path';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
 import { api } from './api.ts';
+import { config } from './config.ts';
 import { privacyLang, renderPrivacyHtml, renderTermsHtml } from './privacy.ts';
 import { sha, version } from './version.ts';
 
@@ -35,7 +36,7 @@ export function createApp(staticDir: string) {
   app.get('/privacy', (c) => {
     const lang = privacyLang(c.req.query('lang'), c.req.header('accept-language'));
     c.header('Cache-Control', 'no-cache');
-    return c.html(renderPrivacyHtml(lang));
+    return c.html(renderPrivacyHtml(lang, config.receiptsProvider));
   });
   // Public Terms of Service: same idea.
   app.get('/terms', (c) => {

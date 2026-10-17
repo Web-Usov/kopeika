@@ -394,7 +394,11 @@ export const en: Dict = {
     photoTooLarge: 'The photo is too large even after shrinking. Try another one.',
     consentTitle: 'Send the photo for recognition?',
     consentText:
+      'The photo goes to an external recognition service; the privacy policy says which one. We don’t keep it: it stays in memory only while the receipt is being read. We ask once.',
+    consentTextAnthropic:
       'The photo goes to a recognition service (Claude by Anthropic). We don’t keep it: it stays in memory only while the receipt is being read. We ask once.',
+    consentTextOpenrouter:
+      'The photo goes through the OpenRouter service to the company that runs the recognition model. We don’t keep it: it stays in memory only while the receipt is being read. We ask once.',
     consentPolicy: 'Privacy policy',
     consentSend: 'I agree, send it',
     consentError: 'Couldn’t save your consent. Try again.',
