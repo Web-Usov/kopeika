@@ -54,6 +54,7 @@ npm run dev:web      # Vite :5173, проксирует /api
 ## Процесс
 
 - Задачи — GitHub Issues с этапами (milestones). Формат задачи: Зачем / Что сделать / Где в коде / Вне рамок / Готово, когда. Метка `agent-ready` — задачу можно брать без уточнений; `needs-info` — сначала нужен человек.
+- План и решения владельца — [docs/roadmap.md](docs/roadmap.md); читать перед новой задачей.
 - Одна задача — одна ветка (`feat/…`, `fix/…`, `chore/…`) и один PR с `Closes #N`. В `main` напрямую не пушить: он защищён, слияние — squash после зелёного CI.
 - CI (`.github/workflows/docker.yml`): `npm run check` (Biome + typecheck + тесты), затем сборка образа. Пуш в `main` публикует `ghcr.io/web-usov/kopeika:latest` — это продакшен.
 - Перед PR: `npm run check`; если менялся UI — проверить в браузере по инструкции выше.
