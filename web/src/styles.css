@@ -1151,3 +1151,36 @@ select.field {
 .quick-hint {
   margin-top: 6px;
 }
+
+.chips.wrap {
+  flex-wrap: wrap;
+  overflow: visible;
+  padding: 0;
+}
+
+.chip.dashed {
+  border: 1px dashed var(--hint);
+}
+
+.row.assign-item {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.assign-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.assign-amount {
+  font-weight: 600;
+  flex: none;
+}
+
+.row.assign-item.unassigned .assign-head {
+  color: var(--destructive, #e53935);
+}

@@ -15,8 +15,9 @@ import { lang, t } from '../i18n.ts';
 import { getReceiptDraft, setReceiptDraft } from '../receiptDraft.ts';
 import { PhotoError, type PreparedPhoto, prepareReceiptPhoto } from '../receiptPhoto.ts';
 import { navigate } from '../router.ts';
-import { BackButton, haptic, MainButton } from '../tg.tsx';
+import { BackButton, haptic, MainButton, openLink } from '../tg.tsx';
 import { ErrorView, Loading, Money, Section, todayIso } from '../ui.tsx';
+import { ReceiptAssign } from './ReceiptAssign.tsx';
 
 type Stage =
   | { kind: 'pick' }
@@ -132,21 +133,9 @@ function Flow({ g }: { g: GroupDetail }) {
 
   if (stage.kind === 'next') {
     const draft = getReceiptDraft(g.id);
-    return (
-      <>
-        <h2 className="page-title">{t('receipt.title')}</h2>
-        <Section>
-          <div className="row hint">{t('receipt.nextBody')}</div>
-        </Section>
-        <button
-          type="button"
-          className="text-btn"
-          onClick={() => setStage({ kind: 'edit', parsed: draft ? draftToParsed(draft) : null })}
-        >
-          {t('receipt.nextBack')}
-        </button>
-      </>
-    );
+    const back = () => setStage({ kind: 'edit', parsed: draft ? draftToParsed(draft) : null });
+    if (!draft) return <DraftEditor g={g} initial={null} onNext={() => setStage({ kind: 'next' })} />;
+    return <ReceiptAssign g={g} draft={draft} onBack={back} />;
   }
 
   if (stage.kind === 'reading')
@@ -167,7 +156,11 @@ function Flow({ g }: { g: GroupDetail }) {
         <h2 className="page-title">{t('receipt.consentTitle')}</h2>
         <Section>
           <p className="row receipt-consent">{t('receipt.consentText')}</p>
-          <button type="button" className="row clickable link" onClick={() => navigate('/privacy')}>
+          <button
+            type="button"
+            className="row clickable link"
+            onClick={() => openLink(`${window.location.origin}/privacy?lang=${lang}`)}
+          >
             {t('receipt.consentPolicy')}
           </button>
         </Section>

@@ -77,7 +77,7 @@ function initialParticipants(g: GroupDetail, e?: Expense): Record<number, Partic
 }
 
 /** "12 октября" (with the year if it is not the current one) for the rate caption. */
-function rateDay(iso: string): string {
+export function rateDay(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number);
   return new Intl.DateTimeFormat(dateLocale, {
     day: 'numeric',
@@ -87,7 +87,7 @@ function rateDay(iso: string): string {
 }
 
 /** Rate for the input and the caption: a decimal comma in Russian. */
-const showRate = (rate: string) => (lang === 'ru' ? rate.replace('.', ',') : rate);
+export const showRate = (rate: string) => (lang === 'ru' ? rate.replace('.', ',') : rate);
 
 type RateInfo = { status: 'idle' | 'loading' | 'ok' | 'error'; date?: string; error?: string };
 
