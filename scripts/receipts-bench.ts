@@ -1,20 +1,21 @@
 // Receipt-recognition benchmark over a folder of your own photos (never commit them). Not part of CI:
-//   OPENROUTER_API_KEY=... npx tsx scripts/receipts-bench.ts <photos-dir> [--models a,b,c] [--currency RUB] [--runs 1]
+//   OPENROUTER_API_KEY=... [RECEIPTS_REASONING=none] npx tsx scripts/receipts-bench.ts <photos-dir>
+//     [--models a,b,c] [--currency RUB] [--runs 1] [--reasoning none|minimal|low|medium|omit]
 // Prints, per model: share of receipts whose lines add up to the printed total (the app's own normalization),
 // tokens, latency p50/p95 and price per scan (prices come from the /models list of the API; n/a if unknown).
 import fs from 'node:fs';
 import path from 'node:path';
 
-const { config } = await import('../server/src/config.ts');
+const { config, parseReasoning } = await import('../server/src/config.ts');
 const { openrouterProvider } = await import('../server/src/receipts/openrouter.ts');
 const { normalizeReceipt, ReceiptContentError } = await import('../server/src/receipts/normalize.ts');
 const { ReceiptProviderError } = await import('../server/src/receipts/provider.ts');
 
 const DEFAULT_MODELS = [
+  'qwen/qwen3.5-35b-a3b',
+  'qwen/qwen3.6-35b-a3b',
+  'inclusionai/ling-3.0-flash-vl',
   'google/gemma-4-26b-a4b-it',
-  'google/gemma-4-31b-it',
-  'mistralai/mistral-small-3.2-24b-instruct',
-  'qwen/qwen3.5-flash-02-23',
 ];
 const MEDIA = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' } as const;
 
@@ -25,7 +26,9 @@ const flag = (name: string) => {
 };
 const dir = args.find((a, i) => !a.startsWith('--') && !args[i - 1]?.startsWith('--'));
 if (!dir) {
-  console.error('Usage: npx tsx scripts/receipts-bench.ts <photos-dir> [--models a,b] [--currency RUB] [--runs 1]');
+  console.error(
+    'Usage: npx tsx scripts/receipts-bench.ts <photos-dir> [--models a,b] [--currency RUB] [--runs 1] [--reasoning none]',
+  );
   process.exit(1);
 }
 if (!config.openrouterApiKey) {
@@ -38,6 +41,9 @@ const models =
     .map((s) => s.trim())
     .filter(Boolean) ?? DEFAULT_MODELS;
 const currency = flag('currency') ?? 'RUB';
+const reasoning = flag('reasoning')
+  ? parseReasoning('--reasoning', flag('reasoning'), config.receiptsReasoning)
+  : config.receiptsReasoning;
 const runs = Math.max(1, Number(flag('runs') ?? 1));
 const timeoutMs = config.receiptsTimeoutSec * 1000;
 
@@ -77,6 +83,7 @@ const pct = (xs: number[], p: number) => {
 };
 const fmt = (n: number, d = 0) => (Number.isFinite(n) ? n.toFixed(d) : 'n/a');
 
+console.error(`# reasoning: ${reasoning}`);
 const prices = await loadPrices();
 const rows: string[][] = [];
 for (const model of models) {
@@ -96,7 +103,7 @@ for (const model of models) {
       try {
         const { draft, usage } = await openrouterProvider.parseReceipt(
           { mediaType, base64 },
-          { model, timeoutMs, hintCurrency: currency },
+          { model, timeoutMs, hintCurrency: currency, reasoning },
         );
         lat.push(performance.now() - t0);
         tin.push(usage.inputTokens);

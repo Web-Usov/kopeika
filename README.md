@@ -92,9 +92,11 @@ docker compose pull && docker compose up -d
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | адрес API; для своего vLLM укажите его |
 | `OPENROUTER_PROVIDERS` | пусто | через запятую: хостеры OpenRouter, которым разрешено отвечать (`provider.only`) |
 | `ANTHROPIC_BASE_URL` | пусто | адрес прокси или шлюза до API (необязательно) |
-| `RECEIPTS_MODEL` | `claude-haiku-5-5` (`google/gemma-4-26b-a4b-it` для openrouter) | модель, читающая чек |
-| `RECEIPTS_FALLBACK_MODEL` | пусто (без каскада) | модель посильнее; её один раз спрашивают, если позиции не сходятся с итогом |
-| `RECEIPTS_TIMEOUT_SEC` | `30` | таймаут одного запроса к провайдеру |
+| `RECEIPTS_MODEL` | `claude-haiku-5-5` (`qwen/qwen3.5-35b-a3b` для openrouter) | модель, читающая чек |
+| `RECEIPTS_FALLBACK_MODEL` | Anthropic: пусто (без каскада); openrouter: та же модель | вторая ступень каскада, её один раз спрашивают, если позиции не сходятся с итогом. Для openrouter пусто = та же модель с `RECEIPTS_FALLBACK_REASONING`; имя модели = она; `none` = без каскада |
+| `RECEIPTS_REASONING` | `none` | только openrouter: рассуждения первого запроса: `none`, `minimal`, `low`, `medium` или `omit` (поле `reasoning` не отправляется, для моделей без этого параметра). Неизвестное значение = по умолчанию и предупреждение при старте |
+| `RECEIPTS_FALLBACK_REASONING` | `low` | только openrouter: рассуждения второй ступени каскада, значения те же |
+| `RECEIPTS_TIMEOUT_SEC` | `30` (`45` для openrouter) | таймаут одного запроса к провайдеру |
 
 Фото принимается как JSON `{ "image": "<base64>", "mediaType": "image/jpeg|image/webp|image/png" }` (до ~3 МБ тела; клиент заранее уменьшает снимок) и живёт только в памяти на время запроса: на диск и в логи не попадает. Ответ — черновик `{ merchant, date, currency, items[{id, name, quantity?, amount}], adjustments[{kind, label, amount, percent}], total, mismatch, confidence, warnings }`; суммы в минимальных единицах валюты чека, `mismatch: true`, если позиции с надбавками не сходятся с напечатанным итогом. API выбранного провайдера должен быть доступен с сервера приложения. Перед первым сканом приложение спрашивает согласие (`users.receipt_consent_at`). В демо-группе чеки выключены.
 
@@ -108,10 +110,10 @@ docker compose pull && docker compose up -d
 | `RECEIPTS_GROUP_TRIAL_MONTHLY` | `5` | пробных сканов на группу в месяц, пока у группы нет права `receipts` |
 | `RECEIPTS_USER_PER_MIN` | `3` | запросов распознавания на пользователя в минуту |
 | `RECEIPTS_GLOBAL_MONTHLY_USD` | `10` | общий потолок расхода в месяц, $ |
-| `RECEIPTS_PRICE_IN_USD_PER_M` | `0.1` | цена входных токенов, $ за 1 млн (для расчёта стоимости; одна на все модели, при каскаде задайте под свою; для Gemma 4 26B A4B ≈ `0.07`) |
-| `RECEIPTS_PRICE_OUT_USD_PER_M` | `0.5` | цена выходных токенов, $ за 1 млн (для Gemma 4 26B A4B ≈ `0.23`) |
+| `RECEIPTS_PRICE_IN_USD_PER_M` | `0.1` (`0.15` для openrouter) | цена входных токенов, $ за 1 млн (для расчёта стоимости; одна на все модели, при каскаде другой моделью задайте под свою; значение по умолчанию для openrouter — Qwen3.5-35B-A3B) |
+| `RECEIPTS_PRICE_OUT_USD_PER_M` | `0.5` (`1.0` для openrouter) | цена выходных токенов, $ за 1 млн |
 
-Замер качества на своих фото (не коммитить): `OPENROUTER_API_KEY=… npx tsx scripts/receipts-bench.ts <папка> [--models a,b]` печатает долю чеков со сходящейся суммой, токены, задержку p50/p95 и цену за 1000 сканов.
+Замер качества на своих фото (не коммитить): `OPENROUTER_API_KEY=… [RECEIPTS_REASONING=none] npx tsx scripts/receipts-bench.ts <папка> [--models a,b] [--reasoning none|minimal|low|medium|omit]` печатает долю чеков со сходящейся суммой, токены, задержку p50/p95 и цену за 1000 сканов.
 
 Конфиденциальность: фото уходит выбранному провайдеру (Anthropic или через OpenRouter к хостеру модели) только на время запроса и у нас не хранится, позиции не сохраняются, учитывается лишь число сканов и стоимость; при «Удалить мои данные» согласие удаляется, а записи о сканах отвязываются от человека (остаются обезличенно как учёт расхода для месячного бюджета). Текст политики (`/privacy` и экран в приложении) и экрана согласия зависит от `RECEIPTS_PROVIDER`: называет того, кто получает фото, и пересказывает его правила хранения по официальной документации (для OpenRouter — запрос с `provider.data_collection: 'deny'`). Политика обещает, что в аккаунте OpenRouter выключены запись запросов и использование их для улучшения продукта (Settings → Privacy) — держите их выключенными. С `OPENROUTER_BASE_URL` на свой сервер текст про OpenRouter неверен — поправьте `shared/privacy.ts`. Перед включением функции или сменой провайдера в продакшене проверьте, что `shared/privacy.ts` (ru/en) отражает фактическое поведение. Подробности: `docs/specs/receipts.md`.
 
