@@ -12,7 +12,7 @@ import {
 import { t } from '../i18n.ts';
 import { scheduleText, shortDate } from '../recurring.ts';
 import { navigate } from '../router.ts';
-import { alertDialog, BackButton, confirmDialog, haptic, shareLink } from '../tg.tsx';
+import { alertDialog, BackButton, canRequestChat, confirmDialog, haptic, requestChat, shareLink } from '../tg.tsx';
 import { Avatar, ErrorView, Loading, Money, Row, Section, Segmented } from '../ui.tsx';
 import { PaymentForm } from './PaymentForm.tsx';
 
@@ -104,6 +104,37 @@ function SettingsView({ g }: { g: GroupDetail }) {
     if (!g.chat || !(await confirmDialog(t('settings.confirmUnlinkChat', { title: g.chat.title })))) return;
     await run(() => api.unlinkChat(g.id));
   };
+
+  // The picker hands the chat to the bot, not to the app: after it closes, reload the group until the link shows up
+  // (and once more when the app regains focus, in case the bot was slow).
+  const [waitingChat, setWaitingChat] = useState(false);
+  const pickChat = async () => {
+    setWaitingChat(true);
+    try {
+      const { id } = await api.prepareChatRequest(g.id);
+      if (!(await requestChat(id))) return;
+      for (let i = 0; i < 10; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        if ((await api.reloadGroup(g.id)).chat) {
+          haptic.success();
+          return;
+        }
+      }
+      await alertDialog(t('settings.chatPickLater'));
+    } catch (e) {
+      haptic.error();
+      await alertDialog((e as Error).message);
+    } finally {
+      setWaitingChat(false);
+    }
+  };
+  useEffect(() => {
+    const onFocus = () => {
+      if (!g.chat) void api.reloadGroup(g.id).catch(() => undefined);
+    };
+    document.addEventListener('visibilitychange', onFocus);
+    return () => document.removeEventListener('visibilitychange', onFocus);
+  }, [g.id, g.chat]);
 
   const toggleArchive = async () => {
     if (!g.archived && !(await confirmDialog(t('settings.confirmArchive', { name: g.name })))) return;
@@ -209,7 +240,12 @@ function SettingsView({ g }: { g: GroupDetail }) {
               />
             </>
           ) : (
-            <div className="row hint">{t('settings.chatNone')}</div>
+            <>
+              <div className="row hint">{waitingChat ? t('settings.chatPickWaiting') : t('settings.chatNone')}</div>
+              {canRequestChat() && (
+                <Row title={t('settings.chatPick')} onClick={waitingChat ? undefined : () => void pickChat()} />
+              )}
+            </>
           )}
         </Section>
       )}

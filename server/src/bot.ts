@@ -5,8 +5,10 @@ import { formatMoney } from '../../shared/money.ts';
 import { checkCommand, checkInline } from './botLimits.ts';
 import {
   type ChatMessage,
+  type ChatSharedResult,
   createChatLink,
   groupOfChat,
+  handleChatShared,
   linkedMessage,
   migrateChat,
   unlinkChat,
@@ -54,13 +56,82 @@ export type ChatMemberLookup = (chatId: number, userId: number) => Promise<strin
 
 export type PrepareShare = (userId: number, result: InlineQueryResult, targets: SharePermissions) => Promise<string>;
 
+export type PrepareChatButton = (userId: number, requestId: number, lang: Lang) => Promise<string>;
+
 let chatMemberLookup: ChatMemberLookup | null = null;
 let prepareShareHook: PrepareShare | null = null;
+let prepareChatButtonHook: PrepareChatButton | null = null;
 
-/** Tests replace the Bot API calls (user's role in a chat, savePreparedInlineMessage). Call with no argument to reset. */
-export function setBotTestHooks(hooks: { chatMember?: ChatMemberLookup; prepareShare?: PrepareShare } = {}) {
+/**
+ * Tests replace the Bot API calls (user's role in a chat, savePreparedInlineMessage, savePreparedKeyboardButton).
+ * Call with no argument to reset.
+ */
+export function setBotTestHooks(
+  hooks: { chatMember?: ChatMemberLookup; prepareShare?: PrepareShare; prepareChatButton?: PrepareChatButton } = {},
+) {
   chatMemberLookup = hooks.chatMember ?? null;
   prepareShareHook = hooks.prepareShare ?? null;
+  prepareChatButtonHook = hooks.prepareChatButton ?? null;
+}
+
+/** True when a chat picker can be offered: the bot is up (or tests replaced the call). */
+export function canRequestChat(): boolean {
+  return Boolean(prepareChatButtonHook) || Boolean(bot && botReady);
+}
+
+// Rights the bot asks for when Telegram adds it to the picked chat: the minimum to be an admin at all, plus invites
+// (for the "join the group" link). The user must hold the same rights, which also filters out non-admins early.
+const BOT_RIGHTS = {
+  is_anonymous: false,
+  can_manage_chat: true,
+  can_delete_messages: false,
+  can_manage_video_chats: false,
+  can_restrict_members: false,
+  can_promote_members: false,
+  can_change_info: false,
+  can_invite_users: true,
+  can_post_stories: false,
+  can_edit_stories: false,
+  can_delete_stories: false,
+  can_send_welcome_messages: false,
+};
+
+/**
+ * savePreparedKeyboardButton: a «pick a group chat» button for WebApp.requestChat(id). The pick comes back to the bot
+ * as chat_shared with `requestId`. Returns null when the bot isn't available. Throws if Telegram refuses.
+ */
+export async function prepareChatButton(userId: number, requestId: number, lang: Lang): Promise<string | null> {
+  if (prepareChatButtonHook) return prepareChatButtonHook(userId, requestId, lang);
+  if (!bot || !botReady) return null;
+  const button = {
+    text: createT(lang)('bot.chatRequestButton'),
+    request_chat: {
+      request_id: requestId,
+      chat_is_channel: false,
+      user_administrator_rights: BOT_RIGHTS,
+      bot_administrator_rights: BOT_RIGHTS,
+      request_title: true,
+    },
+  };
+  return (await bot.api.savePreparedKeyboardButton(userId, button)).id;
+}
+
+/** The private-chat reply to a chat_shared attempt. */
+export function chatSharedReply(lang: Lang, result: ChatSharedResult, chatTitle: string, botName: string): string {
+  const t = createT(lang);
+  if (result.ok) return t('bot.chatSharedLinked', { chat: chatTitle, name: result.group.name });
+  switch (result.problem) {
+    case 'notAdmin':
+      return t('bot.chatSharedNotAdmin');
+    case 'botMissing':
+      return t('bot.chatSharedBotMissing', { bot: botName });
+    case 'expired':
+      return t('bot.chatSharedExpired');
+    case 'unavailable':
+      return t('bot.chatSharedUnavailable');
+    default:
+      return t('bot.chatSharedInvalid');
+  }
 }
 
 /** True when a card can be prepared for sharing: the bot is up (or tests replaced the call). */
@@ -202,6 +273,23 @@ function registerChatHandlers(b: Bot) {
     } else if (member.status === 'left' || member.status === 'kicked') {
       unlinkChat(chat.id, from.id);
     }
+  });
+
+  // The user picked a chat in the Mini App picker (WebApp.requestChat): the bot gets it in the private chat.
+  b.on('message:chat_shared', async (ctx) => {
+    if (ctx.chat.type !== 'private' || !ctx.from) return;
+    upsertUser(ctx.from);
+    const shared = ctx.message.chat_shared;
+    const lang = pickLang(ctx.from.language_code);
+    const title = shared.title?.trim() || String(shared.chat_id);
+    const result = await handleChatShared(
+      { userId: ctx.from.id, botId: b.botInfo.id, requestId: shared.request_id, chatId: shared.chat_id, title },
+      chatMemberStatus,
+    );
+    await ctx
+      .reply(chatSharedReply(lang, result, title, botUsername), { reply_markup: { remove_keyboard: true } })
+      .catch((e) => logTelegramError('chat_shared reply failed', e));
+    if (result.ok) notifyChatLinked(shared.chat_id, result.group, lang);
   });
 
   b.on('message:migrate_to_chat_id', (ctx) => {
