@@ -7,6 +7,7 @@ import { localDate } from './recurring.ts';
 
 export const STAT_EVENTS = [
   'group.create',
+  'group.finish',
   'expense.create',
   'expense.recurring',
   'transfer.create',

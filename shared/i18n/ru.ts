@@ -20,6 +20,9 @@ export const ru = {
     add: 'Добавить',
     version: 'Копейка {version}',
     errorStatus: 'Ошибка {status}',
+    crashTitle: 'Что-то пошло не так',
+    crashText: 'Мы уже знаем об ошибке. Обновите приложение — ваши данные на месте.',
+    crashReload: 'Обновить',
     members: { one: '{count} участник', few: '{count} участника', many: '{count} участников' },
   },
   home: {
@@ -79,6 +82,9 @@ export const ru = {
   group: {
     totalSpent: 'Всего потрачено {amount}',
     settled: 'Вы в расчёте',
+    allSettledBanner: 'Все в расчёте 🎉 Завершить поездку?',
+    finish: 'Завершить',
+    finishLater: 'Не сейчас',
     owedToYou: 'Вам должны {amount}',
     youOwe: 'Вы должны {amount}',
     tileInvite: 'Позвать',
@@ -283,6 +289,11 @@ export const ru = {
     unarchiveGroup: 'Вернуть из архива',
     archiveFooter: 'Архивная группа прячется с главного экрана. Новая трата вернёт её обратно.',
     confirmArchive: 'Архивировать группу «{name}»? Её можно вернуть из архива.',
+    finishTrip: 'Завершить поездку',
+    finishFooter: 'Группа уйдёт в архив, а в привязанный чат бот пришлёт итоги.',
+    confirmFinish: 'Завершить поездку «{name}»? Группа уйдёт в архив, её можно вернуть.',
+    confirmFinishUnsettled:
+      'Не все рассчитались. Всё равно завершить поездку «{name}»? Группа уйдёт в архив, её можно вернуть.',
     leaveGroup: 'Выйти из группы',
     confirmLeave:
       'Выйти из группы «{name}»? Ваше имя и траты останутся у остальных, но вы перестанете видеть группу. Вернуться можно по ссылке-приглашению.',
@@ -551,6 +562,14 @@ export const ru = {
       many: '{count} трат на {amount}',
     },
     digestChanged: 'траты менялись',
+    finishHead: 'Поездка «{name}» завершена',
+    finishTotal: 'Потрачено всего: {amount} · {days}',
+    finishDays: { one: '{count} день', few: '{count} дня', many: '{count} дней' },
+    finishMembers: 'Кто сколько потратил',
+    finishBiggest: 'Самая крупная трата: «{title}», {amount} ({payer})',
+    finishAchievements: 'Ачивки',
+    finishFooter: 'Все в расчёте.',
+    finishOpen: 'Открыть итоги',
     balanceTitle: 'Всего потрачено: {total}',
     balanceMembers: 'Балансы',
     balanceSettle: 'Как рассчитаться',
@@ -612,6 +631,10 @@ export const ru = {
     accessUserRejected:
       'Пока не можем открыть разбор чеков для группы «{group}». Попробуйте попросить ещё раз через сутки.',
     budgetWarn: 'Разбор чеков: потрачено {spent} из {cap} USD в этом месяце (80%).',
+    errorAlert: '⚠️ Ошибка ({where}): {message}\nГде: {at}\nВерсия: {version}',
+    errorAlertRepeat: '\nСлучаев с прошлого сообщения: {count}',
+    errorWhereServer: 'сервер',
+    errorWhereClient: 'приложение',
     budgetStop: 'Разбор чеков: потолок {cap} USD в месяц исчерпан, функция выключена до следующего месяца.',
   },
   stats: {
@@ -631,6 +654,7 @@ export const ru = {
     weeklyTitle: 'Итоги недели',
     event: {
       group_create: 'Групп создано',
+      group_finish: 'Поездок завершено',
       expense_create: 'Трат добавлено',
       expense_recurring: 'Регулярных трат создано',
       transfer_create: 'Переводов отмечено',

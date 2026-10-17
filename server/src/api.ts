@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
 import { categoryTotals, DEFAULT_CATEGORY } from '../../shared/categories.ts';
+import { CLIENT_ERROR_LIMITS, routePattern, scrubText, stackHead } from '../../shared/clientError.ts';
 import { createT, type Lang, pickLang, type TFn } from '../../shared/i18n/index.ts';
 import { startParamFor } from '../../shared/invite.ts';
 import { CURRENCIES, SplitError } from '../../shared/money.ts';
@@ -10,6 +11,7 @@ import { firstOccurrence } from '../../shared/recurring.ts';
 import { groupSummary, summaryShareText } from '../../shared/summary.ts';
 import { deleteAccount, eraseGroup, leaveGroup } from './account.ts';
 import { expenseSnapshot, listActivity, logActivity } from './activity.ts';
+import { alerter, reportServerError } from './alerts.ts';
 import { type TelegramUser, validateInitData } from './auth.ts';
 import {
   appLink,
@@ -23,6 +25,7 @@ import {
   notifyExpenseChange,
   notifyMemberRemoved,
   notifyRemind,
+  notifyTripFinished,
   prepareChatButton,
   prepareShare,
   sendExportFile,
@@ -95,6 +98,7 @@ api.onError((err, c) => {
   // A Telegram error would drag the request payload (message text) into the log.
   if (err instanceof GrammyError || err instanceof HttpError) logTelegramError('API request failed', err);
   else console.error(err);
+  void reportServerError(err);
   return c.json({ error: t('errors.internal') }, 500);
 });
 
@@ -137,6 +141,51 @@ api.use('*', async (c, next) => {
 
 // Exchange rates hit an external service, so they get a stricter limit of their own.
 export const ratesLimiter = createRateLimiter({ limit: config.ratesLimitPerMin });
+
+// Error reports from the Mini App: a small body, a strict schema, a limit of their own. No personal data is kept:
+// anything beyond the listed fields is refused, text is scrubbed (no query strings, no launch params) and cut.
+export const clientErrorsLimiter = createRateLimiter({ limit: 10 });
+const cut = (max: number) =>
+  z
+    .string()
+    .transform((s) => scrubText(s).slice(0, max))
+    .pipe(z.string().min(1));
+const clientErrorBody = z
+  .object({
+    kind: z.enum(['error', 'rejection', 'render']),
+    message: cut(CLIENT_ERROR_LIMITS.message),
+    stack: z
+      .string()
+      .optional()
+      .transform((s) => stackHead(s)),
+    route: z.string().transform((s) => routePattern(s)),
+    version: cut(CLIENT_ERROR_LIMITS.short),
+    platform: cut(CLIENT_ERROR_LIMITS.short),
+    tgVersion: cut(CLIENT_ERROR_LIMITS.short),
+  })
+  .strict();
+
+api.post(
+  '/client-errors',
+  bodyLimit({ maxSize: 8 * 1024, onError: (c) => c.json({ error: 'Payload too large' }, 413) }),
+  async (c) => {
+    if (!clientErrorsLimiter.allow(c.get('user').id)) throw fail(429, 'errors.tooMany');
+    const r = clientErrorBody.parse(await c.req.json());
+    console.warn(`client error ${JSON.stringify(r)}`);
+    void alerter.report({
+      source: 'client',
+      message: r.message,
+      at: `${
+        r.stack
+          .split('\n')
+          .find((l) => /^\s*at\s|@/.test(l))
+          ?.trim() ?? '-'
+      }\n${r.route} · ${r.platform} · tg ${r.tgVersion}`,
+      version: r.version,
+    });
+    return c.body(null, 204);
+  },
+);
 
 const idParam = (v: string | undefined) => {
   const n = Number(v);
@@ -306,12 +355,18 @@ api.post('/groups/:id/export', async (c) => {
   return c.json({ ok: true });
 });
 
+// Finishing a trip is archiving: the first archive call (not a repeat) counts the event and posts the summary card.
 api.post('/groups/:id/archive', (c) => {
   const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
+  const finishing = group.archived_at === null;
   tx(() => {
-    if (group.archived_at === null) logActivity(group.id, c.get('user').id, 'group.archive', {});
+    if (finishing) {
+      logActivity(group.id, c.get('user').id, 'group.archive', {});
+      if (!group.is_demo) countEvent('group.finish');
+    }
     run("UPDATE groups SET archived_at = COALESCE(archived_at, datetime('now')) WHERE id = ?", group.id);
   });
+  if (finishing) notifyTripFinished(group, c.get('lang'));
   return c.json(detail({ ...group, archived_at: group.archived_at ?? 'now' }, me));
 });
 

@@ -17,6 +17,7 @@ import {
 } from '../api.ts';
 import { Celebration } from '../Celebration.tsx';
 import { applySavedGroup } from '../celebration.ts';
+import { dismissFinishOffer, finishOfferDismissed, finishTrip, isAllSettled } from '../finish.ts';
 import { dateLocale, lang, rich, t } from '../i18n.ts';
 import { setQuickDraft } from '../quickDraft.ts';
 import { navigate } from '../router.ts';
@@ -56,6 +57,7 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
     <div className="page">
       {back}
       {g.isDemo && <DemoBanner g={g} />}
+      {!g.isDemo && !g.archived && isAllSettled(g) && <FinishBanner g={g} />}
       <header className="group-header">
         <button
           type="button"
@@ -120,6 +122,32 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
 
       <MainButton text={t('group.addExpense')} onClick={() => navigate(`/g/${g.id}/expense/new`)} />
       <Celebration groupId={g.id} />
+    </div>
+  );
+}
+
+/** «Everyone is settled up. Finish the trip?»; «Not now» hides it until the next entry in the group. */
+function FinishBanner({ g }: { g: GroupDetail }) {
+  const [, rerender] = useState(0);
+  if (finishOfferDismissed(g)) return null;
+  return (
+    <div className="banner finish-banner">
+      <div>{t('group.allSettledBanner')}</div>
+      <div className="banner-actions">
+        <button type="button" className="chip finish-yes" onClick={() => void finishTrip(g)}>
+          {t('group.finish')}
+        </button>
+        <button
+          type="button"
+          className="chip"
+          onClick={() => {
+            dismissFinishOffer(g);
+            rerender((n) => n + 1);
+          }}
+        >
+          {t('group.finishLater')}
+        </button>
+      </div>
     </div>
   );
 }

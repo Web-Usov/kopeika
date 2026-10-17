@@ -79,6 +79,8 @@ export const config = {
   }),
   /** Telegram ids (comma-separated) that may use /stats in a private chat with the bot. Empty = nobody. */
   adminUserIds: parseAdminIds(env.ADMIN_USER_IDS),
+  /** Tell ADMIN_USER_IDS in a private message about server and app errors. ERROR_ALERTS=0 turns it off (the log stays). */
+  errorAlerts: (env.ERROR_ALERTS ?? '1').trim() !== '0',
   /** Max API requests per user per minute. */
   rateLimitPerMin: parseNumber('RATE_LIMIT_PER_MIN', env.RATE_LIMIT_PER_MIN, { default: 120, max: 1_000_000 }),
   ratesLimitPerMin: parseNumber('RATES_LIMIT_PER_MIN', env.RATES_LIMIT_PER_MIN, { default: 20, max: 1_000_000 }),
