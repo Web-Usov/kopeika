@@ -1,5 +1,6 @@
 import { config } from '../config.ts';
 import { anthropicProvider } from './anthropic.ts';
+import { openrouterProvider } from './openrouter.ts';
 
 export type ReceiptMediaType = 'image/jpeg' | 'image/webp' | 'image/png';
 
@@ -57,7 +58,10 @@ export function setReceiptProviderForTests(p?: ReceiptProvider) {
   testProvider = p ?? null;
 }
 
-/** The feature is on when a key is configured (or a test provider is injected). */
-export const receiptsEnabled = () => testProvider !== null || config.anthropicApiKey !== '';
+/** The feature is on when the selected provider has a key (or a test provider is injected). */
+export const receiptsEnabled = () =>
+  testProvider !== null ||
+  (config.receiptsProvider === 'openrouter' ? config.openrouterApiKey : config.anthropicApiKey) !== '';
 
-export const getReceiptProvider = (): ReceiptProvider => testProvider ?? anthropicProvider;
+export const getReceiptProvider = (): ReceiptProvider =>
+  testProvider ?? (config.receiptsProvider === 'openrouter' ? openrouterProvider : anthropicProvider);

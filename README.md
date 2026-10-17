@@ -72,13 +72,17 @@ docker compose pull && docker compose up -d
 
 ### Чеки
 
-Распознавание чека по фото (`POST /api/groups/:id/receipts/parse`) работает через Anthropic API. Чтобы включить: задайте `ANTHROPIC_API_KEY` (ключ ваш, не коммитьте). Пока ключ пуст, функция выключена: эндпоинт отвечает 503, а `GET /api/me` отдаёт `receiptsEnabled: false`.
+Распознавание чека по фото (`POST /api/groups/:id/receipts/parse`) работает через Anthropic API или через любой OpenAI-совместимый (OpenRouter, свой vLLM). Чтобы включить: задайте `ANTHROPIC_API_KEY` (ключ ваш, не коммитьте), либо `RECEIPTS_PROVIDER=openrouter` и `OPENROUTER_API_KEY`. Пока ключ выбранного провайдера пуст, функция выключена: эндпоинт отвечает 503, а `GET /api/me` отдаёт `receiptsEnabled: false`.
 
 | Переменная | По умолчанию | Что делает |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | пусто (выключено) | ключ API; не логируется и не отдаётся клиенту |
+| `RECEIPTS_PROVIDER` | `anthropic` | `anthropic` или `openrouter` (OpenAI-совместимый API) |
+| `OPENROUTER_API_KEY` | пусто (выключено) | ключ OpenRouter (или своего сервера); нужен при `RECEIPTS_PROVIDER=openrouter` |
+| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | адрес API; для своего vLLM укажите его |
+| `OPENROUTER_PROVIDERS` | пусто | через запятую: хостеры OpenRouter, которым разрешено отвечать (`provider.only`) |
 | `ANTHROPIC_BASE_URL` | пусто | адрес прокси или шлюза до API (необязательно) |
-| `RECEIPTS_MODEL` | `claude-haiku-5-5` | модель, читающая чек |
+| `RECEIPTS_MODEL` | `claude-haiku-5-5` (`google/gemma-4-26b-a4b-it` для openrouter) | модель, читающая чек |
 | `RECEIPTS_FALLBACK_MODEL` | пусто (без каскада) | модель посильнее; её один раз спрашивают, если позиции не сходятся с итогом |
 | `RECEIPTS_TIMEOUT_SEC` | `30` | таймаут одного запроса к провайдеру |
 
@@ -94,8 +98,10 @@ docker compose pull && docker compose up -d
 | `RECEIPTS_GROUP_TRIAL_MONTHLY` | `5` | пробных сканов на группу в месяц, пока у группы нет права `receipts` |
 | `RECEIPTS_USER_PER_MIN` | `3` | запросов распознавания на пользователя в минуту |
 | `RECEIPTS_GLOBAL_MONTHLY_USD` | `10` | общий потолок расхода в месяц, $ |
-| `RECEIPTS_PRICE_IN_USD_PER_M` | `0.1` | цена входных токенов, $ за 1 млн (для расчёта стоимости; одна на все модели, при каскаде задайте под свою) |
-| `RECEIPTS_PRICE_OUT_USD_PER_M` | `0.5` | цена выходных токенов, $ за 1 млн |
+| `RECEIPTS_PRICE_IN_USD_PER_M` | `0.1` | цена входных токенов, $ за 1 млн (для расчёта стоимости; одна на все модели, при каскаде задайте под свою; для Gemma 4 26B A4B ≈ `0.07`) |
+| `RECEIPTS_PRICE_OUT_USD_PER_M` | `0.5` | цена выходных токенов, $ за 1 млн (для Gemma 4 26B A4B ≈ `0.23`) |
+
+Замер качества на своих фото (не коммитить): `OPENROUTER_API_KEY=… npx tsx scripts/receipts-bench.ts <папка> [--models a,b]` печатает долю чеков со сходящейся суммой, токены, задержку p50/p95 и цену за 1000 сканов.
 
 Конфиденциальность: фото уходит в Anthropic только на время запроса и у нас не хранится, позиции не сохраняются, учитывается лишь число сканов и стоимость; при «Удалить мои данные» согласие удаляется, а записи о сканах отвязываются от человека (остаются обезличенно как учёт расхода для месячного бюджета). Перед включением функции в продакшене проверьте, что `shared/privacy.ts` (ru/en) отражает фактическое поведение. Подробности: `docs/specs/receipts.md`.
 
