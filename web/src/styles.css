@@ -1099,3 +1099,55 @@ select.field {
 .row.clickable.link {
   width: 100%;
 }
+
+/* --- Быстрая трата --- */
+.quick-add {
+  margin: 12px 16px;
+}
+
+.quick-input {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 0.5px solid var(--separator);
+  border-radius: var(--radius);
+  outline: none;
+  background: var(--section-bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.quick-input::placeholder {
+  color: var(--hint);
+}
+
+.quick-input:focus {
+  border-color: var(--button);
+}
+
+.quick-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.quick-chip {
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 6px 10px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--button) 15%, transparent);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.quick-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.quick-hint {
+  margin-top: 6px;
+}

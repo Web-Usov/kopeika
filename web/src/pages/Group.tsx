@@ -2,6 +2,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { type ActivityEntry, activityText } from '../../../shared/activity.ts';
 import { type CategoryId, type CategoryTotal, categoryEmoji, categoryKey } from '../../../shared/categories.ts';
 import { formatMoney } from '../../../shared/money.ts';
+import { parseQuickExpense } from '../../../shared/quickExpense.ts';
 import {
   type ApiError,
   api,
@@ -15,7 +16,9 @@ import {
   useGroup,
 } from '../api.ts';
 import { Celebration } from '../Celebration.tsx';
+import { applySavedGroup } from '../celebration.ts';
 import { dateLocale, lang, rich, t } from '../i18n.ts';
+import { setQuickDraft } from '../quickDraft.ts';
 import { navigate } from '../router.ts';
 import {
   alertDialog,
@@ -29,7 +32,7 @@ import {
   shareLink,
   shareMessage,
 } from '../tg.tsx';
-import { Avatar, ErrorView, formatDay, Loading, Money, Row, Section, Segmented } from '../ui.tsx';
+import { Avatar, ErrorView, formatDay, Loading, Money, Row, Section, Segmented, todayIso } from '../ui.tsx';
 
 export type Tab = 'expenses' | 'balances' | 'history';
 
@@ -155,6 +158,7 @@ function ExpensesTab({ g }: { g: GroupDetail }) {
   if (g.expenses.length === 0) {
     return (
       <>
+        <QuickAdd g={g} />
         <div className="empty">
           <div className="empty-emoji">🧾</div>
           <p>{t('group.noExpenses')}</p>
@@ -171,6 +175,7 @@ function ExpensesTab({ g }: { g: GroupDetail }) {
 
   return (
     <>
+      <QuickAdd g={g} />
       {solo && <InviteHint g={g} />}
       {[...byDay].map(([day, list]) => (
         <Section key={day} title={formatDay(day)}>
@@ -217,6 +222,94 @@ function ExpensesTab({ g }: { g: GroupDetail }) {
       ))}
       {g.hasMoreExpenses && <LoadMore groupId={g.id} />}
     </>
+  );
+}
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** «Быстрая трата»: a line like «1200 такси» becomes an equal-split expense paid by me, or opens the form. */
+function QuickAdd({ g }: { g: GroupDetail }) {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const parsed = parseQuickExpense(text, { lang, groupCurrency: g.currency });
+  const foreign = Boolean(parsed && parsed.currency !== g.currency);
+
+  const edit = () => {
+    if (!parsed) return;
+    setQuickDraft(g.id, { ...parsed, title: capitalize(parsed.title) });
+    navigate(`/g/${g.id}/expense/new`);
+  };
+  const add = async () => {
+    if (!parsed || busy) return;
+    if (foreign) return edit(); // the rate needs a look first
+    setBusy(true);
+    try {
+      const saved = await api.addExpense(g.id, {
+        title: capitalize(parsed.title),
+        amount: parsed.amount,
+        payerId: g.meId,
+        splitMode: 'equal',
+        spentOn: todayIso(),
+        category: parsed.category,
+        shares: g.members.map((m) => ({ memberId: m.id, value: 1 })),
+      });
+      applySavedGroup(saved);
+      haptic.success();
+      setText('');
+    } catch (e) {
+      haptic.error();
+      await alertDialog((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form
+      className="quick-add"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void add();
+      }}
+    >
+      <input
+        className="quick-input"
+        aria-label={t('quick.label')}
+        placeholder={t('quick.placeholder')}
+        value={text}
+        maxLength={140}
+        enterKeyHint="done"
+        onChange={(e) => setText(e.target.value)}
+      />
+      {parsed ? (
+        <div className="quick-preview">
+          <span className="quick-chip">
+            {[
+              `${categoryEmoji(parsed.category)} ${capitalize(parsed.title)}`,
+              formatMoney(parsed.amount, parsed.currency, lang),
+              foreign ? t('quick.foreignTail') : t('quick.tail'),
+            ].join(' · ')}
+          </span>
+          <span className="quick-actions">
+            {!foreign && (
+              <button type="submit" className="small-btn primary" disabled={busy}>
+                {t('quick.add')}
+              </button>
+            )}
+            <button
+              type="button"
+              className={`small-btn ${foreign ? 'primary' : ''}`}
+              disabled={busy}
+              onClick={foreign ? () => void add() : edit}
+            >
+              {foreign ? t('quick.setRate') : t('quick.edit')}
+            </button>
+          </span>
+        </div>
+      ) : (
+        text.trim() && <div className="hint small quick-hint">{t('quick.noAmount')}</div>
+      )}
+    </form>
   );
 }
 

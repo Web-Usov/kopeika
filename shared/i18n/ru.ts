@@ -331,6 +331,16 @@ export const ru = {
     totalBalance: 'Баланс',
     caption: 'Траты группы «{name}»: {count} записей',
   },
+  quick: {
+    label: 'Быстрая трата',
+    placeholder: 'Быстрая трата: 1200 такси',
+    add: 'Добавить',
+    edit: 'Изменить',
+    setRate: 'Указать курс',
+    tail: 'поровну на всех · платили вы',
+    foreignTail: 'курс уточним в форме',
+    noAmount: 'Не вижу сумму. Напишите, например: 1200 такси',
+  },
   expense: {
     titleNew: 'Новая трата',
     titleEdit: 'Трата',

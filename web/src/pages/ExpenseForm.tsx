@@ -22,6 +22,7 @@ import { addDays, isoWeekday, nextOccurrence, type Period } from '../../../share
 import { api, type Expense, type GroupDetail, useExpense, useGroup } from '../api.ts';
 import { applySavedGroup } from '../celebration.ts';
 import { dateLocale, errorText, lang, rich, t } from '../i18n.ts';
+import { clearQuickDraft, peekQuickDraft } from '../quickDraft.ts';
 import { setReceiptDraft } from '../receiptDraft.ts';
 import { scheduleText, shortDate } from '../recurring.ts';
 import { navigate } from '../router.ts';
@@ -137,21 +138,26 @@ function ReceiptEntry({ g }: { g: GroupDetail }) {
 }
 
 function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
-  const [title, setTitle] = useState(expense?.title ?? '');
-  const [currency, setCurrency] = useState(expense?.originalCurrency ?? g.currency);
+  // «Быстрая трата» hands over what it parsed; only a new expense takes it.
+  const [quick] = useState(() => (expense ? undefined : peekQuickDraft(g.id)));
+  useEffect(() => clearQuickDraft(), []);
+  const [title, setTitle] = useState(expense?.title ?? quick?.title ?? '');
+  const [currency, setCurrency] = useState(expense?.originalCurrency ?? quick?.currency ?? g.currency);
   const foreign = currency !== g.currency;
   // An existing foreign expense keeps its saved rate until the currency changes.
   const [rateStr, setRateStr] = useState(expense?.rate ? showRate(expense.rate) : '');
   const [rateManual, setRateManual] = useState(Boolean(expense?.rate));
   const [rateInfo, setRateInfo] = useState<RateInfo>({ status: 'idle' });
-  const [amountStr, setAmountStr] = useState(expense ? amountToInput(expense.originalAmount ?? expense.amount) : '');
+  const [amountStr, setAmountStr] = useState(
+    expense ? amountToInput(expense.originalAmount ?? expense.amount) : quick ? amountToInput(quick.amount) : '',
+  );
   const [payerId, setPayerId] = useState(expense?.payerId ?? g.meId);
   const [spentOn, setSpentOn] = useState(expense?.spentOn ?? todayIso());
   const [mode, setMode] = useState<SplitMode>(expense?.splitMode ?? 'equal');
   const [parts, setParts] = useState(() => initialParticipants(g, expense));
-  const [category, setCategory] = useState<CategoryId>(expense?.category ?? DEFAULT_CATEGORY);
+  const [category, setCategory] = useState<CategoryId>(expense?.category ?? quick?.category ?? DEFAULT_CATEGORY);
   // Until the user picks a category by hand, it follows the title; an existing expense keeps its own.
-  const [categoryPicked, setCategoryPicked] = useState(Boolean(expense));
+  const [categoryPicked, setCategoryPicked] = useState(Boolean(expense || quick));
   const [saving, setSaving] = useState(false);
   // New expenses only: also create a recurring template (same day of month / weekday as the expense date).
   const [repeat, setRepeat] = useState<Period | 'none'>('none');
