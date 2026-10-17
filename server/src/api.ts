@@ -3,12 +3,14 @@ import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
 import { categoryTotals, DEFAULT_CATEGORY } from '../../shared/categories.ts';
+import { CLIENT_ERROR_LIMITS, routePattern, scrubText, stackHead } from '../../shared/clientError.ts';
 import { createT, type Lang, pickLang, type TFn } from '../../shared/i18n/index.ts';
 import { CURRENCIES, SplitError } from '../../shared/money.ts';
 import { firstOccurrence } from '../../shared/recurring.ts';
 import { groupSummary, summaryShareText } from '../../shared/summary.ts';
 import { deleteAccount, eraseGroup, leaveGroup } from './account.ts';
 import { expenseSnapshot, listActivity, logActivity } from './activity.ts';
+import { alerter, reportServerError } from './alerts.ts';
 import { type TelegramUser, validateInitData } from './auth.ts';
 import {
   appLink,
@@ -94,6 +96,7 @@ api.onError((err, c) => {
   // A Telegram error would drag the request payload (message text) into the log.
   if (err instanceof GrammyError || err instanceof HttpError) logTelegramError('API request failed', err);
   else console.error(err);
+  void reportServerError(err);
   return c.json({ error: t('errors.internal') }, 500);
 });
 
@@ -136,6 +139,51 @@ api.use('*', async (c, next) => {
 
 // Exchange rates hit an external service, so they get a stricter limit of their own.
 export const ratesLimiter = createRateLimiter({ limit: config.ratesLimitPerMin });
+
+// Error reports from the Mini App: a small body, a strict schema, a limit of their own. No personal data is kept:
+// anything beyond the listed fields is refused, text is scrubbed (no query strings, no launch params) and cut.
+export const clientErrorsLimiter = createRateLimiter({ limit: 10 });
+const cut = (max: number) =>
+  z
+    .string()
+    .transform((s) => scrubText(s).slice(0, max))
+    .pipe(z.string().min(1));
+const clientErrorBody = z
+  .object({
+    kind: z.enum(['error', 'rejection', 'render']),
+    message: cut(CLIENT_ERROR_LIMITS.message),
+    stack: z
+      .string()
+      .optional()
+      .transform((s) => stackHead(s)),
+    route: z.string().transform((s) => routePattern(s)),
+    version: cut(CLIENT_ERROR_LIMITS.short),
+    platform: cut(CLIENT_ERROR_LIMITS.short),
+    tgVersion: cut(CLIENT_ERROR_LIMITS.short),
+  })
+  .strict();
+
+api.post(
+  '/client-errors',
+  bodyLimit({ maxSize: 8 * 1024, onError: (c) => c.json({ error: 'Payload too large' }, 413) }),
+  async (c) => {
+    if (!clientErrorsLimiter.allow(c.get('user').id)) throw fail(429, 'errors.tooMany');
+    const r = clientErrorBody.parse(await c.req.json());
+    console.warn(`client error ${JSON.stringify(r)}`);
+    void alerter.report({
+      source: 'client',
+      message: r.message,
+      at: `${
+        r.stack
+          .split('\n')
+          .find((l) => /^\s*at\s|@/.test(l))
+          ?.trim() ?? '-'
+      }\n${r.route} · ${r.platform} · tg ${r.tgVersion}`,
+      version: r.version,
+    });
+    return c.body(null, 204);
+  },
+);
 
 const idParam = (v: string | undefined) => {
   const n = Number(v);

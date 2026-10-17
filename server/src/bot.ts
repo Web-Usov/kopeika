@@ -1,6 +1,6 @@
 import { Bot, GrammyError, InlineKeyboard, InputFile } from 'grammy';
 import type { InlineQueryResult } from 'grammy/types';
-import { createT, type Lang, pickLang } from '../../shared/i18n/index.ts';
+import { createT, type Lang, pickLang, type TFn } from '../../shared/i18n/index.ts';
 import { formatMoney } from '../../shared/money.ts';
 import { checkCommand, checkInline } from './botLimits.ts';
 import {
@@ -858,6 +858,16 @@ export function notifyRemind(
     hasPaymentInfo,
   });
   void send(debtorUserId, text, group, lang);
+}
+
+/** True when a message to the owners can go out now (someone to tell, and the bot is up or tests replaced the call). */
+export function canAlertAdmins(): boolean {
+  return config.adminUserIds.size > 0 && Boolean(sendMessageHook || (bot && botReady));
+}
+
+/** A private message to every ADMIN_USER_IDS, each in their own language. Never throws. */
+export async function alertAdmins(build: (t: TFn) => string): Promise<void> {
+  await Promise.all([...config.adminUserIds].map((id) => dm(id, build(createT(userLang(id))))));
 }
 
 /** Budget thresholds of receipt scanning: tell every owner (ADMIN_USER_IDS), each in their language. */

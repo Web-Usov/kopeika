@@ -98,6 +98,7 @@ const ru = (r: ReceiptsProvider): Policy => ({
       paragraphs: [
         'Данные лежат в базе на сервере владельца приложения. Пока вы пользуетесь Копейкой, они хранятся. Раз в сутки сервер делает резервную копию базы и держит последние 14 копий; после удаления данных они исчезнут и из копий в течение 14 дней. Отдельно владелец видит обезличенную статистику использования: дневные суммы по видам действий (сколько групп и трат создано и т. п.) и число активных пользователей — без имён, идентификаторов и содержимого.',
         `Фото чека мы не сохраняем: оно живёт в памяти сервера только на время запроса и не попадает ни на диск, ни в логи. Распознанные позиции тоже не сохраняются — в трате остаются только итоговые доли. Мы учитываем лишь число сканирований и их стоимость (модель, число токенов, цена) — для лимитов и месячного бюджета, без содержимого чека. ${receiptsRu[r].retention}`,
+        'Если в приложении или на сервере случается ошибка, владельцу может уйти технический отчёт: текст ошибки, несколько строк кода, экран без номеров и кодов, версия приложения и Telegram. Имён, сумм, названий трат, идентификаторов и данных входа Telegram в нём нет.',
       ],
     },
     {
@@ -177,6 +178,7 @@ const en = (r: ReceiptsProvider): Policy => ({
       paragraphs: [
         'Data lives in a database on the app owner’s server and is kept while you use Kopeika. Once a day the server makes a database backup and keeps the last 14; after you delete your data it disappears from the backups within 14 days. Separately, the owner sees anonymous usage statistics: daily totals per kind of action (how many groups and expenses were created, etc.) and the number of active users, with no names, IDs or content.',
         `We do not store receipt photos: the image lives in the server’s memory only for the duration of the request and never reaches the disk or the logs. Recognized items are not stored either; an expense keeps only the final shares. We record only the number of scans and their cost (model, token count, price) for limits and the monthly budget, never the content of a receipt. ${receiptsEn[r].retention}`,
+        'When an error happens in the app or on the server, a technical report may be sent to the owner: the error text, a few lines of code, the screen without numbers or codes, and the app and Telegram versions. It contains no names, amounts, expense titles, identifiers or Telegram sign-in data.',
       ],
     },
     {
