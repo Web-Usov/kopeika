@@ -38,6 +38,7 @@ interface WebApp {
   openLink(url: string): void;
   requestWriteAccess(cb: (allowed: boolean) => void): void;
   shareMessage?(id: string, cb?: (sent: boolean) => void): void;
+  requestChat?(id: string, cb?: (ok: boolean) => void): void;
 }
 
 declare global {
@@ -109,6 +110,14 @@ export const canShareMessage = () => atLeast('8.0') && typeof tg!.shareMessage =
 /** Opens Telegram's chat picker for a message prepared with savePreparedInlineMessage; resolves true if it was sent. */
 export function shareMessage(id: string): Promise<boolean> {
   return new Promise((resolve) => tg!.shareMessage!(id, (sent) => resolve(sent)));
+}
+
+/** Telegram's chat picker (WebApp.requestChat, Bot API 9.6). False outside Telegram and on older clients. */
+export const canRequestChat = () => atLeast('9.6') && typeof tg!.requestChat === 'function';
+
+/** Opens the picker for a button saved with savePreparedKeyboardButton; the pick goes to the bot, not to the app. */
+export function requestChat(id: string): Promise<boolean> {
+  return new Promise((resolve) => tg!.requestChat!(id, (ok) => resolve(ok !== false)));
 }
 
 /** Copies text to the clipboard; if that is blocked, shows the text in a dialog so it can be copied by hand. */

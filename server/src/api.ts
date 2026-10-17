@@ -13,6 +13,7 @@ import { type TelegramUser, validateInitData } from './auth.ts';
 import {
   appLink,
   canPrepareShare,
+  canRequestChat,
   chatMemberStatus,
   loadExpenseSnap,
   notifyChatLinked,
@@ -20,10 +21,11 @@ import {
   notifyExpenseChange,
   notifyMemberRemoved,
   notifyRemind,
+  prepareChatButton,
   prepareShare,
   sendExportFile,
 } from './bot.ts';
-import { attachChat, checkChatLink, groupOfChat, unlinkGroup } from './chatLink.ts';
+import { attachChat, checkChatLink, createChatRequest, groupOfChat, unlinkGroup } from './chatLink.ts';
 import { config } from './config.ts';
 import { all, one, run, tx } from './db.ts';
 import { createDemoGroup } from './demo.ts';
@@ -446,6 +448,24 @@ api.post('/chat-links/:token/attach', async (c) => {
   const linked = one<GroupRow>('SELECT * FROM groups WHERE id = ?', group.id)!;
   notifyChatLinked(link.chat_id, linked, c.get('lang'));
   return c.json(detail(linked, me));
+});
+
+// «Link a Telegram chat» from settings: a prepared request_chat button for WebApp.requestChat(id). The pick arrives
+// at the bot as chat_shared and is linked there (see handleChatShared); the Mini App just reloads the group.
+api.post('/groups/:id/chat/request', async (c) => {
+  const user = c.get('user');
+  const { group } = loadGroupFor(c.req.param('id'), user.id);
+  if (group.is_demo) throw fail(409, 'errors.demoNotAllowed');
+  if (!canRequestChat()) throw fail(503, 'errors.chatRequestUnavailable');
+  let id: string | null;
+  try {
+    id = await prepareChatButton(user.id, createChatRequest(user.id, group.id), c.get('lang'));
+  } catch (e) {
+    logTelegramError('savePreparedKeyboardButton failed', e);
+    throw fail(503, 'errors.chatRequestUnavailable');
+  }
+  if (!id) throw fail(503, 'errors.chatRequestUnavailable');
+  return c.json({ id });
 });
 
 api.put('/groups/:id/chat/feed', async (c) => {

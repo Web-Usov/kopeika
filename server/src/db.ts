@@ -220,6 +220,17 @@ const migrations = [
     PRIMARY KEY (month, kind)
   );
   `,
+  // Chat requests: the Mini App asks Telegram to let the user pick a chat (WebApp.requestChat); the bot gets the
+  // choice as chat_shared with this row's id as request_id and links the chat to group_id. Short-lived, one use.
+  `
+  CREATE TABLE chat_requests (
+    id         INTEGER PRIMARY KEY,   -- random, fits Telegram's signed 32-bit request_id
+    user_id    INTEGER NOT NULL,
+    group_id   INTEGER NOT NULL,
+    expires_at TEXT NOT NULL,         -- UTC, 'YYYY-MM-DD HH:MM:SS'
+    used_at    TEXT
+  );
+  `,
 ];
 
 const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;

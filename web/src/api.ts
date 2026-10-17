@@ -317,6 +317,14 @@ export const api = {
   unarchiveGroup: (id: number) => request<GroupDetail>('POST', `/groups/${id}/unarchive`),
   prepareShare: (id: number, kind: 'balance' | 'summary') =>
     request<{ id: string }>('POST', `/groups/${id}/share`, { kind }),
+  /** Prepared request_chat button for WebApp.requestChat; the bot links the picked chat by itself. */
+  prepareChatRequest: (id: number) => request<{ id: string }>('POST', `/groups/${id}/chat/request`),
+  /** Refetches the group (the bot may have linked a chat meanwhile) and puts it in the cache. */
+  reloadGroup: async (id: number) => {
+    const fresh = await request<GroupDetail>('GET', `/groups/${id}`);
+    setGroup(withLoadedTail(fresh, groupCache.get(id)));
+    return fresh;
+  },
   exportGroup: (id: number) => request<{ ok: true }>('POST', `/groups/${id}/export`),
   rotateInvite: (id: number) => request<GroupDetail>('POST', `/groups/${id}/invite/rotate`),
   removeMember: (id: number, memberId: number) =>

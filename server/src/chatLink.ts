@@ -144,6 +144,82 @@ export function welcomeMessage(lang: Lang, linkUrl: string | null): ChatMessage 
   return { text: t('bot.chatWelcome'), button: { text: t('bot.chatLinkButton'), url: linkUrl } };
 }
 
+// --- Linking from the Mini App: WebApp.requestChat -> chat_shared ---
+
+const REQUEST_TTL_MIN = 15;
+
+/** A pending «pick a chat» request. Its id is the request_id of the keyboard button, so Telegram brings it back. */
+export function createChatRequest(userId: number, groupId: number, now = new Date()): number {
+  run('DELETE FROM chat_requests WHERE expires_at < ?', sqlTime(new Date(now.getTime() - KEEP_DAYS * 24 * 3600_000)));
+  for (;;) {
+    const id = crypto.randomInt(1, 2 ** 31);
+    if (one('SELECT 1 FROM chat_requests WHERE id = ?', id)) continue;
+    run(
+      'INSERT INTO chat_requests (id, user_id, group_id, expires_at) VALUES (?, ?, ?, ?)',
+      id,
+      userId,
+      groupId,
+      sqlTime(new Date(now.getTime() + REQUEST_TTL_MIN * 60_000)),
+    );
+    return id;
+  }
+}
+
+export type ChatSharedProblem = 'invalid' | 'expired' | 'used' | 'demo' | 'notAdmin' | 'botMissing' | 'unavailable';
+
+export type ChatSharedResult = { ok: true; group: GroupRow } | { ok: false; problem: ChatSharedProblem };
+
+/** Looks up a user's role in a chat ('creator', 'administrator', 'left', ...); null when the bot isn't available. */
+export type MemberLookup = (chatId: number, userId: number) => Promise<string | null>;
+
+/**
+ * The bot received chat_shared from `userId`: checks the request, that the user is an admin of the chosen chat and the
+ * bot is in it, then links the chat to the group. Telegram itself is not called here: the lookup is injected.
+ */
+export async function handleChatShared(
+  input: { userId: number; botId: number; requestId: number; chatId: number; title?: string },
+  lookup: MemberLookup,
+  now = new Date(),
+): Promise<ChatSharedResult> {
+  const req = one<{ user_id: number; group_id: number; expires_at: string; used_at: string | null }>(
+    'SELECT * FROM chat_requests WHERE id = ?',
+    input.requestId,
+  );
+  // A request of someone else is as good as unknown: do not reveal that it exists.
+  if (!req || req.user_id !== input.userId) return { ok: false, problem: 'invalid' };
+  if (req.used_at !== null) return { ok: false, problem: 'used' };
+  if (req.expires_at <= sqlTime(now)) return { ok: false, problem: 'expired' };
+  const group = one<GroupRow>('SELECT * FROM groups WHERE id = ?', req.group_id);
+  const member = group && one('SELECT 1 FROM members WHERE group_id = ? AND user_id = ?', group.id, input.userId);
+  if (!group || !member) return { ok: false, problem: 'invalid' };
+  if (group.is_demo) return { ok: false, problem: 'demo' };
+  let userStatus: string | null;
+  let botStatus: string | null = null;
+  try {
+    userStatus = await lookup(input.chatId, input.userId);
+    if (userStatus !== null) botStatus = await lookup(input.chatId, input.botId);
+  } catch {
+    return { ok: false, problem: 'unavailable' };
+  }
+  if (userStatus === null) return { ok: false, problem: 'unavailable' };
+  if (userStatus !== 'creator' && userStatus !== 'administrator') return { ok: false, problem: 'notAdmin' };
+  if (botStatus !== 'member' && botStatus !== 'administrator') return { ok: false, problem: 'botMissing' };
+  run("UPDATE chat_requests SET used_at = datetime('now') WHERE id = ?", input.requestId);
+  attachChat(
+    {
+      token: '',
+      chat_id: input.chatId,
+      chat_title: input.title?.trim() || String(input.chatId),
+      created_by_user: input.userId,
+      expires_at: req.expires_at,
+      used_at: null,
+    },
+    group,
+    input.userId,
+  );
+  return { ok: true, group: one<GroupRow>('SELECT * FROM groups WHERE id = ?', group.id)! };
+}
+
 /** Confirmation in the chat after linking, with a "join" button when the invite link exists. */
 export function linkedMessage(lang: Lang, groupName: string, inviteUrl: string | null): ChatMessage {
   const t = createT(lang);
