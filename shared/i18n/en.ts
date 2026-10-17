@@ -322,6 +322,16 @@ export const en: Dict = {
     telegram: 'Telegram',
     noTelegram: 'no Telegram',
   },
+  quick: {
+    label: 'Quick expense',
+    placeholder: 'Quick expense: 12 taxi',
+    add: 'Add',
+    edit: 'Edit',
+    setRate: 'Set rate',
+    tail: 'split equally · you paid',
+    foreignTail: 'rate is set in the form',
+    noAmount: 'Can’t see an amount. Try: 12 taxi',
+  },
   expense: {
     titleNew: 'New expense',
     titleEdit: 'Expense',
