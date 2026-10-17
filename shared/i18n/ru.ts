@@ -20,6 +20,9 @@ export const ru = {
     add: 'Добавить',
     version: 'Копейка {version}',
     errorStatus: 'Ошибка {status}',
+    crashTitle: 'Что-то пошло не так',
+    crashText: 'Мы уже знаем об ошибке. Обновите приложение — ваши данные на месте.',
+    crashReload: 'Обновить',
     members: { one: '{count} участник', few: '{count} участника', many: '{count} участников' },
   },
   home: {
@@ -612,6 +615,10 @@ export const ru = {
     accessUserRejected:
       'Пока не можем открыть разбор чеков для группы «{group}». Попробуйте попросить ещё раз через сутки.',
     budgetWarn: 'Разбор чеков: потрачено {spent} из {cap} USD в этом месяце (80%).',
+    errorAlert: '⚠️ Ошибка ({where}): {message}\nГде: {at}\nВерсия: {version}',
+    errorAlertRepeat: '\nСлучаев с прошлого сообщения: {count}',
+    errorWhereServer: 'сервер',
+    errorWhereClient: 'приложение',
     budgetStop: 'Разбор чеков: потолок {cap} USD в месяц исчерпан, функция выключена до следующего месяца.',
   },
   stats: {

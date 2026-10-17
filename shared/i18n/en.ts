@@ -20,6 +20,9 @@ export const en: Dict = {
     add: 'Add',
     version: 'Kopeika {version}',
     errorStatus: 'Error {status}',
+    crashTitle: 'Something went wrong',
+    crashText: 'We already know about the error. Reload the app — your data is safe.',
+    crashReload: 'Reload',
     members: { one: '{count} member', other: '{count} members' },
   },
   home: {
@@ -594,6 +597,10 @@ export const en: Dict = {
       'Receipt scanning is open for “{group}”. 5 free scans a month are waiting: add an expense and tap “Scan a receipt”.',
     accessUserRejected: 'We can’t open receipt scanning for “{group}” yet. You can ask again in a day.',
     budgetWarn: 'Receipt scanning: {spent} of the {cap} USD monthly budget is spent (80%).',
+    errorAlert: '⚠️ Error ({where}): {message}\nWhere: {at}\nVersion: {version}',
+    errorAlertRepeat: '\nOccurrences since the last message: {count}',
+    errorWhereServer: 'server',
+    errorWhereClient: 'app',
     budgetStop: 'Receipt scanning: the {cap} USD monthly budget is used up, the feature is off until next month.',
   },
   export: {

@@ -1,4 +1,5 @@
 import { serve } from '@hono/node-server';
+import { installProcessHandlers } from './alerts.ts';
 import { createApp } from './app.ts';
 import { startBackupSchedule } from './backup.ts';
 import { startBot } from './bot.ts';
@@ -6,6 +7,8 @@ import { config } from './config.ts';
 import { startDigestSchedule } from './digest.ts';
 import { startRecurringSchedule } from './recurring.ts';
 import { version } from './version.ts';
+
+installProcessHandlers();
 
 const app = createApp(config.staticDir);
 
