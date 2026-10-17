@@ -58,11 +58,17 @@ export function detectCurrency(hint: string | null): string | null {
 }
 
 /**
- * Parses a printed amount ("1 234,50", "1.234,50", "1,234.50", "12.5", "-3,00", "(3.00)") into minor units
+ * Parses a printed amount ("1 234,50", "1.234,50", "1,234.50", "12.5", "-3,00", "(3.00)", "$82.93", "1 815,00 ₽", "руб. 120") into minor units
  * with integer arithmetic only. Returns null if it is not a clear number or does not fit `digits` decimals.
  */
 export function parseDecimal(input: string, digits: number): number | null {
-  let s = input.replace(/[\s  ']/g, '');
+  // Currency symbols, codes and words ("$", "฿", "руб.", "USD", "*") may surround the number but never sit inside it.
+  const first = input.search(/\d/);
+  if (first < 0) return null;
+  let end = input.length;
+  while (!/\d/.test(input[end - 1] as string)) end--;
+  const junk = (part: string) => part.replace(/\p{L}+\.?/gu, '').replace(/[^\-−().,]/gu, '');
+  let s = (junk(input.slice(0, first)) + input.slice(first, end) + junk(input.slice(end))).replace(/[\s  ']/g, '');
   let negative = false;
   if (/^\(.*\)$/.test(s)) {
     negative = true;

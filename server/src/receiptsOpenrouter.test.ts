@@ -8,6 +8,12 @@ process.env.OPENROUTER_BASE_URL = 'http://llm.test/v1/';
 process.env.OPENROUTER_PROVIDERS = 'deepinfra, novita';
 delete process.env.ANTHROPIC_API_KEY;
 delete process.env.RECEIPTS_MODEL;
+delete process.env.RECEIPTS_FALLBACK_MODEL;
+delete process.env.RECEIPTS_REASONING;
+delete process.env.RECEIPTS_FALLBACK_REASONING;
+delete process.env.RECEIPTS_TIMEOUT_SEC;
+delete process.env.RECEIPTS_PRICE_IN_USD_PER_M;
+delete process.env.RECEIPTS_PRICE_OUT_USD_PER_M;
 
 let provider: typeof import('./receipts/provider.ts');
 let openrouter: typeof import('./receipts/openrouter.ts');
@@ -60,7 +66,14 @@ const reason = async (p: Promise<unknown>) => {
 
 test('config: provider selection, default model and key check', () => {
   assert.equal(config.receiptsProvider, 'openrouter');
-  assert.equal(config.receiptsModel, 'google/gemma-4-26b-a4b-it');
+  assert.equal(config.receiptsModel, 'qwen/qwen3.5-35b-a3b');
+  // Per-provider defaults: model, prices, timeout, reasoning and a same-model cascade.
+  assert.equal(config.receiptsPriceInUsdPerM, 0.15);
+  assert.equal(config.receiptsPriceOutUsdPerM, 1);
+  assert.equal(config.receiptsTimeoutSec, 45);
+  assert.equal(config.receiptsReasoning, 'none');
+  assert.equal(config.receiptsFallbackReasoning, 'low');
+  assert.equal(config.receiptsFallbackModel, 'qwen/qwen3.5-35b-a3b');
   assert.equal(config.openrouterBaseUrl, 'http://llm.test/v1');
   assert.deepEqual(config.openrouterProviders, ['deepinfra', 'novita']);
   assert.equal(provider.receiptsEnabled(), true);
@@ -92,7 +105,7 @@ test('success: request shape and parsed answer with usage', async () => {
   assert.equal(sent.response_format.type, 'json_schema');
   assert.equal(sent.response_format.json_schema.strict, true);
   assert.deepEqual(sent.provider, { require_parameters: true, data_collection: 'deny', only: ['deepinfra', 'novita'] });
-  assert.deepEqual(sent.reasoning, { effort: 'low' });
+  assert.deepEqual(sent.reasoning, { effort: 'none' }); // default mode
   assert.equal(draft.merchant, 'Кафе');
   assert.equal(draft.items[0]?.lineTotal, '300.00');
   assert.deepEqual(usage, { model: 'google/gemma-4-26b-a4b-it', inputTokens: 1234, outputTokens: 56 });
@@ -151,4 +164,36 @@ test('network failure -> unavailable; timeout -> timeout', async () => {
       });
     })) as typeof fetch;
   assert.equal(await reason(openrouter.openrouterProvider.parseReceipt(image, { ...opts, timeoutMs: 20 })), 'timeout');
+});
+
+test('reasoning: each mode goes into the body, omit sends no field', async () => {
+  let sent: Record<string, unknown> = {};
+  globalThis.fetch = (async (_u: string, i: RequestInit) => {
+    sent = JSON.parse(i.body as string);
+    return completion(JSON.stringify(answer));
+  }) as typeof fetch;
+  for (const mode of ['none', 'minimal', 'low', 'medium'] as const) {
+    await openrouter.openrouterProvider.parseReceipt(image, { ...opts, reasoning: mode });
+    assert.deepEqual(sent.reasoning, { effort: mode });
+  }
+  await openrouter.openrouterProvider.parseReceipt(image, { ...opts, reasoning: 'omit' });
+  assert.equal('reasoning' in sent, false);
+  assert.equal((sent.provider as { require_parameters: boolean }).require_parameters, true);
+});
+
+test('parseReasoning: valid values, default and warning for junk', async () => {
+  const { parseReasoning } = await import('./config.ts');
+  assert.equal(parseReasoning('X', undefined, 'none'), 'none');
+  assert.equal(parseReasoning('X', ' ', 'low'), 'low');
+  assert.equal(parseReasoning('X', ' Medium ', 'none'), 'medium');
+  assert.equal(parseReasoning('X', 'omit', 'none'), 'omit');
+  const warn = console.warn;
+  const seen: string[] = [];
+  console.warn = (m: string) => seen.push(m);
+  try {
+    assert.equal(parseReasoning('RECEIPTS_REASONING', 'high', 'none'), 'none');
+  } finally {
+    console.warn = warn;
+  }
+  assert.match(seen[0] ?? '', /RECEIPTS_REASONING/);
 });

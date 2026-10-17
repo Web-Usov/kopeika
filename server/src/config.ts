@@ -35,6 +35,18 @@ export function parseNumber(
   return n;
 }
 
+export const REASONING_MODES = ['none', 'minimal', 'low', 'medium', 'omit'] as const;
+export type ReasoningMode = (typeof REASONING_MODES)[number];
+
+/** Reads a reasoning mode: unset/empty -> default; an unknown value -> default plus a startup warning. */
+export function parseReasoning(name: string, raw: string | undefined, def: ReasoningMode): ReasoningMode {
+  const v = (raw ?? '').trim().toLowerCase();
+  if (v === '') return def;
+  if ((REASONING_MODES as readonly string[]).includes(v)) return v as ReasoningMode;
+  console.warn(`Config: ${name}="${raw}" is not one of ${REASONING_MODES.join('|')}; using "${def}"`);
+  return def;
+}
+
 /** Throws if DEV_AUTH would run in production (unless the CI-only escape hatch is set). */
 export function checkDevAuth(e: Record<string, string | undefined>): void {
   if (e.NODE_ENV === 'production' && e.DEV_AUTH === '1' && e.ALLOW_DEV_AUTH_IN_PRODUCTION !== '1') {
@@ -46,6 +58,16 @@ export function checkDevAuth(e: Record<string, string | undefined>): void {
 }
 
 checkDevAuth(env);
+
+const receiptsProvider = (
+  (env.RECEIPTS_PROVIDER ?? '').trim().toLowerCase() === 'openrouter' ? 'openrouter' : 'anthropic'
+) as 'anthropic' | 'openrouter';
+const viaOpenrouter = receiptsProvider === 'openrouter';
+const receiptsModel = env.RECEIPTS_MODEL?.trim() || (viaOpenrouter ? 'qwen/qwen3.5-35b-a3b' : 'claude-haiku-5-5');
+/** Second cascade step. "none" = off; for openrouter, unset = the same model with the fallback reasoning mode. */
+const fallbackRaw = env.RECEIPTS_FALLBACK_MODEL?.trim() ?? '';
+const receiptsFallbackModel =
+  fallbackRaw.toLowerCase() === 'none' ? '' : fallbackRaw || (viaOpenrouter ? receiptsModel : '');
 
 export const config = {
   port: parseNumber('PORT', env.PORT, { default: 3000, max: 65535 }),
@@ -89,9 +111,7 @@ export const config = {
   /** Optional gateway/proxy address for the Anthropic API; empty = the SDK default. */
   anthropicBaseUrl: env.ANTHROPIC_BASE_URL ?? '',
   /** Which backend reads receipts: the Anthropic API (default) or an OpenAI-compatible one (OpenRouter, own vLLM). */
-  receiptsProvider: ((env.RECEIPTS_PROVIDER ?? '').trim().toLowerCase() === 'openrouter'
-    ? 'openrouter'
-    : 'anthropic') as 'anthropic' | 'openrouter',
+  receiptsProvider,
   /** OpenRouter (or any OpenAI-compatible server) key. Empty = the feature is off when this provider is selected. */
   openrouterApiKey: env.OPENROUTER_API_KEY ?? '',
   /** Base URL of the OpenAI-compatible API, without a trailing slash. */
@@ -102,15 +122,22 @@ export const config = {
     .map((s) => s.trim())
     .filter(Boolean),
   /** Model that reads receipt photos. */
-  receiptsModel:
-    env.RECEIPTS_MODEL?.trim() ||
-    ((env.RECEIPTS_PROVIDER ?? '').trim().toLowerCase() === 'openrouter'
-      ? 'google/gemma-4-26b-a4b-it'
-      : 'claude-haiku-5-5'),
-  /** Stronger model tried once when the sum of the lines does not match the total. Empty (default) = no cascade. */
-  receiptsFallbackModel: env.RECEIPTS_FALLBACK_MODEL?.trim() ?? '',
+  receiptsModel,
+  /**
+   * Model of the second cascade step, tried once when the lines do not add up to the total. Empty = no cascade.
+   * Anthropic: empty by default. OpenRouter: the same model as the first step (with the fallback reasoning mode)
+   * unless RECEIPTS_FALLBACK_MODEL names another one; RECEIPTS_FALLBACK_MODEL=none turns the cascade off.
+   */
+  receiptsFallbackModel,
+  /** OpenRouter only: reasoning mode of the first request (`omit` = send no `reasoning` field at all). */
+  receiptsReasoning: parseReasoning('RECEIPTS_REASONING', env.RECEIPTS_REASONING, 'none'),
+  /** OpenRouter only: reasoning mode of the second cascade step. */
+  receiptsFallbackReasoning: parseReasoning('RECEIPTS_FALLBACK_REASONING', env.RECEIPTS_FALLBACK_REASONING, 'low'),
   /** Timeout of one recognition request to the provider, seconds. */
-  receiptsTimeoutSec: parseNumber('RECEIPTS_TIMEOUT_SEC', env.RECEIPTS_TIMEOUT_SEC, { default: 30, max: 300 }),
+  receiptsTimeoutSec: parseNumber('RECEIPTS_TIMEOUT_SEC', env.RECEIPTS_TIMEOUT_SEC, {
+    default: viaOpenrouter ? 45 : 30,
+    max: 300,
+  }),
   /** Closed beta (default): receipt scanning works only for groups the owner has approved. RECEIPTS_BETA=0 opens it to all. */
   receiptsBeta: (env.RECEIPTS_BETA ?? '1').trim() !== '0',
   /** Free scans per group per calendar month (server-local) while the group has no `receipts` entitlement. */
@@ -128,15 +155,15 @@ export const config = {
     max: 1_000_000,
     int: false,
   }),
-  /** Provider price, USD per 1M tokens (Haiku 5.5). Applies to every model: set it if the fallback cascade is on. */
+  /** Provider price, USD per 1M tokens (Haiku 5.5; Qwen3.5-35B-A3B for openrouter). Applies to every model: set it if the cascade uses another model. */
   receiptsPriceInUsdPerM: parseNumber('RECEIPTS_PRICE_IN_USD_PER_M', env.RECEIPTS_PRICE_IN_USD_PER_M, {
-    default: 0.1,
+    default: viaOpenrouter ? 0.15 : 0.1,
     min: 0,
     max: 10_000,
     int: false,
   }),
   receiptsPriceOutUsdPerM: parseNumber('RECEIPTS_PRICE_OUT_USD_PER_M', env.RECEIPTS_PRICE_OUT_USD_PER_M, {
-    default: 0.5,
+    default: viaOpenrouter ? 1.0 : 0.5,
     min: 0,
     max: 10_000,
     int: false,

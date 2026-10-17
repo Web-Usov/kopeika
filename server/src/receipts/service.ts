@@ -1,4 +1,4 @@
-import { config } from '../config.ts';
+import { config, type ReasoningMode } from '../config.ts';
 import { ApiError, fail } from '../errors.ts';
 import { mismatchSize, normalizeReceipt, ReceiptContentError, type ReceiptDraft } from './normalize.ts';
 import {
@@ -33,12 +33,13 @@ export async function scanReceipt(
   if (!receiptsEnabled()) throw fail(503, 'errors.receipt.disabled');
   const provider = getReceiptProvider();
 
-  async function attempt(model: string): Promise<ReceiptDraft> {
+  async function attempt(model: string, reasoning: ReasoningMode): Promise<ReceiptDraft> {
     try {
       const { draft, usage } = await provider.parseReceipt(image, {
         model,
         timeoutMs: config.receiptsTimeoutSec * 1000,
         hintCurrency: groupCurrency,
+        reasoning,
       });
       onUsage(usage);
       return normalizeReceipt(draft, { groupCurrency });
@@ -55,12 +56,16 @@ export async function scanReceipt(
     }
   }
 
-  let draft = await attempt(config.receiptsModel);
+  let draft = await attempt(config.receiptsModel, config.receiptsReasoning);
   const fallback = config.receiptsFallbackModel;
-  if (draft.mismatch && fallback && fallback !== config.receiptsModel) {
+  // The same model is a valid second step on openrouter when only the reasoning mode differs.
+  const differs =
+    fallback !== config.receiptsModel ||
+    (config.receiptsProvider === 'openrouter' && config.receiptsFallbackReasoning !== config.receiptsReasoning);
+  if (draft.mismatch && fallback && differs) {
     // The sum does not add up: ask the stronger model once and keep the closer attempt. A failed retry is not an error.
     try {
-      const second = await attempt(fallback);
+      const second = await attempt(fallback, config.receiptsFallbackReasoning);
       if (mismatchSize(second) < mismatchSize(draft)) draft = second;
     } catch {
       // keep the first attempt

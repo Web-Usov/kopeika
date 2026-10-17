@@ -20,6 +20,7 @@ async function parseReceipt(
   image: ReceiptImage,
   opts: ReceiptParseOptions,
 ): Promise<{ draft: RawReceipt; usage: ReceiptUsage }> {
+  const reasoning = opts.reasoning ?? 'none';
   const body = {
     model: opts.model,
     max_tokens: MAX_TOKENS,
@@ -41,8 +42,9 @@ async function parseReceipt(
       data_collection: 'deny',
       ...(config.openrouterProviders.length > 0 ? { only: config.openrouterProviders } : {}),
     },
-    // Reading a receipt does not need long reasoning; "none" is rejected by models that insist on it, "low" is not.
-    reasoning: { effort: 'low' },
+    // Reading a receipt does not need reasoning (it triples the price). `omit` sends no field at all: models
+    // without the parameter would otherwise answer 404 because of require_parameters.
+    ...(reasoning === 'omit' ? {} : { reasoning: { effort: reasoning } }),
   };
 
   let res: Response;

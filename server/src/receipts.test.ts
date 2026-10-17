@@ -321,8 +321,35 @@ test('parseDecimal reads common notations into minor units', () => {
   assert.equal(p('1.5055', 2), null); // does not fit two decimals
   assert.equal(p('1.500', 2), 150000); // grouping
   assert.equal(p('abc', 2), null);
+  assert.equal(p('1a2', 2), null);
+  assert.equal(p('1e5', 2), null);
+  assert.equal(p('.50', 2), null);
+  assert.equal(p('5.00-', 2), null);
+  assert.equal(p('$', 2), null);
   assert.equal(p('', 2), null);
   assert.equal(p('99999999999999999', 2), null);
+});
+
+test('parseDecimal strips currency signs, codes and stray characters', () => {
+  const p = normalize.parseDecimal;
+  assert.equal(p('$82.93', 2), 8293);
+  assert.equal(p('฿1,815.00', 2), 181500);
+  assert.equal(p('*4.174,50', 2), 417450);
+  assert.equal(p('1 815,00 ₽', 2), 181500);
+  assert.equal(p('82.93 USD', 2), 8293);
+  assert.equal(p('руб. 120', 2), 12000);
+  assert.equal(p('120 р.', 2), 12000);
+  assert.equal(p('12 руб.', 2), 1200);
+  assert.equal(p('€ 12,50', 2), 1250);
+  assert.equal(p('-$5.00', 2), -500);
+  assert.equal(p('−$5.00', 2), -500);
+  assert.equal(p('$-5.00', 2), -500);
+  assert.equal(p('($5.00)', 2), -500);
+  assert.equal(p('₾12.00', 2), 1200);
+  assert.equal(p('₺ 99,90', 2), 9990);
+  assert.equal(p('£1,000.00', 2), 100000);
+  assert.equal(p('¥500', 0), 500);
+  assert.equal(p('GEL 8.50', 2), 850);
 });
 
 test('detectCurrency: ISO codes and symbols, anything else is unknown', () => {
@@ -373,4 +400,6 @@ test('config defaults: Haiku 5.5, no fallback', () => {
   assert.equal(config.receiptsModel, 'claude-haiku-5-5');
   assert.equal(config.receiptsFallbackModel, '');
   assert.equal(config.receiptsTimeoutSec, 30);
+  assert.equal(config.receiptsPriceInUsdPerM, 0.1);
+  assert.equal(config.receiptsPriceOutUsdPerM, 0.5);
 });

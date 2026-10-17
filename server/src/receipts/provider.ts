@@ -1,4 +1,4 @@
-import { config } from '../config.ts';
+import { config, type ReasoningMode } from '../config.ts';
 import { anthropicProvider } from './anthropic.ts';
 import { openrouterProvider } from './openrouter.ts';
 
@@ -15,6 +15,8 @@ export interface ReceiptParseOptions {
   timeoutMs: number;
   /** The group's currency: a weak hint, used only when the receipt shows none. */
   hintCurrency?: string;
+  /** openrouter only: the reasoning mode of this call; undefined = `none`. Ignored by the Anthropic provider. */
+  reasoning?: ReasoningMode;
 }
 
 /** What the model read off the photo, exactly as printed: amounts are still decimal strings in any notation. */
