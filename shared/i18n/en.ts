@@ -4,7 +4,7 @@ import type { Dict } from './index.ts';
 export const en: Dict = {
   common: {
     brand: 'Kopeika',
-    tagline: 'Shared expenses, no arguments',
+    tagline: 'No limits, no ads. Right in Telegram',
     loading: 'Loading…',
     you: 'You',
     youParen: '{name} (you)',
@@ -25,11 +25,11 @@ export const en: Dict = {
   home: {
     welcomeTitle: 'How it works',
     welcomeStep1Title: 'Create a group',
-    welcomeStep1Text: 'For a trip, a cabin or a shared flat.',
+    welcomeStep1Text: 'For a trip, a cabin or a shared flat. No limits on expenses or people.',
     welcomeStep2Title: 'Invite your friends',
     welcomeStep2Text: 'Send a link — they pick themselves from the list.',
     welcomeStep3Title: 'Note down expenses',
-    welcomeStep3Text: 'Kopeika works out who owes whom and how much.',
+    welcomeStep3Text: 'In different currencies, at the rate of the day. Kopeika works out who owes whom.',
     seeExample: 'See an example',
     demoBadge: 'example',
     myGroups: 'My groups',
@@ -436,16 +436,18 @@ export const en: Dict = {
   bot: {
     description:
       'Split shared expenses without arguments or spreadsheets: on a trip, at a cabin, in a shared flat or with a group of friends.\n\n' +
-      '• Note who paid for what: split equally, by shares or exact amounts\n' +
-      '• See at once who owes whom, and the fewest transfers to settle up\n' +
-      '• Friends join by a link, no sign-up needed\n' +
-      '• The bot reminds about debts and posts new expenses to your chat\n\n' +
-      'Free. The app never touches your money: it only does the math.',
-    shortDescription: 'Shared expenses with friends: who owes whom, no arguments',
+      '• Free, no limits on expenses or people, no ads\n' +
+      '• Works right in Telegram: nothing to install, friends join by a link\n' +
+      '• Expenses in different currencies at the central bank rate of the day\n' +
+      '• Recurring expenses: rent and subscriptions add themselves\n' +
+      '• The bot posts to your trip chat and reminds about debts\n\n' +
+      'The app never touches your money: it only does the math.',
+    shortDescription: 'Shared expenses in Telegram: no limits, no ads, multiple currencies, a bot in your chat',
     startText:
       'Hi! Kopeika helps you split shared expenses with friends: on a trip, at a cabin or in a shared flat.\n\n' +
       'Create a group, invite your friends with a link and note down who paid for what. ' +
-      'I’ll work out who owes whom and send you notifications about new expenses here.',
+      'I’ll work out who owes whom and post new expenses here.\n\n' +
+      'Free, no limits, no ads.',
     openApp: 'Open Kopeika',
     openGroup: 'Open group',
     removed: 'You were removed from the group “{group}”',
@@ -495,13 +497,13 @@ export const en: Dict = {
     balancePrivateEmpty: 'You don’t have any groups yet. Open Kopeika and create the first one.',
     balancePrivateSettled: 'settled up',
     helpPrivate:
-      'I’m Kopeika: I help split shared expenses.\n\n' +
+      'I’m Kopeika: I help split shared expenses. Free, no limits, no ads.\n\n' +
       '/balance — your balances in each group\n' +
       '/help — this message\n\n' +
       'In any chat, type @{bot} and a group name to share its balance.\n\n' +
       'Groups, expenses and transfers live in the app. I’ll message you when someone adds an expense that includes you.',
     helpGroup:
-      'I’m Kopeika: I help split shared expenses.\n\n' +
+      'I’m Kopeika: I help split shared expenses. Free, no limits, no ads.\n\n' +
       '/balance — who owes whom\n' +
       '/unlink — unlink the chat from the group (admins only)\n' +
       '/help — this message\n\n' +
