@@ -64,6 +64,7 @@ export interface GroupDetail {
   isDemo: boolean;
   archived: boolean;
   /** Linked Telegram chat (title only), if any. */
+  autoRemind: boolean;
   chat: { title: string; feed: ChatFeed } | null;
   meId: number;
   totalSpent: number;
@@ -357,6 +358,8 @@ export const api = {
   attachChat: (token: string, groupId: number) =>
     request<GroupDetail>('POST', `/chat-links/${encodeURIComponent(token)}/attach`, { groupId }),
   setChatFeed: (id: number, feed: ChatFeed) => request<GroupDetail>('PUT', `/groups/${id}/chat/feed`, { feed }),
+  setAutoRemind: (id: number, enabled: boolean) =>
+    request<GroupDetail>('PUT', `/groups/${id}/auto-remind`, { enabled }),
   unlinkChat: (id: number) => request<GroupDetail>('POST', `/groups/${id}/chat/unlink`),
   addExpense: (id: number, body: ExpenseInput) => request<GroupDetail>('POST', `/groups/${id}/expenses`, body),
   updateExpense: (id: number, expenseId: number, body: ExpenseInput) =>

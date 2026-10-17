@@ -899,6 +899,31 @@ export function notifyRemind(
   void send(debtorUserId, text, group, lang);
 }
 
+/**
+ * Sends an automatic debt reminder to the debtor's DM and says whether it went out. A 403 (blocked the bot) is
+ * swallowed like in `send` and turns their notifications off. The bot not being ready counts as "did not go out".
+ */
+export async function sendAutoRemind(userId: number, text: string, group: GroupRow, lang: Lang): Promise<boolean> {
+  if (group.is_demo || (!sendMessageHook && !(bot && botReady))) return false;
+  const link = appLink(group.invite_code);
+  const reply_markup = link ? new InlineKeyboard().url(createT(lang)('bot.openGroup'), link) : undefined;
+  try {
+    if (sendMessageHook) await sendMessageHook(userId, text, { reply_markup });
+    else if (bot) {
+      await bot.api.sendMessage(userId, text, {
+        parse_mode: 'HTML',
+        reply_markup,
+        link_preview_options: { is_disabled: true },
+      });
+    }
+    return true;
+  } catch (e) {
+    if (e instanceof GrammyError && e.error_code === 403) run('UPDATE users SET notify = 0 WHERE id = ?', userId);
+    else logTelegramError('auto remind failed', e);
+    return false;
+  }
+}
+
 /** True when a message to the owners can go out now (someone to tell, and the bot is up or tests replaced the call). */
 export function canAlertAdmins(): boolean {
   return config.adminUserIds.size > 0 && Boolean(sendMessageHook || (bot && botReady));

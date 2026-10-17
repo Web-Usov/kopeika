@@ -545,6 +545,19 @@ api.put('/groups/:id/chat/feed', async (c) => {
   return c.json(detail({ ...group, chat_feed: feed }, me));
 });
 
+api.put('/groups/:id/auto-remind', async (c) => {
+  const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
+  const { enabled } = z.object({ enabled: z.boolean() }).parse(await c.req.json());
+  if (group.is_demo) throw fail(409, 'errors.demoNotAllowed');
+  if (enabled !== (group.auto_remind === 1)) {
+    tx(() => {
+      run('UPDATE groups SET auto_remind = ? WHERE id = ?', enabled ? 1 : 0, group.id);
+      logActivity(group.id, c.get('user').id, 'group.auto_remind', { enabled });
+    });
+  }
+  return c.json(detail({ ...group, auto_remind: enabled ? 1 : 0 }, me));
+});
+
 api.post('/groups/:id/chat/unlink', (c) => {
   const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
   unlinkGroup(group, c.get('user').id);

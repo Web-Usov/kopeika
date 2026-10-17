@@ -6,6 +6,7 @@ import {
   computeShares,
   convertAmount,
   convertExactShares,
+  debtSince,
   formatRate,
   minorDigits,
   normalizeRate,
@@ -217,4 +218,35 @@ test('convertExactShares keeps zero-weight members at zero and is stable', () =>
     out.reduce((a, i) => a + i.value, 0),
     convertAmount(3, '0.5', 'USD', 'EUR'),
   );
+});
+
+test('debtSince: debt start survives partial repayment, resets after full repayment', () => {
+  const e = (at: string, payerId: number, amount: number, shares: [number, number][]) => ({
+    at,
+    payerId,
+    amount,
+    shares: shares.map(([memberId, a]) => ({ memberId, amount: a })),
+  });
+  const ids = [1, 2];
+  const partial = [
+    e('d1', 1, 100, [
+      [1, 50],
+      [2, 50],
+    ]),
+    e('d3', 2, 20, [[1, 20]]),
+  ];
+  assert.deepEqual([...debtSince(ids, partial)], [[2, 'd1']]);
+  const again = [
+    e('d1', 1, 100, [
+      [1, 50],
+      [2, 50],
+    ]),
+    e('d3', 2, 50, [[1, 50]]),
+    e('d5', 1, 40, [
+      [1, 20],
+      [2, 20],
+    ]),
+  ];
+  assert.deepEqual([...debtSince(ids, again)], [[2, 'd5']]);
+  assert.equal(debtSince(ids, again.slice(0, 2)).size, 0);
 });

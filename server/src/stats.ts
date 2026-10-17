@@ -17,6 +17,7 @@ export const STAT_EVENTS = [
   'join.card',
   'chat.link',
   'debt.remind',
+  'debt.autoremind',
   'export.csv',
   'inline.query',
   'bot.start',
