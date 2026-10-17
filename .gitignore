@@ -11,5 +11,4 @@ data/
 playwright-report/
 test-results/
 
-# Пробные SVG-трассировки маскота (design/mascot/tools/vectorize.py), в продукт не идут
-design/mascot/svg-attempts/
+__pycache__/
