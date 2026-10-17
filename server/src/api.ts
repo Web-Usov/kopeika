@@ -157,6 +157,10 @@ const detail = (group: GroupRow, me: MemberRow, all = false) =>
 const name = z.string().trim().min(1).max(64);
 
 // --- Me ---
+// Consent counts only for the provider it was given for: switching RECEIPTS_PROVIDER asks everyone again.
+const hasReceiptConsent = (u: Pick<UserRow, 'receipt_consent_at' | 'receipt_consent_provider'>) =>
+  u.receipt_consent_at !== null && u.receipt_consent_provider === config.receiptsProvider;
+
 api.get('/me', (c) => {
   const u = one<UserRow>('SELECT * FROM users WHERE id = ?', c.get('user').id)!;
   // No Telegram id: the client identifies itself through `meId` of the group.
@@ -166,7 +170,7 @@ api.get('/me', (c) => {
     receiptsEnabled: receiptsEnabled(),
     // The privacy page and the consent screen name whoever reads the photos.
     receiptsProvider: config.receiptsProvider,
-    receiptConsent: u.receipt_consent_at !== null,
+    receiptConsent: hasReceiptConsent(u),
   });
 });
 
@@ -177,11 +181,15 @@ api.put('/me', async (c) => {
 });
 
 // The user agrees that receipt photos are sent to the recognition provider (see the privacy text). Required before parse.
+// Repeating it for the same provider keeps the first stamp.
 api.post('/me/receipt-consent', (c) => {
   run(
-    'UPDATE users SET receipt_consent_at = COALESCE(receipt_consent_at, ?) WHERE id = ?',
+    `UPDATE users SET receipt_consent_at = ?, receipt_consent_provider = ?
+     WHERE id = ? AND (receipt_consent_at IS NULL OR receipt_consent_provider IS NOT ?)`,
     new Date().toISOString(),
+    config.receiptsProvider,
     c.get('user').id,
+    config.receiptsProvider,
   );
   return c.json({ ok: true });
 });
@@ -581,11 +589,11 @@ api.post(
     if (!receiptsEnabled()) throw fail(503, 'errors.receipt.disabled');
     // Closed beta: enforced here, whatever the client shows. Checked before consent and limits.
     if (!hasReceiptsAccess(group.id)) throw fail(403, 'errors.receipt.betaNoAccess');
-    const consent = one<{ receipt_consent_at: string | null }>(
-      'SELECT receipt_consent_at FROM users WHERE id = ?',
+    const consent = one<Pick<UserRow, 'receipt_consent_at' | 'receipt_consent_provider'>>(
+      'SELECT receipt_consent_at, receipt_consent_provider FROM users WHERE id = ?',
       user.id,
     );
-    if (!consent?.receipt_consent_at) throw fail(409, 'errors.receipt.consentRequired');
+    if (!consent || !hasReceiptConsent(consent)) throw fail(409, 'errors.receipt.consentRequired');
     if (budgetExhausted()) throw fail(503, 'errors.receipt.budget');
     if (!receiptsLimiter.allow(user.id)) throw fail(429, 'errors.receipt.tooFast');
     if (!acquireScan(user.id, group.id)) throw fail(429, 'errors.receipt.busy');
