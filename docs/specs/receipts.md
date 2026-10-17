@@ -285,6 +285,14 @@ QR на клиенте (необязательно): `Telegram.WebApp.showScanQr
 2. Провайдер, доступный из РФ (облачный OCR вроде Yandex Vision OCR плюс разбор структуры правилами или российской LLM). Мы это направление глубоко не исследовали, оно потребует нового замера качества и цены.
 3. Локальный Tesseract: бесплатно и локально, но хуже по качеству и дороже в разработке.
 
+### 6.1. Второй провайдер: OpenAI-совместимый (OpenRouter)
+
+`RECEIPTS_PROVIDER=openrouter` включает `server/src/receipts/openrouter.ts` за тем же интерфейсом `ReceiptProvider` и теми же эндпоинтами; Anthropic-провайдер остаётся по умолчанию. Общие промпт, схема и разбор ответа лежат в `receipts/common.ts`. Переменные: `OPENROUTER_API_KEY` (без него функция выключена), `OPENROUTER_BASE_URL` (по умолчанию `https://openrouter.ai/api/v1`; сюда же ставится свой vLLM), `OPENROUTER_PROVIDERS` (необязательный список для `provider.only`). Модель по умолчанию в этом режиме — `google/gemma-4-26b-a4b-it`; цены `RECEIPTS_PRICE_IN/OUT_USD_PER_M` для неё ≈ 0,07 / 0,23 $ за 1M токенов.
+
+Запрос: `POST {base}/chat/completions`, `fetch` без SDK. system = тот же промпт; user = `image_url` (data-URI) перед текстом; `response_format: { type: 'json_schema', json_schema: { name: 'receipt', strict: true, schema } }`; `provider: { require_parameters: true, data_collection: 'deny', only? }` — только хостеры, которые понимают схему и не хранят данные ([Structured outputs](https://openrouter.ai/docs/features/structured-outputs), [Provider routing](https://openrouter.ai/docs/features/provider-routing)); `reasoning: { effort: 'low' }` ([Reasoning](https://openrouter.ai/docs/use-cases/reasoning-tokens)): `none` отключает рассуждения совсем, но модели с обязательными рассуждениями его отвергают, поэтому берём `low`. Ошибки: таймаут → `timeout`; любой не-2xx (в том числе 403 для неподдерживаемого региона, 402, 429, 5xx) и сетевой сбой → `unavailable` (в лог идёт только `HTTP <код>`); `finish_reason: length` → `truncated`; `refusal`/`content_filter` → `refusal`; пустой ответ или JSON не по схеме → `malformed`. Токены — из `usage.prompt_tokens/completion_tokens`.
+
+Не-2xx от OpenRouter не обязательно означает блокировку региона: проверьте доступность с боевого сервера. Если не пускает, провайдер всё равно годится для своего сервера через `OPENROUTER_BASE_URL`. Выбор модели — по замеру: `scripts/receipts-bench.ts` (кандидаты: Gemma 4 26B A4B и 31B, Mistral Small 3.2 24B, Qwen3.5 Flash).
+
 ## 7. Лимиты и контроль затрат
 
 Лимит стоит **на группу**, а не на человека (решение владельца, раздел 0). Значения настраиваются через env; реализовано в `server/src/receipts/limits.ts`.

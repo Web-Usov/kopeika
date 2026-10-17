@@ -84,8 +84,25 @@ export const config = {
   anthropicApiKey: env.ANTHROPIC_API_KEY ?? '',
   /** Optional gateway/proxy address for the Anthropic API; empty = the SDK default. */
   anthropicBaseUrl: env.ANTHROPIC_BASE_URL ?? '',
+  /** Which backend reads receipts: the Anthropic API (default) or an OpenAI-compatible one (OpenRouter, own vLLM). */
+  receiptsProvider: ((env.RECEIPTS_PROVIDER ?? '').trim().toLowerCase() === 'openrouter'
+    ? 'openrouter'
+    : 'anthropic') as 'anthropic' | 'openrouter',
+  /** OpenRouter (or any OpenAI-compatible server) key. Empty = the feature is off when this provider is selected. */
+  openrouterApiKey: env.OPENROUTER_API_KEY ?? '',
+  /** Base URL of the OpenAI-compatible API, without a trailing slash. */
+  openrouterBaseUrl: (env.OPENROUTER_BASE_URL?.trim() || 'https://openrouter.ai/api/v1').replace(/\/+$/, ''),
+  /** OpenRouter provider slugs allowed to serve the request (`provider.only`); empty = any. */
+  openrouterProviders: (env.OPENROUTER_PROVIDERS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
   /** Model that reads receipt photos. */
-  receiptsModel: env.RECEIPTS_MODEL?.trim() || 'claude-haiku-5-5',
+  receiptsModel:
+    env.RECEIPTS_MODEL?.trim() ||
+    ((env.RECEIPTS_PROVIDER ?? '').trim().toLowerCase() === 'openrouter'
+      ? 'google/gemma-4-26b-a4b-it'
+      : 'claude-haiku-5-5'),
   /** Stronger model tried once when the sum of the lines does not match the total. Empty (default) = no cascade. */
   receiptsFallbackModel: env.RECEIPTS_FALLBACK_MODEL?.trim() ?? '',
   /** Timeout of one recognition request to the provider, seconds. */
