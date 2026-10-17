@@ -27,7 +27,10 @@ const routes: [pattern: string, render: (p: Params, query: Query) => ReactElemen
   ['/terms', () => <Terms />],
   ['/new', (_p, query) => <NewGroup linkToken={query.get('link')} />],
   ['/link/:token', (p) => <Link key={p.token} token={p.token} />],
-  ['/join/:code', (p) => <Join key={p.code} code={p.code} />],
+  [
+    '/join/:code',
+    (p, query) => <Join key={p.code} code={p.code} to={query.get('to') === 'summary' ? 'summary' : undefined} />,
+  ],
   ['/g/:id', (p, query) => <Group key={p.id} id={Number(p.id)} tab={groupTab(query.get('tab'))} />],
   ['/g/:id/settings', (p) => <Settings id={Number(p.id)} />],
   ['/g/:id/summary', (p) => <Summary id={Number(p.id)} />],

@@ -24,6 +24,7 @@ import {
   notifyExpenseChange,
   notifyMemberRemoved,
   notifyRemind,
+  notifyTripFinished,
   prepareChatButton,
   prepareShare,
   sendExportFile,
@@ -353,12 +354,18 @@ api.post('/groups/:id/export', async (c) => {
   return c.json({ ok: true });
 });
 
+// Finishing a trip is archiving: the first archive call (not a repeat) counts the event and posts the summary card.
 api.post('/groups/:id/archive', (c) => {
   const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
+  const finishing = group.archived_at === null;
   tx(() => {
-    if (group.archived_at === null) logActivity(group.id, c.get('user').id, 'group.archive', {});
+    if (finishing) {
+      logActivity(group.id, c.get('user').id, 'group.archive', {});
+      if (!group.is_demo) countEvent('group.finish');
+    }
     run("UPDATE groups SET archived_at = COALESCE(archived_at, datetime('now')) WHERE id = ?", group.id);
   });
+  if (finishing) notifyTripFinished(group, c.get('lang'));
   return c.json(detail({ ...group, archived_at: group.archived_at ?? 'now' }, me));
 });
 
