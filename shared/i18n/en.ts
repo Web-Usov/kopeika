@@ -81,6 +81,7 @@ export const en: Dict = {
     settled: 'You’re settled up',
     owedToYou: 'You’re owed {amount}',
     youOwe: 'You owe {amount}',
+    shareChat: '💬 Share to chat',
     invite: '👋 Invite',
     settings: '⚙️ Group',
     tabExpenses: 'Expenses',
@@ -619,6 +620,7 @@ export const en: Dict = {
     recurringNotFound: 'Recurring expense not found',
     invalidData: 'Invalid data',
     internal: 'Something went wrong on our side. Please try again.',
+    shareUnavailable: 'The bot is unavailable right now — try again a bit later',
     exportBotUnavailable:
       'The bot can’t message you. Open the chat with the bot, press Start and turn on notifications.',
     quota: {

@@ -17,7 +17,18 @@ import {
 import { Celebration } from '../Celebration.tsx';
 import { dateLocale, lang, rich, t } from '../i18n.ts';
 import { navigate } from '../router.ts';
-import { alertDialog, BackButton, confirmDialog, copyText, haptic, MainButton, openLink, shareLink } from '../tg.tsx';
+import {
+  alertDialog,
+  BackButton,
+  canShareMessage,
+  confirmDialog,
+  copyText,
+  haptic,
+  MainButton,
+  openLink,
+  shareLink,
+  shareMessage,
+} from '../tg.tsx';
 import { Avatar, ErrorView, formatDay, Loading, Money, Row, Section, Segmented } from '../ui.tsx';
 
 export type Tab = 'expenses' | 'balances' | 'history';
@@ -58,6 +69,11 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
           <button type="button" onClick={() => invite(g)}>
             {t('group.invite')}
           </button>
+          {!g.isDemo && (
+            <button type="button" onClick={() => void shareBalance(g)}>
+              {t('group.shareChat')}
+            </button>
+          )}
           <button type="button" onClick={() => navigate(`/g/${g.id}/summary`)}>
             {t('summary.open')}
             <span className="hint small">
@@ -111,6 +127,17 @@ function DemoBanner({ g }: { g: GroupDetail }) {
       </button>
     </div>
   );
+}
+
+/** Sends the balance card to a chosen chat; on clients without shareMessage falls back to the invite link share. */
+async function shareBalance(g: GroupDetail) {
+  if (!canShareMessage()) return invite(g);
+  try {
+    const { id } = await api.prepareShare(g.id, 'balance');
+    await shareMessage(id);
+  } catch (e) {
+    await alertDialog((e as Error).message);
+  }
 }
 
 function invite(g: GroupDetail) {

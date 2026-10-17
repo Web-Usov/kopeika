@@ -1,4 +1,5 @@
 import { Bot, GrammyError, InlineKeyboard, InputFile } from 'grammy';
+import type { InlineQueryResult } from 'grammy/types';
 import { createT, type Lang, pickLang } from '../../shared/i18n/index.ts';
 import { formatMoney } from '../../shared/money.ts';
 import { checkCommand, checkInline } from './botLimits.ts';
@@ -32,6 +33,7 @@ import {
   inlineGroupsForUser,
   upsertUser,
 } from './repo.ts';
+import type { SHARE_TARGETS } from './shareCard.ts';
 import { buildStatsReport, canSeeStats, collectStats, countEventSafe } from './stats.ts';
 
 export const bot = config.botToken
@@ -46,13 +48,38 @@ let botUsername = '';
 /** True only after bot.init() succeeded; until then everything behaves as if the bot isn't configured. */
 let botReady = false;
 
+type SharePermissions = typeof SHARE_TARGETS;
+
 export type ChatMemberLookup = (chatId: number, userId: number) => Promise<string>;
 
-let chatMemberLookup: ChatMemberLookup | null = null;
+export type PrepareShare = (userId: number, result: InlineQueryResult, targets: SharePermissions) => Promise<string>;
 
-/** Tests replace the Bot API call that tells the user's role in a chat. Call with no argument to reset. */
-export function setBotTestHooks(hooks: { chatMember?: ChatMemberLookup } = {}) {
+let chatMemberLookup: ChatMemberLookup | null = null;
+let prepareShareHook: PrepareShare | null = null;
+
+/** Tests replace the Bot API calls (user's role in a chat, savePreparedInlineMessage). Call with no argument to reset. */
+export function setBotTestHooks(hooks: { chatMember?: ChatMemberLookup; prepareShare?: PrepareShare } = {}) {
   chatMemberLookup = hooks.chatMember ?? null;
+  prepareShareHook = hooks.prepareShare ?? null;
+}
+
+/** True when a card can be prepared for sharing: the bot is up (or tests replaced the call). */
+export function canPrepareShare(): boolean {
+  return Boolean(prepareShareHook) || Boolean(bot && botReady);
+}
+
+/**
+ * savePreparedInlineMessage: stores a card that the Mini App sends with WebApp.shareMessage(id). Returns the prepared
+ * message id, or null when the bot isn't available. Throws if Telegram refuses.
+ */
+export async function prepareShare(
+  userId: number,
+  result: InlineQueryResult,
+  targets: SharePermissions,
+): Promise<string | null> {
+  if (prepareShareHook) return prepareShareHook(userId, result, targets);
+  if (!bot || !botReady) return null;
+  return (await bot.api.savePreparedInlineMessage(userId, result, targets)).id;
 }
 
 /**

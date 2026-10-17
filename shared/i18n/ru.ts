@@ -81,6 +81,7 @@ export const ru = {
     settled: 'Вы в расчёте',
     owedToYou: 'Вам должны {amount}',
     youOwe: 'Вы должны {amount}',
+    shareChat: '💬 Поделиться в чат',
     invite: '👋 Пригласить',
     settings: '⚙️ Группа',
     tabExpenses: 'Траты',
@@ -618,6 +619,7 @@ export const ru = {
     recurringNotFound: 'Регулярная трата не найдена',
     invalidData: 'Некорректные данные',
     internal: 'Внутренняя ошибка сервера',
+    shareUnavailable: 'Бот сейчас недоступен — попробуйте чуть позже',
     exportBotUnavailable:
       'Бот не может написать вам. Откройте чат с ботом, нажмите «Запустить» и включите уведомления.',
     quota: {

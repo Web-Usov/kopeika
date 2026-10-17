@@ -37,6 +37,7 @@ interface WebApp {
   openTelegramLink(url: string): void;
   openLink(url: string): void;
   requestWriteAccess(cb: (allowed: boolean) => void): void;
+  shareMessage?(id: string, cb?: (sent: boolean) => void): void;
 }
 
 declare global {
@@ -100,6 +101,14 @@ export function shareLink(url: string, text: string) {
   const share = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
   if (inTelegram) tg!.openTelegramLink(share);
   else window.open(share, '_blank');
+}
+
+/** Native «send this prepared card to a chat» (WebApp 8.0+). False outside Telegram and on older clients. */
+export const canShareMessage = () => atLeast('8.0') && typeof tg!.shareMessage === 'function';
+
+/** Opens Telegram's chat picker for a message prepared with savePreparedInlineMessage; resolves true if it was sent. */
+export function shareMessage(id: string): Promise<boolean> {
+  return new Promise((resolve) => tg!.shareMessage!(id, (sent) => resolve(sent)));
 }
 
 /** Copies text to the clipboard; if that is blocked, shows the text in a dialog so it can be copied by hand. */
