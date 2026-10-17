@@ -144,15 +144,23 @@ def apple_touch():
 
 
 def avatar():
-    """Поясной кадр: лицо-монета и машущая рука крупно, ножки уходят за круг."""
-    c = Image.new('RGBA', (640, 640), CREAM + (255,))
-    im = S.render(S.compose('greet'))
-    k = 12
-    cx, cy = 285, 285   # центр лица чуть выше центра круга
-    place(c, im, cx - 28 * k, cy - 28 * k, k)
-    for x, y in ((120, 150), (535, 440)):
-        centered(c, spark_img(True), 4, x, y)
-    return c
+    """Монета «в край» без рук и ног: Telegram режет аватар в круг, и круглая монета заполняет его целиком.
+    Фон — цвет контура: углы срезает круг, а край выглядит продолжением обводки монеты."""
+    coin = S.coin_fill()
+    coin.update(S.face('greet'))
+    lay = S.outline(coin)
+    xs = [x for x, _ in lay]
+    ys = [y for _, y in lay]
+    x0, y0 = min(xs), min(ys)
+    w, h = max(xs) - x0 + 1, max(ys) - y0 + 1
+    side = max(w, h)
+    im = Image.new('RGBA', (side, side), P['O'] + (255,))
+    for (x, y), ch in lay.items():
+        im.putpixel((x - x0 + (side - w) // 2, y - y0 + (side - h) // 2), P[ch] + (255,))
+    k = -(-640 // side)  # наименьшее целое увеличение, покрывающее 640
+    big = up(im, k)
+    m = (big.width - 640) // 2
+    return big.crop((m, m, m + 640, m + 640))
 
 
 def miniapp():
