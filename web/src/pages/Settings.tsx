@@ -9,6 +9,7 @@ import {
   setGroup,
   useGroup,
 } from '../api.ts';
+import { finishTrip } from '../finish.ts';
 import { t } from '../i18n.ts';
 import { scheduleText, shortDate } from '../recurring.ts';
 import { navigate } from '../router.ts';
@@ -143,6 +144,12 @@ function SettingsView({ g }: { g: GroupDetail }) {
     }
   };
 
+  const finish = async () => {
+    const unsettled = g.members.some((m) => m.balance !== 0);
+    const message = t(unsettled ? 'settings.confirmFinishUnsettled' : 'settings.confirmFinish', { name: g.name });
+    if (await confirmDialog(message)) await finishTrip(g);
+  };
+
   const rotateInvite = async () => {
     if (await confirmDialog(t('settings.confirmRotateInvite'))) await run(() => api.rotateInvite(g.id));
   };
@@ -258,6 +265,12 @@ function SettingsView({ g }: { g: GroupDetail }) {
           onClick={exporting ? undefined : exportCsv}
         />
       </Section>
+
+      {!g.archived && !g.isDemo && (
+        <Section footer={t('settings.finishFooter')}>
+          <Row title={t('settings.finishTrip')} onClick={finish} />
+        </Section>
+      )}
 
       <Section footer={t('settings.archiveFooter')}>
         <Row title={g.archived ? t('settings.unarchiveGroup') : t('settings.archiveGroup')} onClick={toggleArchive} />

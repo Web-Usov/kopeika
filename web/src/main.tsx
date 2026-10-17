@@ -12,6 +12,8 @@ initTelegram();
 // `link_<token>` comes from the button the bot posts when it is added to a group chat: link that chat to a group.
 const code = startParam();
 if (code?.startsWith('link_') && /^[\w-]+$/.test(code)) history.replaceState(null, '', `#/link/${code.slice(5)}`);
+else if (code?.startsWith('sum_') && /^[\w-]+$/.test(code))
+  history.replaceState(null, '', `#/join/${code.slice(4)}?to=summary`);
 else if (code && /^[\w-]+$/.test(code)) history.replaceState(null, '', `#/join/${code}`);
 else if (!location.hash.startsWith('#/')) history.replaceState(null, '', '#/');
 

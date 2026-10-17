@@ -993,6 +993,23 @@ select.field {
   font-size: 14px;
 }
 
+/* Offer to finish the trip: calm, same family as the demo banner but solid, not dashed. */
+.finish-banner {
+  border-style: solid;
+}
+
+.banner-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.chip.finish-yes {
+  background: var(--button);
+  color: var(--button-text);
+  font-weight: 600;
+}
+
 .link-btn {
   color: var(--destructive);
   font-size: inherit;

@@ -17,6 +17,7 @@ import {
 import { balanceText, esc, helpText, privateBalanceText } from './chatText.ts';
 import { config } from './config.ts';
 import { all, one, run } from './db.ts';
+import { finishCardFor } from './finishCard.ts';
 import { buildInlineResults } from './inline.ts';
 import { describeTelegramError, logTelegramError } from './logging.ts';
 import {
@@ -60,12 +61,17 @@ export type PrepareShare = (userId: number, result: InlineQueryResult, targets: 
 /** A private message to a user (access requests and their results). Tests capture these instead of calling Telegram. */
 export type SendMessage = (userId: number, text: string, extra?: { reply_markup?: InlineKeyboard }) => Promise<unknown>;
 
+/** A post to a group's linked chat. Tests capture these instead of calling Telegram. */
+export type ChatPost = (group: GroupRow, text: string, button: ChatMessage['button']) => Promise<boolean>;
+
 export type PrepareChatButton = (userId: number, requestId: number, lang: Lang) => Promise<string>;
 
 let chatMemberLookup: ChatMemberLookup | null = null;
 let prepareShareHook: PrepareShare | null = null;
 let prepareChatButtonHook: PrepareChatButton | null = null;
 let sendMessageHook: SendMessage | null = null;
+let chatPostHook: ChatPost | null = null;
+let appLinkHook: ((startParam?: string) => string | null) | null = null;
 
 /**
  * Tests replace the Bot API calls (user's role in a chat, savePreparedInlineMessage, savePreparedKeyboardButton).
@@ -77,9 +83,13 @@ export function setBotTestHooks(
     prepareShare?: PrepareShare;
     prepareChatButton?: PrepareChatButton;
     sendMessage?: SendMessage;
+    chatPost?: ChatPost;
+    appLink?: (startParam?: string) => string | null;
   } = {},
 ) {
   sendMessageHook = hooks.sendMessage ?? null;
+  chatPostHook = hooks.chatPost ?? null;
+  appLinkHook = hooks.appLink ?? null;
   chatMemberLookup = hooks.chatMember ?? null;
   prepareShareHook = hooks.prepareShare ?? null;
   prepareChatButtonHook = hooks.prepareChatButton ?? null;
@@ -182,6 +192,7 @@ export function retryDelaySec(attempt: number): number {
 }
 
 export function appLink(startParam?: string): string | null {
+  if (appLinkHook) return appLinkHook(startParam);
   if (!botReady || !botUsername || !config.appShortName) return null;
   const base = `https://t.me/${botUsername}/${config.appShortName}`;
   return startParam ? `${base}?startapp=${startParam}` : base;
@@ -559,6 +570,24 @@ export async function handleAccessCallback(
   );
 }
 
+/**
+ * «Trip finished» card in the linked chat, in the language of the person who finished. Fire-and-forget; the caller
+ * decides when it is due (once per archive transition). No-op without a linked chat, for demo groups, or until the bot is up.
+ */
+export function notifyTripFinished(group: GroupRow, lang: Lang) {
+  if (group.is_demo || group.chat_id === null || (!chatPostHook && !(bot && botReady))) return;
+  try {
+    const url = appLink(`sum_${group.invite_code}`);
+    void sendToChat(
+      group,
+      finishCardFor(group, lang),
+      url ? { text: createT(lang)('bot.finishOpen'), url } : undefined,
+    );
+  } catch (e) {
+    logTelegramError('trip finish card failed', e);
+  }
+}
+
 /** After a successful link: confirmation in the chat in the linking user's language. Fire-and-forget. */
 export function notifyChatLinked(chatId: number, group: GroupRow, lang: Lang) {
   if (!bot || !botReady || group.is_demo) return;
@@ -675,6 +704,7 @@ export function isChatGone(e: unknown): boolean {
  * unlinked; if it became a supergroup the link moves to the new id. Never throws.
  */
 export async function sendToChat(group: GroupRow, text: string, button?: ChatMessage['button']): Promise<boolean> {
+  if (chatPostHook) return group.chat_id === null ? false : chatPostHook(group, text, button);
   if (!bot || !botReady || group.chat_id === null) return false;
   try {
     await bot.api.sendMessage(group.chat_id, text, {
