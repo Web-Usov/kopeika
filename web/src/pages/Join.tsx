@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, type InvitePreview } from '../api.ts';
 import { t } from '../i18n.ts';
+import { joinSource } from '../joinSource.ts';
 import { askNotifyOnce } from '../notify.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, haptic, MainButton } from '../tg.tsx';
@@ -27,7 +28,7 @@ export function Join({ code, to }: { code: string; to?: 'summary' }) {
   const join = async () => {
     setSaving(true);
     try {
-      const { groupId } = await api.join(code, claim ?? undefined);
+      const { groupId } = await api.join(code, claim ?? undefined, joinSource.value);
       haptic.success();
       navigate(`/g/${groupId}`, { replace: true });
       void askNotifyOnce();

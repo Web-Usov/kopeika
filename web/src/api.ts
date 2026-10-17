@@ -2,6 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { Achievement } from '../../shared/achievements.ts';
 import type { ActivityEntry } from '../../shared/activity.ts';
 import type { CategoryId, CategoryTotal } from '../../shared/categories.ts';
+import type { JoinSource } from '../../shared/invite.ts';
 import type { SplitMode } from '../../shared/money.ts';
 import type { ReceiptsProvider } from '../../shared/privacy.ts';
 import type { Period } from '../../shared/recurring.ts';
@@ -350,8 +351,8 @@ export const api = {
     request<GroupDetail>('PATCH', `/groups/${id}/members/${memberId}`, { name }),
   deleteMember: (id: number, memberId: number) => request<GroupDetail>('DELETE', `/groups/${id}/members/${memberId}`),
   invite: (code: string) => request<InvitePreview>('GET', `/invite/${encodeURIComponent(code)}`),
-  join: (code: string, claimMemberId?: number) =>
-    request<{ groupId: number }>('POST', `/invite/${encodeURIComponent(code)}/join`, { claimMemberId }),
+  join: (code: string, claimMemberId?: number, source?: JoinSource) =>
+    request<{ groupId: number }>('POST', `/invite/${encodeURIComponent(code)}/join`, { claimMemberId, source }),
   chatLink: (token: string) => request<ChatLinkPreview>('GET', `/chat-links/${encodeURIComponent(token)}`),
   attachChat: (token: string, groupId: number) =>
     request<GroupDetail>('POST', `/chat-links/${encodeURIComponent(token)}/attach`, { groupId }),
