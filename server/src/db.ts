@@ -187,6 +187,39 @@ const migrations = [
   // Demo group ("Look at an example" on first launch): a sandbox with made-up people and expenses. Invites, the bot,
   // chat links, recurring templates and the inline list ignore it; it is deleted like any other group.
   `ALTER TABLE groups ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0;`,
+  // Receipts (#102): rights of a group (a trial is the absence of a row; 'stars' is reserved for paid Premium),
+  // a ledger of provider calls for cost control (no receipt content, no photo), the user's consent, and a marker
+  // so that each monthly budget warning reaches the owner once.
+  `
+  ALTER TABLE users ADD COLUMN receipt_consent_at TEXT;
+  CREATE TABLE group_entitlements (
+    group_id    INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    feature     TEXT NOT NULL CHECK (feature IN ('receipts')),
+    source      TEXT NOT NULL CHECK (source IN ('trial', 'admin', 'stars')),
+    granted_at  TEXT NOT NULL,   -- UTC ISO
+    expires_at  TEXT,            -- UTC ISO; NULL = no end
+    granted_by  INTEGER,
+    PRIMARY KEY (group_id, feature)
+  );
+  CREATE TABLE receipt_scans (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id         INTEGER NOT NULL,   -- 0 (the "deleted user") after account deletion; no foreign key on purpose
+    group_id        INTEGER NOT NULL,   -- no foreign key: the spend stays in the budget after the group is gone
+    created_at      TEXT NOT NULL,      -- UTC ISO
+    model           TEXT NOT NULL,
+    input_tokens    INTEGER NOT NULL,
+    output_tokens   INTEGER NOT NULL,
+    cost_micro_usd  INTEGER NOT NULL,
+    counted         INTEGER NOT NULL DEFAULT 0   -- 1: a successful scan that counts against the group's free quota
+  );
+  CREATE INDEX receipt_scans_group ON receipt_scans(group_id, created_at);
+  CREATE INDEX receipt_scans_time ON receipt_scans(created_at);
+  CREATE TABLE receipt_notices (
+    month  TEXT NOT NULL,   -- YYYY-MM, server-local
+    kind   TEXT NOT NULL,   -- 'warn' | 'stop'
+    PRIMARY KEY (month, kind)
+  );
+  `,
 ];
 
 const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
