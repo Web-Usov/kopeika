@@ -11,9 +11,9 @@ import numpy as np
 from PIL import Image, ImageFilter
 from scipy import ndimage as ndi
 
-ROOT = Path(__file__).resolve().parents[3]
-SRC = ROOT / "design/mascot/emotions"
-DST = ROOT / "design/mascot/masters"
+ROOT = Path(__file__).resolve().parents[4]
+SRC = ROOT / "design/mascot/illustrated/emotions"
+DST = ROOT / "design/mascot/illustrated/masters"
 PREV = Path("/private/tmp/claude-502/kopeika-stream1/preview")
 SIZE = 1600  # итоговая сторона мастера
 PAD = 0.04

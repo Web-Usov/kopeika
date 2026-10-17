@@ -2,9 +2,9 @@
 
 Запуск (из корня репозитория, после cutout.py):
   uv run --with potracer --with numpy --with pillow python design/mascot/tools/trace.py [имена]
-  npx --yes svgo --config design/mascot/tools/svgo.config.mjs -f web/public/brand/mascot
+  npx --yes svgo --config design/mascot/tools/svgo.config.mjs -f design/mascot/illustrated/brand/mascot
 Выход:
-  web/public/brand/mascot/<имя>.svg  ~30–40 КБ после svgo
+  design/mascot/illustrated/brand/mascot/<имя>.svg  ~30–40 КБ после svgo
 
 Как работает:
   1. Мастер уменьшается до 800 px и сглаживается медианным фильтром (убирает шум генерации).
@@ -22,7 +22,7 @@ import numpy as np
 import potrace
 from PIL import Image, ImageFilter
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[4]
 SIZE = 800
 SEEDS = [
     "#311202",  # глаза, рот
@@ -68,7 +68,7 @@ def path_d(curves):
 
 
 def trace(name):
-    im = Image.open(ROOT / f"design/mascot/masters/{name}.png").convert("RGBA").resize((SIZE, SIZE), Image.LANCZOS)
+    im = Image.open(ROOT / f"design/mascot/illustrated/masters/{name}.png").convert("RGBA").resize((SIZE, SIZE), Image.LANCZOS)
     alpha = np.array(im)[:, :, 3] > 128
     bg = Image.new("RGBA", im.size, (104, 46, 13, 255))  # фон под контур, чтобы край не светлел
     bg.alpha_composite(im)
@@ -102,7 +102,7 @@ def trace(name):
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {SIZE} {SIZE}">'
         f"<title>{TITLES[name]}</title>{''.join(layers)}</svg>\n"
     )
-    out = ROOT / f"web/public/brand/mascot/{name}.svg"
+    out = ROOT / f"design/mascot/illustrated/brand/mascot/{name}.svg"
     out.write_text(svg, encoding="utf-8")
     print(f"{len(svg.encode()) // 1024:4d} КБ  {out.relative_to(ROOT)}")
 

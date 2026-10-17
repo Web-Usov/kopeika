@@ -9,9 +9,9 @@
 Что делает: мастер целиком двигается трансформациями (сдвиг, поворот вокруг точки у ступней,
 squash & stretch с сохранением площади) + процедурные частицы. Рисунок не перерисовывается.
 Результат:
-    design/mascot/animations/stickers/<имя>.webm   VP9+alpha, 512x512, 30 fps (видеостикеры Telegram)
-    design/mascot/animations/preview/<имя>.gif     256x256 на кремовом фоне, 20 fps
-    design/mascot/animations/preview/all.gif       сетка 3x2, плитки по 128 px, 8 fps, 10 с
+    design/mascot/illustrated/animations/stickers/<имя>.webm   VP9+alpha, 512x512, 30 fps (видеостикеры Telegram)
+    design/mascot/illustrated/animations/preview/<имя>.gif     256x256 на кремовом фоне, 20 fps
+    design/mascot/illustrated/animations/preview/all.gif       сетка 3x2, плитки по 128 px, 8 fps, 10 с
 ffmpeg берётся из imageio_ffmpeg (в нём есть libvpx-vp9).
 """
 
@@ -24,9 +24,9 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
 
-ROOT = Path(__file__).resolve().parents[3]
-MASTERS = ROOT / "design/mascot/masters"
-OUT = ROOT / "design/mascot/animations"
+ROOT = Path(__file__).resolve().parents[4]
+MASTERS = ROOT / "design/mascot/illustrated/masters"
+OUT = ROOT / "design/mascot/illustrated/animations"
 
 # ───────────────────────── параметры движений ─────────────────────────
 # Единицы: px на холсте 512x512; углы в градусах; время в секундах.

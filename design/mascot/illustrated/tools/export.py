@@ -3,17 +3,17 @@
 Запуск (из корня репозитория, после cutout.py):
   uv run --with pillow --with numpy python design/mascot/tools/export.py
 Выход:
-  design/mascot/stickers/<имя>.webp|.png  512x512, прозрачные (webp <=150 КБ, png <=512 КБ)
-  web/public/brand/mascot/<имя>.webp         512x512, прозрачный, <=60 КБ (подбор качества)
+  design/mascot/illustrated/stickers/<имя>.webp|.png  512x512, прозрачные (webp <=150 КБ, png <=512 КБ)
+  design/mascot/illustrated/brand/mascot/<имя>.webp         512x512, прозрачный, <=60 КБ (подбор качества)
 """
 import io
 from pathlib import Path
 from PIL import Image
 
-ROOT = Path(__file__).resolve().parents[3]
-MAS = ROOT / "design/mascot/masters"
-STK = ROOT / "design/mascot/stickers"
-APP = ROOT / "web/public/brand/mascot"
+ROOT = Path(__file__).resolve().parents[4]
+MAS = ROOT / "design/mascot/illustrated/masters"
+STK = ROOT / "design/mascot/illustrated/stickers"
+APP = ROOT / "design/mascot/illustrated/brand/mascot"
 
 
 def webp_under(img, limit):
