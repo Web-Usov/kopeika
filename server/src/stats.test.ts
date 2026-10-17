@@ -94,6 +94,28 @@ test('API actions count: group, expense, transfer, join (once)', async () => {
   assert.equal(total('member.join') - j0, 1);
 });
 
+test('join source: link by default and for old clients, card when the client says so', async () => {
+  const [l0, c0] = [total('join.link'), total('join.card')];
+  const created = await call(9111, 'POST', '/groups', { name: 'Источники', currency: 'RUB', memberNames: ['Коля'] });
+  const code = db.one<{ invite_code: string }>(
+    'SELECT invite_code FROM groups WHERE id = ?',
+    created.body.id,
+  )?.invite_code;
+  assert.equal((await call(9112, 'POST', `/invite/${code}/join`, {})).status, 200);
+  assert.equal((await call(9113, 'POST', `/invite/${code}/join`, { source: 'link' })).status, 200);
+  assert.equal((await call(9114, 'POST', `/invite/${code}/join`, { source: 'card' })).status, 200);
+  // a repeated join is not counted again
+  assert.equal((await call(9114, 'POST', `/invite/${code}/join`, { source: 'card' })).status, 200);
+  const nameOnly = created.body.members.find((m: Json) => m.name === 'Коля').id;
+  assert.equal(
+    (await call(9115, 'POST', `/invite/${code}/join`, { claimMemberId: nameOnly, source: 'card' })).status,
+    200,
+  );
+  assert.ok((await call(9116, 'POST', `/invite/${code}/join`, { source: 'bogus' })).status >= 400);
+  assert.equal(total('join.link') - l0, 2);
+  assert.equal(total('join.card') - c0, 2);
+});
+
 test('stats_daily holds only date, event and count: no ids', () => {
   const cols = db.all<{ name: string }>('PRAGMA table_info(stats_daily)').map((c) => c.name);
   assert.deepEqual(cols, ['date', 'event', 'count']);
@@ -125,15 +147,22 @@ test('buildStatsReport: every event, both languages', () => {
     active: { 1: 2, 7: 5, 30: 9 },
     users: 12,
     groups: 4,
+    funnel: {
+      7: { created: 4, alive: 1, returned: 0, returnedOf: 0 },
+      30: { created: 10, alive: 5, returned: 2, returnedOf: 8 },
+    },
   } as import('./stats.ts').StatsSnapshot;
   const ru = stats.buildStatsReport('ru', snap);
   assert.match(ru, /Трат добавлено: 3 · 20 · 80/);
   assert.match(ru, /Активных пользователей: 2 · 5 · 9/);
   assert.match(ru, /пользователей 12, групп 4/);
   assert.match(ru, /Групп создано: 0 · 0 · 0/);
+  assert.match(ru, /Ожило: 1 \(25%\) · 5 \(50%\)/);
+  assert.match(ru, /Вернулись на 2-й неделе: 0\/0 \(—\) · 2\/8 \(25%\)/);
   const en = stats.buildStatsReport('en', snap);
   assert.match(en, /Expenses added: 3 · 20 · 80/);
   assert.match(en, /12 users, 4 groups/);
+  assert.match(en, /Came alive: 1 \(25%\) · 5 \(50%\)/);
   assert.equal(en.split('\n').length, ru.split('\n').length);
 });
 

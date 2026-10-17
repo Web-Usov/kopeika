@@ -4,6 +4,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
 import { categoryTotals, DEFAULT_CATEGORY } from '../../shared/categories.ts';
 import { createT, type Lang, pickLang, type TFn } from '../../shared/i18n/index.ts';
+import { startParamFor } from '../../shared/invite.ts';
 import { CURRENCIES, SplitError } from '../../shared/money.ts';
 import { firstOccurrence } from '../../shared/recurring.ts';
 import { groupSummary, summaryShareText } from '../../shared/summary.ts';
@@ -510,9 +511,13 @@ api.get('/invite/:code', (c) => {
 
 api.post('/invite/:code/join', async (c) => {
   const user = c.get('user');
-  const body = z.object({ claimMemberId: z.number().int().positive().optional() }).parse(await c.req.json());
+  const body = z
+    .object({ claimMemberId: z.number().int().positive().optional(), source: z.enum(['link', 'card']).optional() })
+    .parse(await c.req.json());
   const group = one<GroupRow>('SELECT * FROM groups WHERE invite_code = ? AND is_demo = 0', c.req.param('code'));
   if (!group) throw fail(404, 'errors.inviteInvalid');
+  // Old clients send no source: that is a plain invite link.
+  const joinEvent = body.source === 'card' ? 'join.card' : 'join.link';
   if (!findMembership(group.id, user.id)) {
     tx(() => {
       assertCanJoinMoreGroups(user.id);
@@ -528,6 +533,7 @@ api.post('/invite/:code/join', async (c) => {
         const claimed = one<MemberRow>('SELECT * FROM members WHERE id = ?', body.claimMemberId)!;
         logActivity(group.id, user.id, 'member.claim', { memberId: claimed.id, name: claimed.name });
         countEvent('member.claim');
+        countEvent(joinEvent);
       } else {
         assertRoomForMembers(group.id);
         const res = run(
@@ -541,6 +547,7 @@ api.post('/invite/:code/join', async (c) => {
           name: displayName(user),
         });
         countEvent('member.join');
+        countEvent(joinEvent);
       }
     });
   }
@@ -684,7 +691,7 @@ api.post('/groups/:id/share', async (c) => {
   }
   let id: string | null;
   try {
-    const result = buildShareResult(lang, kind, group.name, text, appLink(group.invite_code));
+    const result = buildShareResult(lang, kind, group.name, text, appLink(startParamFor(group.invite_code, 'card')));
     id = await prepareShare(user.id, result, SHARE_TARGETS);
   } catch (e) {
     logTelegramError('savePreparedInlineMessage failed', e);

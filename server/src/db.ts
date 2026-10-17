@@ -263,6 +263,8 @@ const migrations = [
   ALTER TABLE users ADD COLUMN receipt_consent_provider TEXT;
   UPDATE users SET receipt_consent_provider = 'anthropic' WHERE receipt_consent_at IS NOT NULL;
   `,
+  // Tiny key-value store for server state that must survive restarts (e.g. the week the stats report went out).
+  `CREATE TABLE app_state (key TEXT PRIMARY KEY, value TEXT NOT NULL);`,
 ];
 
 const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;

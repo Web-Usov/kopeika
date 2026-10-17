@@ -1,6 +1,7 @@
 import { Bot, GrammyError, InlineKeyboard, InputFile } from 'grammy';
 import type { InlineQueryResult } from 'grammy/types';
 import { createT, type Lang, pickLang } from '../../shared/i18n/index.ts';
+import { startParamFor } from '../../shared/invite.ts';
 import { formatMoney } from '../../shared/money.ts';
 import { checkCommand, checkInline } from './botLimits.ts';
 import {
@@ -362,7 +363,10 @@ function registerChatHandlers(b: Bot) {
       pickLang(from.language_code),
       inlineGroupsForUser(from.id),
       ctx.inlineQuery.query,
-      { groupLink: (code) => appLink(code), botLink: botUsername ? `https://t.me/${botUsername}` : null },
+      {
+        groupLink: (code) => appLink(startParamFor(code, 'card')),
+        botLink: botUsername ? `https://t.me/${botUsername}` : null,
+      },
     );
     await ctx.answerInlineQuery(results, { cache_time: 10, is_personal: true });
   });
@@ -472,10 +476,15 @@ export function requestsReply(
   return `${t('bot.requestsTitle')}\n\n${lines.join('\n\n')}`;
 }
 
+/** True when a private message can go out now: the bot is up (or tests replaced the call). */
+export function canDm(): boolean {
+  return Boolean(sendMessageHook) || Boolean(bot && botReady);
+}
+
 const requesterLabel = (name: string, id: number) => name || `id ${id}`;
 
 /** A private message that never throws: the person may have blocked the bot. */
-async function dm(userId: number, text: string, extra?: { reply_markup?: InlineKeyboard }) {
+export async function dm(userId: number, text: string, extra?: { reply_markup?: InlineKeyboard }) {
   try {
     if (sendMessageHook) await sendMessageHook(userId, text, extra);
     else if (bot && botReady) await bot.api.sendMessage(userId, text, extra);

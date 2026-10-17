@@ -618,6 +618,16 @@ export const en: Dict = {
     periods: 'today · 7 days · 30 days',
     active: 'Active users',
     totals: 'Total: {users} users, {groups} groups',
+    funnel: {
+      title: 'Group funnel (by creation date)',
+      periods: '7 days · 30 days',
+      created: 'Groups created',
+      alive: 'Came alive',
+      returned: 'Returned in week 2',
+      footer:
+        'Alive: 2+ members with Telegram and 3+ expenses. Returned: an expense or transfer 7–14 days after creation, among groups older than 14 days.',
+    },
+    weeklyTitle: 'Weekly summary',
     event: {
       group_create: 'Groups created',
       expense_create: 'Expenses added',
@@ -625,6 +635,8 @@ export const en: Dict = {
       transfer_create: 'Transfers recorded',
       member_join: 'Joined by invite',
       member_claim: '“This is me” picks',
+      join_link: 'Joins: invite link',
+      join_card: 'Joins: card from a chat',
       chat_link: 'Chats linked',
       debt_remind: 'Reminders sent',
       export_csv: 'CSV exports',

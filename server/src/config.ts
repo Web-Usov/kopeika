@@ -65,6 +65,8 @@ export const config = {
   backupKeep: parseNumber('BACKUP_KEEP', env.BACKUP_KEEP, { default: 14, max: 10000 }),
   /** Local server hour (0-23) when the daily chat digest is posted. */
   chatDigestHour: parseNumber('CHAT_DIGEST_HOUR', env.CHAT_DIGEST_HOUR, { default: 20, min: 0, max: 23 }),
+  /** Weekly stats report to ADMIN_USER_IDS on Monday morning (server time). STATS_WEEKLY=0 turns it off. */
+  statsWeekly: env.STATS_WEEKLY !== '0',
   staticDir: env.STATIC_DIR ?? path.resolve('web/dist'),
   /** Run the bot with long polling. Disable locally if the production bot uses the same token. */
   botPolling: (env.BOT_POLLING ?? '1') === '1',
