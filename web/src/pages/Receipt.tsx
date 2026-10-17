@@ -46,6 +46,14 @@ export function Receipt({ groupId }: { groupId: number }) {
 
 function Flow({ g }: { g: GroupDetail }) {
   const [stage, setStage] = useState<Stage>({ kind: 'pick' });
+  // Whether the user has already agreed (from /me). Unknown or older server: the 409 from parse tells.
+  const [consented, setConsented] = useState<boolean>();
+  useEffect(() => {
+    api.me().then(
+      (me) => setConsented(me.receiptConsent),
+      () => {},
+    );
+  }, []);
   const photo = useRef<PreparedPhoto | null>(null);
   const abort = useRef<AbortController | null>(null);
   useEffect(() => () => abort.current?.abort(), []);
@@ -87,13 +95,15 @@ function Flow({ g }: { g: GroupDetail }) {
       });
       return;
     }
-    await send();
+    if (consented === false) setStage({ kind: 'consent' });
+    else await send();
   };
 
   const consent = async () => {
     setStage({ kind: 'reading', phase: 'upload' });
     try {
       await api.giveReceiptConsent();
+      setConsented(true);
     } catch (e) {
       haptic.error();
       setStage({

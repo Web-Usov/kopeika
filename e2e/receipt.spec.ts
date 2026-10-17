@@ -21,13 +21,27 @@ const draft = {
   warnings: ['qty_mismatch'],
 };
 
-/** No real API: receipts are "enabled" and the parse answer is fixed. */
-async function mockReceipts(page: Page, parse: (body: { image: string; mediaType: string }) => void) {
+/** The server has no recognition key in e2e: pretend the feature is on (the account and the group say so). */
+async function enableReceipts(page: Page, { consent = true } = {}) {
   await page.route('**/api/me', async (route) => {
     if (route.request().method() !== 'GET') return route.continue();
     const res = await route.fetch();
-    await route.fulfill({ response: res, json: { ...(await res.json()), receiptsEnabled: true } });
+    await route.fulfill({
+      response: res,
+      json: { ...(await res.json()), receiptsEnabled: true, receiptConsent: consent },
+    });
   });
+  await page.route(/\/api\/groups\/\d+$/, async (route) => {
+    if (route.request().method() !== 'GET') return route.continue();
+    const res = await route.fetch();
+    const receipts = { enabled: true, unlimited: false, used: 2, limit: 5, resetsAt: null };
+    await route.fulfill({ response: res, json: { ...(await res.json()), receipts } });
+  });
+}
+
+/** No real API: receipts are "enabled" and the parse answer is fixed. */
+async function mockReceipts(page: Page, parse: (body: { image: string; mediaType: string }) => void) {
+  await enableReceipts(page);
   await page.route('**/api/groups/*/receipts/parse', async (route) => {
     parse(route.request().postDataJSON());
     await route.fulfill({ json: draft });
@@ -121,19 +135,15 @@ test('чек: ручной ввод без фото, английский', asyn
 test('чек: нужно согласие, потом повтор', async ({ page }) => {
   let calls = 0;
   let consented = false;
-  await page.route('**/api/me', async (route) => {
-    if (route.request().method() !== 'GET') return route.continue();
-    const res = await route.fetch();
-    await route.fulfill({ response: res, json: { ...(await res.json()), receiptsEnabled: true } });
-  });
+  await enableReceipts(page, { consent: false });
   await page.route('**/api/me/receipt-consent', async (route) => {
     consented = true;
     await route.fulfill({ json: { ok: true } });
   });
   await page.route('**/api/groups/*/receipts/parse', async (route) => {
     calls++;
-    if (!consented) await route.fulfill({ status: 409, json: { error: 'Нужно согласие' } });
-    else await route.fulfill({ json: { ...draft, mismatch: false, total: null, warnings: [] } });
+    expect(consented).toBe(true); // nothing is uploaded before the user agrees
+    await route.fulfill({ json: { ...draft, mismatch: false, total: null, warnings: [] } });
   });
   await openReceipt(page);
   await page.locator('input[type="file"]:not([capture])').setInputFiles(photo);
@@ -142,15 +152,27 @@ test('чек: нужно согласие, потом повтор', async ({ pa
   await expect(page.getByRole('button', { name: 'Политика конфиденциальности' })).toBeVisible();
   await page.getByRole('button', { name: 'Согласен, отправить' }).click();
   await expect(page.getByPlaceholder('Заведение')).toHaveValue('Хинкальная');
+  expect(calls).toBe(1);
+});
+
+test('чек: сервер просит согласие уже при отправке (409), потом повтор', async ({ page }) => {
+  let calls = 0;
+  await enableReceipts(page); // /me says "agreed", the server disagrees
+  await page.route('**/api/me/receipt-consent', (route) => route.fulfill({ json: { ok: true } }));
+  await page.route('**/api/groups/*/receipts/parse', async (route) => {
+    calls++;
+    if (calls === 1) await route.fulfill({ status: 409, json: { error: 'Нужно согласие' } });
+    else await route.fulfill({ json: draft });
+  });
+  await openReceipt(page);
+  await page.locator('input[type="file"]:not([capture])').setInputFiles(photo);
+  await page.getByRole('button', { name: 'Согласен, отправить' }).click();
+  await expect(page.getByPlaceholder('Заведение')).toHaveValue('Хинкальная');
   expect(calls).toBe(2);
 });
 
 test('чек: ошибка «не чек» показывает текст и ручной ввод', async ({ page }) => {
-  await page.route('**/api/me', async (route) => {
-    if (route.request().method() !== 'GET') return route.continue();
-    const res = await route.fetch();
-    await route.fulfill({ response: res, json: { ...(await res.json()), receiptsEnabled: true } });
-  });
+  await enableReceipts(page);
   await page.route('**/api/groups/*/receipts/parse', (route) =>
     route.fulfill({ status: 400, json: { error: 'Не похоже на чек.' } }),
   );

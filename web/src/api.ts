@@ -298,7 +298,8 @@ export function clearCache() {
 
 export const api = {
   deleteMe: () => request<{ ok: true; groupsDeleted: number; groupsLeft: number }>('DELETE', '/me'),
-  me: () => request<{ name: string; notify: boolean; receiptsEnabled?: boolean }>('GET', '/me'),
+  me: () =>
+    request<{ name: string; notify: boolean; receiptsEnabled?: boolean; receiptConsent?: boolean }>('GET', '/me'),
   parseReceipt: (id: number, body: { image: string; mediaType: string }, signal?: AbortSignal) =>
     request<ParsedReceipt>('POST', `/groups/${id}/receipts/parse`, body, signal),
   giveReceiptConsent: () => request<unknown>('POST', '/me/receipt-consent', {}),
