@@ -257,6 +257,16 @@ function SettingsView({ g }: { g: GroupDetail }) {
         </Section>
       )}
 
+      {!g.isDemo && (
+        <Section footer={t('settings.autoRemindFooter')}>
+          <Row
+            title={t('settings.autoRemindTitle')}
+            onClick={() => void run(() => api.setAutoRemind(g.id, !g.autoRemind))}
+            right={<span className={`switch ${g.autoRemind ? 'on' : ''}`} />}
+          />
+        </Section>
+      )}
+
       {!g.isDemo && <RecurringSection g={g} />}
 
       <Section title={t('settings.exportSection')} footer={t('settings.exportFooter')}>

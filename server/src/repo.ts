@@ -40,6 +40,7 @@ export interface GroupRow {
   chat_feed: ChatFeed;
   last_digest_date: string | null;
   last_digest_at: string | null;
+  auto_remind: number;
   is_demo: number;
 }
 
@@ -307,6 +308,7 @@ export function groupDetail(group: GroupRow, me: MemberRow, inviteLink: string |
     isDemo: group.is_demo === 1,
     isOwner: group.created_by === me.user_id,
     archived: group.archived_at !== null,
+    autoRemind: group.auto_remind === 1,
     // Only the title: the numeric chat id never leaves the server.
     chat: group.chat_id === null ? null : { title: group.chat_title ?? '', feed: group.chat_feed },
     meId: me.id,

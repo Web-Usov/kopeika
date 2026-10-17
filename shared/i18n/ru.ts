@@ -214,6 +214,8 @@ export const ru = {
     emptyHint: 'Здесь появятся все изменения в группе: кто и что добавил, исправил или удалил.',
     loadMore: 'Показать ещё',
     remind: '{actor} напомнил(а) о долге: {name}, {amount}',
+    autoRemindOn: '{actor} включил(а) автонапоминание о долгах',
+    autoRemindOff: '{actor} выключил(а) автонапоминание о долгах',
     chatLink: '{actor} привязал(а) чат «{name}»',
     chatUnlink: '{actor} отвязал(а) чат «{name}»',
     deletedUser: 'удалённый пользователь',
@@ -329,6 +331,9 @@ export const ru = {
     feedFooterOff: 'Бот ничего не пишет в чат.',
     feedFooterEach: 'Бот пишет в чат о каждой новой, изменённой и удалённой трате.',
     feedFooterDaily: 'Раз в день бот присылает в чат сводку, если были траты.',
+    autoRemindTitle: 'Автонапоминание о долгах',
+    autoRemindFooter:
+      'Если долг висит неделю, бот сам мягко напомнит должнику в личке. Раз в неделю, не чаще. Менять может любой участник.',
     confirmUnlinkChat: 'Отвязать чат «{title}» от группы?',
   },
   export: {
@@ -652,6 +657,7 @@ export const ru = {
       member_claim: 'Выбрано «это я»',
       chat_link: 'Чатов привязано',
       debt_remind: 'Напоминаний',
+      debt_autoremind: 'Автонапоминаний',
       export_csv: 'Экспортов CSV',
       inline_query: 'Inline-запросов',
       bot_start: 'Запусков /start',

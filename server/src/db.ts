@@ -263,6 +263,13 @@ const migrations = [
   ALTER TABLE users ADD COLUMN receipt_consent_provider TEXT;
   UPDATE users SET receipt_consent_provider = 'anthropic' WHERE receipt_consent_at IS NOT NULL;
   `,
+  // Automatic debt reminders (#135): a group setting (off by default), and a mark on reminders that tells the bot's
+  // own (auto = 1) from the ones a creditor pressed. Both kinds share the 7-day cooldown per debtor.
+  `
+  ALTER TABLE groups ADD COLUMN auto_remind INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE reminders ADD COLUMN auto INTEGER NOT NULL DEFAULT 0;
+  CREATE INDEX reminders_debtor ON reminders(group_id, to_member, created_at);
+  `,
 ];
 
 const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;

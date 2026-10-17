@@ -15,6 +15,7 @@ export const STAT_EVENTS = [
   'member.claim',
   'chat.link',
   'debt.remind',
+  'debt.autoremind',
   'export.csv',
   'inline.query',
   'bot.start',

@@ -21,6 +21,7 @@ export type ActivityAction =
   | 'expense.update'
   | 'expense.delete'
   | 'debt.remind'
+  | 'group.auto_remind'
   | 'group.chat_link'
   | 'group.chat_unlink';
 
@@ -48,6 +49,8 @@ export interface ActivityPayload {
   before?: ExpenseSnapshot;
   after?: ExpenseSnapshot;
   expense?: ExpenseSnapshot;
+  /** group.auto_remind: the new state of the setting. */
+  enabled?: boolean;
   /** The expense was created by a recurring template. */
   recurring?: boolean;
 }
@@ -98,6 +101,8 @@ export function activityText(lang: Lang, entry: ActivityEntry, currency: string)
       return t(lang, 'activity.paymentInfo', { actor, name: p.name ?? '' });
     case 'debt.remind':
       return t(lang, 'activity.remind', { actor, name: p.name ?? '', amount: money(p.amount ?? 0) });
+    case 'group.auto_remind':
+      return t(lang, p.enabled ? 'activity.autoRemindOn' : 'activity.autoRemindOff', { actor });
     case 'expense.create': {
       const e = p.expense;
       if (!e) return actor;

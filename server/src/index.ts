@@ -1,6 +1,7 @@
 import { serve } from '@hono/node-server';
 import { installProcessHandlers } from './alerts.ts';
 import { createApp } from './app.ts';
+import { startAutoRemindSchedule } from './autoremind.ts';
 import { startBackupSchedule } from './backup.ts';
 import { startBot } from './bot.ts';
 import { config } from './config.ts';
@@ -22,5 +23,6 @@ startBot();
 
 startBackupSchedule();
 startDigestSchedule();
+startAutoRemindSchedule();
 
 startRecurringSchedule();

@@ -533,6 +533,27 @@ async function debtSetup(opts: { notify?: boolean } = {}) {
   return { owner, guest, g, ownerMember: full.meId as number, guestMember };
 }
 
+test('auto-remind: off by default, any member toggles it, history records it, demo and strangers refused', async () => {
+  const { owner, guest, g } = await debtSetup();
+  assert.equal(((await call(owner, 'GET', `/groups/${g.id}`)).body as Json).autoRemind, false);
+  const on = await call(guest, 'PUT', `/groups/${g.id}/auto-remind`, { enabled: true });
+  assert.equal(on.status, 200);
+  assert.equal(on.body.autoRemind, true);
+  // The same value again: no second history entry.
+  await call(guest, 'PUT', `/groups/${g.id}/auto-remind`, { enabled: true });
+  assert.equal((await call(owner, 'PUT', `/groups/${g.id}/auto-remind`, { enabled: false })).body.autoRemind, false);
+  const h = (await call(owner, 'GET', `/groups/${g.id}/activity`)).body as Json;
+  const entries = h.items.filter((i: Json) => i.action === 'group.auto_remind');
+  assert.deepEqual(
+    entries.map((i: Json) => i.payload.enabled),
+    [false, true],
+  );
+  assert.equal((await call(newUser(), 'PUT', `/groups/${g.id}/auto-remind`, { enabled: true })).status, 404);
+  assert.equal((await call(owner, 'PUT', `/groups/${g.id}/auto-remind`, { enabled: 'yes' })).status, 400);
+  const demo = await call(owner, 'POST', '/demo');
+  assert.equal((await call(owner, 'PUT', `/groups/${demo.body.id}/auto-remind`, { enabled: true })).status, 409);
+});
+
 test('remind: creditor can remind a debtor, history gets an entry', async () => {
   const { owner, g, guestMember } = await debtSetup();
   const res = await call(owner, 'POST', `/groups/${g.id}/remind`, { memberId: guestMember.id });
