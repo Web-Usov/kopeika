@@ -330,10 +330,19 @@ function MemberRow({ g, m }: { g: GroupDetail; m: Member }) {
   return (
     <Row
       left={<Avatar member={m} />}
-      title={m.id === g.meId ? t('common.youParen', { name: m.name }) : m.name}
+      title={
+        <>
+          {m.id === g.meId ? t('common.youParen', { name: m.name }) : m.name}
+          {m.hasTelegram && (
+            <span className="hint" aria-hidden="true">
+              {' '}
+              ✎
+            </span>
+          )}
+        </>
+      }
       subtitle={m.hasTelegram ? (m.username ? `@${m.username}` : t('settings.telegram')) : t('settings.noTelegram')}
       onClick={() => setEditing(true)}
-      right={!m.hasTelegram ? undefined : <span className="hint">✎</span>}
       action={
         !m.hasTelegram ? (
           <button type="button" className="icon-btn" aria-label={t('common.delete')} onClick={() => void remove()}>
