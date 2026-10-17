@@ -73,7 +73,41 @@ npm run storefront:shots
 - языки интерфейса (RU, EN);
 - ваш контакт в Telegram (не публикуется).
 
-Подготовьте тексты заранее. Короткое описание (до 20 слов), например: «Split shared expenses with friends: see who owes whom and settle up with the fewest transfers. Free, no sign-up.» Полное можно взять из `bot.description` (ru и en).
+Подготовьте тексты заранее. Позиционирование везде одно: бесплатно, без лимитов и рекламы, прямо в Telegram, любые валюты с курсом на день траты, регулярные траты, бот в вашем чате. Источник правды — словари (`bot.description`, `bot.shortDescription`); если меняете там, обновите и этот раздел.
+
+Короткое описание (до 20 слов, 15 слов):
+
+> Shared expenses in Telegram: no limits, no ads, any currency, a bot in your chat.
+
+Короткое, по-русски:
+
+> Общие траты в Telegram: без лимитов и рекламы, любые валюты, бот в вашем чате.
+
+Полное, по-английски (то же, что `bot.description` en):
+
+> Split shared expenses without arguments or spreadsheets: on a trip, at a cabin, in a shared flat or with a group of friends.
+>
+> - Free, no limits on expenses or people, no ads
+> - Works right in Telegram: nothing to install, friends join by a link
+> - Any currency, central bank rate on the day of the expense
+> - Recurring expenses: rent and subscriptions add themselves
+> - The bot posts to your trip chat and reminds about debts
+>
+> The app never touches your money: it only does the math.
+
+Полное, по-русски (то же, что `bot.description` ru):
+
+> Делите общие траты без споров и таблиц: в поездке, на даче, в общей квартире или в компании друзей.
+>
+> - Бесплатно, без лимитов на траты и участников, без рекламы
+> - Работает прямо в Telegram: ничего не нужно ставить, друзья заходят по ссылке
+> - Любые валюты, курс ЦБ на день траты
+> - Регулярные траты: аренда и подписки сами попадают в счёт
+> - Бот пишет в чат поездки и напоминает о долгах
+>
+> Деньги приложение не трогает: только считает.
+
+Про разбор чеков по фото в эти тексты не пишем: он работает только когда у сервера задан ключ API. Если он включён, добавьте в полное описание строку «Receipt scanning by photo, free scans for every group» / «Разбор чеков по фото, бесплатные сканы для каждой группы».
 
 ### tApps Center
 
