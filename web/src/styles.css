@@ -141,12 +141,14 @@ button:disabled {
 }
 
 .group-header {
+  position: relative;
   text-align: center;
   padding: 8px 0 16px;
 }
 
 .group-header h2 {
   margin: 0 0 4px;
+  padding: 0 44px;
   font-size: 24px;
 }
 
@@ -159,19 +161,61 @@ button:disabled {
   font-weight: 600;
 }
 
+.header-gear {
+  position: absolute;
+  top: 0;
+  right: -8px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.header-gear:active {
+  background: var(--section-bg);
+}
+
 .header-actions {
   display: flex;
-  justify-content: center;
   gap: 8px;
   margin-top: 14px;
 }
 
 .header-actions button {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
   background: var(--section-bg);
   border-radius: 10px;
-  padding: 8px 14px;
-  font-size: 14px;
+  padding: 4px;
+  font-size: 13px;
+  line-height: 1.2;
   color: var(--link);
+  white-space: nowrap;
+}
+
+.tile-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.tile-badge {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--hint);
 }
 
 .dev-back {
@@ -583,6 +627,13 @@ select.field {
   color: var(--hint);
   padding: 4px 8px;
   cursor: pointer;
+}
+
+.row.split > .small-btn {
+  flex: none;
+  margin-left: 12px;
+  min-height: 44px;
+  padding: 0 14px;
 }
 
 .row.split > .icon-btn {
@@ -1102,7 +1153,7 @@ select.field {
 
 /* --- Быстрая трата --- */
 .quick-add {
-  margin: 12px 16px;
+  margin: 12px 0;
 }
 
 .quick-input {

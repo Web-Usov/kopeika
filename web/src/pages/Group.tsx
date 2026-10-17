@@ -57,6 +57,14 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
       {back}
       {g.isDemo && <DemoBanner g={g} />}
       <header className="group-header">
+        <button
+          type="button"
+          className="header-gear"
+          aria-label={t('group.settings')}
+          onClick={() => navigate(`/g/${g.id}/settings`)}
+        >
+          ⚙️
+        </button>
         <h2>{g.name}</h2>
         <div className="hint">
           {rich('group.totalSpent', { amount: <Money value={g.totalSpent} currency={g.currency} /> })}
@@ -70,22 +78,27 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
         </div>
         <div className="header-actions">
           <button type="button" onClick={() => invite(g)}>
-            {t('group.invite')}
+            <span className="tile-icon" aria-hidden="true">
+              👋
+            </span>
+            {t('group.tileInvite')}
           </button>
           {!g.isDemo && (
             <button type="button" onClick={() => void shareBalance(g)}>
-              {t('group.shareChat')}
+              <span className="tile-icon" aria-hidden="true">
+                💬
+              </span>
+              {t('group.tileChat')}
             </button>
           )}
           <button type="button" onClick={() => navigate(`/g/${g.id}/summary`)}>
-            {t('summary.open')}
-            <span className="hint small">
-              {' '}
+            <span className="tile-icon" aria-hidden="true">
+              🏆
+            </span>
+            {t('group.tileSummary')}
+            <span className="tile-badge">
               {t('achievements.counter', { done: unlockedCount, total: achievementList.length })}
             </span>
-          </button>
-          <button type="button" onClick={() => navigate(`/g/${g.id}/settings`)}>
-            {t('group.settings')}
           </button>
         </div>
       </header>
