@@ -4,7 +4,7 @@ import { expect, type Page, test } from '@playwright/test';
 const photo = fileURLToPath(new URL('./fixtures/receipt.jpg', import.meta.url));
 
 // Intl puts non-breaking spaces into amounts; compare with them normalized.
-const text = (s: string | null) => (s ?? '').replace(/[\s {2}]+/g, ' ').trim();
+const text = (s: string | null) => (s ?? '').replace(/\s+/g, ' ').trim();
 
 const draft = {
   merchant: 'Хинкальная',
@@ -106,7 +106,7 @@ test('чек: фото → черновик → правка → расхожд�
   await expect(next).toBeEnabled();
 
   await next.click();
-  await expect(page.getByText('Следующий шаг: кто что ел (в работе)')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Кто что ел' })).toBeVisible();
   // Back to the editor keeps the edits.
   await page.getByRole('button', { name: 'Вернуться к позициям' }).click();
   await expect(page.getByLabel('Сумма').nth(1)).toHaveValue('6');
@@ -129,7 +129,8 @@ test('чек: ручной ввод без фото, английский', asyn
   await page.getByLabel('Amount').fill('12,5');
   await expect(next).toBeEnabled();
   await next.click();
-  await expect(page.getByText('Next step: who ate what (in progress)')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Who ate what' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Create expense' })).toBeDisabled();
 });
 
 test('чек: нужно согласие, потом повтор', async ({ page }) => {
@@ -182,4 +183,69 @@ test('чек: ошибка «не чек» показывает текст и р
   await expect(page.getByRole('button', { name: 'Попробовать ещё раз' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Ввести вручную' }).click();
   await expect(page.getByRole('button', { name: 'Далее' })).toBeDisabled();
+});
+
+/** Group of three (me + two placeholders), photo parsed with the given currency. */
+async function assignFlow(page: Page, currency: string) {
+  await mockReceiptDraft(page, currency);
+  await page.goto('/?dev=23');
+  await page.getByRole('button', { name: 'Создать группу' }).click();
+  await page.getByPlaceholder('Поездка в Грузию').fill('Ужин');
+  for (const name of ['Маша', 'Петя']) {
+    await page.getByRole('button', { name: '+ Добавить участника' }).click();
+    await page.getByPlaceholder('Имя участника').last().fill(name);
+  }
+  await page.getByRole('button', { name: 'Создать группу' }).click();
+  await expect(page.getByRole('heading', { name: 'Ужин' })).toBeVisible();
+  await page.getByRole('button', { name: 'Добавить трату' }).click();
+  await page.getByText('📷 Разобрать чек').click();
+  await page.locator('input[type="file"]:not([capture])').setInputFiles(photo);
+  await page.getByRole('button', { name: 'Далее' }).click();
+  await expect(page.getByRole('heading', { name: 'Кто что ел' })).toBeVisible();
+
+  const create = page.getByRole('button', { name: 'Создать трату' });
+  await expect(create).toBeDisabled();
+  await expect(page.getByText('Не отмечено: Хинкали, Лимонад')).toBeVisible();
+
+  const item = (name: string) => page.locator('.assign-item', { hasText: name });
+  // Хинкали: one dish for two (me and Маша), the lemonade is Петя's.
+  await item('Хинкали').locator('.chip').nth(1).click();
+  await item('Хинкали').getByRole('button', { name: 'Маша' }).click();
+  await item('Лимонад').getByRole('button', { name: 'Петя' }).click();
+  await expect(create).toBeEnabled();
+  return { create, item };
+}
+
+async function mockReceiptDraft(page: Page, currency: string) {
+  await enableReceipts(page);
+  await page.route('**/api/groups/*/receipts/parse', (route) =>
+    route.fulfill({ json: { ...draft, currency, mismatch: false, total: null, warnings: [] } }),
+  );
+}
+
+test('чек: кто что ел → трата, доли ровно, баланс', async ({ page }) => {
+  const { create } = await assignFlow(page, 'RUB');
+  // 2400 split by two = 1200 each, the service charge 290 goes by shares: 120 / 120 / 50.
+  const people = page.locator('.section', { hasText: 'Итоги по людям' });
+  await expect.poll(async () => text(await people.textContent())).toContain('13,20 ₽');
+  await expect.poll(async () => text(await people.textContent())).toContain('5,50 ₽');
+  await expect(people).toContainText('Всего 31,90 ₽');
+
+  await create.click();
+  await expect(page.getByRole('heading', { name: 'Ужин' })).toBeVisible();
+  await expect(page.getByText('Хинкальная')).toBeVisible();
+  // I paid 31,90 and my share is 13,20.
+  await expect.poll(async () => text(await page.locator('.my-balance').textContent())).toBe('Вам должны 18,70 ₽');
+});
+
+test('чек: чек в другой валюте идёт по курсу, доли в оригинале', async ({ page }) => {
+  await page.route('**/api/rates*', (route) =>
+    route.fulfill({ json: { rate: '30', source: 'test', date: '2026-10-16' } }),
+  );
+  const { create } = await assignFlow(page, 'GEL');
+  await expect(page.getByLabel('Курс')).toHaveValue('30');
+  await create.click();
+  await expect(page.getByText('Хинкальная')).toBeVisible();
+  // 31,90 GEL = 957 ₽, my share 13,20 GEL = 396 ₽.
+  await expect.poll(async () => text(await page.locator('.my-balance').textContent())).toBe('Вам должны 561 ₽');
 });
