@@ -326,6 +326,35 @@ test('consent: required before parse, can be given, is reported in /me, and is i
   assert.equal((await parse(u, g.id)).status, 200);
 });
 
+test('consent is tied to the provider: after a switch parse asks again, a new consent works', async () => {
+  const { u, g } = await setup();
+  const calls = useProvider();
+  assert.equal(config.receiptsProvider, 'anthropic');
+  assert.equal(
+    dbModule.one<{ receipt_consent_provider: string }>('SELECT receipt_consent_provider FROM users WHERE id = ?', u)!
+      .receipt_consent_provider,
+    'anthropic',
+  );
+  assert.equal((await parse(u, g.id)).status, 200);
+  config.receiptsProvider = 'openrouter';
+  try {
+    assert.equal((await call(u, 'GET', '/me')).body.receiptConsent, false);
+    const refused = await parse(u, g.id);
+    assert.equal(refused.status, 409);
+    assert.match(refused.body.error, /согласие/);
+    assert.equal(calls(), 1);
+    assert.equal((await call(u, 'POST', '/me/receipt-consent')).status, 200);
+    assert.equal((await call(u, 'GET', '/me')).body.receiptConsent, true);
+    assert.equal((await parse(u, g.id)).status, 200);
+    assert.equal(calls(), 2);
+  } finally {
+    config.receiptsProvider = 'anthropic';
+  }
+  // back on Anthropic the consent given for OpenRouter does not count either
+  assert.equal((await call(u, 'GET', '/me')).body.receiptConsent, false);
+  assert.equal((await parse(u, g.id)).status, 409);
+});
+
 test('the demo group does not scan (it would burn the shared budget)', async () => {
   const u = newUser();
   await call(u, 'POST', '/me/receipt-consent');
@@ -352,6 +381,12 @@ test('deleting the account removes the consent and detaches the ledger from the 
   assert.equal(row.cost_micro_usd, 200);
   // a returning user has no consent and must agree again
   assert.equal((await call(u, 'GET', '/me')).body.receiptConsent, false);
+  const fresh = dbModule.one<{ receipt_consent_at: string | null; receipt_consent_provider: string | null }>(
+    'SELECT receipt_consent_at, receipt_consent_provider FROM users WHERE id = ?',
+    u,
+  )!;
+  assert.equal(fresh.receipt_consent_at, null);
+  assert.equal(fresh.receipt_consent_provider, null);
 });
 
 test('deleting a group removes its right', async () => {

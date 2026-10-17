@@ -257,6 +257,12 @@ const migrations = [
   );
   CREATE INDEX receipt_access_requests_group ON receipt_access_requests(group_id, id);
   `,
+  // Receipt consent names the provider it was given for: after RECEIPTS_PROVIDER changes, people agree again.
+  // Every consent before this migration was for Anthropic, the only provider until OpenRouter (#127).
+  `
+  ALTER TABLE users ADD COLUMN receipt_consent_provider TEXT;
+  UPDATE users SET receipt_consent_provider = 'anthropic' WHERE receipt_consent_at IS NOT NULL;
+  `,
 ];
 
 const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;

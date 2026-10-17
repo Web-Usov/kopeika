@@ -20,6 +20,7 @@ export interface UserRow {
   notify: number;
   lang: string | null;
   receipt_consent_at: string | null;
+  receipt_consent_provider: string | null;
   payment_info: string | null;
 }
 

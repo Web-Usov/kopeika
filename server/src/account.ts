@@ -43,7 +43,8 @@ export function leaveGroup(group: GroupRow, me: MemberRow, userId: number) {
  * - in the other groups the user leaves (name-only member, ownership passed on), history stays for the others;
  * - their reminders, chat-link tokens and recurring templates are removed or stopped;
  * - expenses, history entries and templates they authored point at the "deleted user" placeholder;
- * - the users row (name, username, photo, language, payment details, notification flag) is deleted.
+ * - the users row (name, username, photo, language, payment details, notification flag, receipt consent and its
+ *   provider) is deleted.
  * A later request from the same Telegram user simply creates a new account.
  */
 export function deleteAccount(userId: number) {
