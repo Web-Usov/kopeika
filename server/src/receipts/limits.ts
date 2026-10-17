@@ -153,7 +153,8 @@ export function grantReceipts(inviteCode: string, days: number | null, adminId: 
 export function revokeReceipts(inviteCode: string) {
   const group = groupByCode(inviteCode);
   if (!group) return null;
-  run("DELETE FROM group_entitlements WHERE group_id = ? AND feature = 'receipts'", group.id);
+  // Both rights: the unlimited one and the beta approval.
+  run("DELETE FROM group_entitlements WHERE group_id = ? AND feature IN ('receipts', 'receipts_beta')", group.id);
   return group;
 }
 

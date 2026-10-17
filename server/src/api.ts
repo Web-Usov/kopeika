@@ -16,6 +16,7 @@ import {
   canRequestChat,
   chatMemberStatus,
   loadExpenseSnap,
+  notifyAccessRequest,
   notifyChatLinked,
   notifyExpense,
   notifyExpenseChange,
@@ -37,6 +38,7 @@ import { deserialize, isEmpty, PaymentInfoError, parsePaymentInfo, serialize } f
 import { assertCanJoinMoreGroups, assertRoomForMembers, assertRoomForRecurring } from './quota.ts';
 import { createRateLimiter } from './rateLimit.ts';
 import { getRate, RatesError } from './rates.ts';
+import { hasReceiptsAccess, requestAccess } from './receipts/access.ts';
 import {
   acquireScan,
   budgetExhausted,
@@ -575,6 +577,8 @@ api.post(
     // The demo group is a sandbox open to everyone: scanning there would only burn the shared budget.
     if (group.is_demo) throw fail(409, 'errors.demoNotAllowed');
     if (!receiptsEnabled()) throw fail(503, 'errors.receipt.disabled');
+    // Closed beta: enforced here, whatever the client shows. Checked before consent and limits.
+    if (!hasReceiptsAccess(group.id)) throw fail(403, 'errors.receipt.betaNoAccess');
     const consent = one<{ receipt_consent_at: string | null }>(
       'SELECT receipt_consent_at FROM users WHERE id = ?',
       user.id,
@@ -602,6 +606,17 @@ api.post(
     }
   },
 );
+
+// The group asks the owner to open receipt scanning (closed beta). Members only; repeated while pending = no new request.
+api.post('/groups/:id/receipts/access-request', (c) => {
+  const user = c.get('user');
+  const { group, me } = loadGroupFor(c.req.param('id'), user.id);
+  if (group.is_demo) throw fail(409, 'errors.demoNotAllowed');
+  if (!receiptsEnabled()) throw fail(503, 'errors.receipt.disabled');
+  const { created, requestId } = requestAccess(group.id, user.id);
+  if (created && requestId !== null) notifyAccessRequest(requestId);
+  return c.json(detail(group, me), created ? 201 : 200);
+});
 
 // --- Expenses ---
 api.post('/groups/:id/expenses', async (c) => {

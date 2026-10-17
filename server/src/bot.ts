@@ -26,6 +26,7 @@ import {
   changeAudience,
   type ExpenseSnap,
 } from './notify.ts';
+import { accessRequestInfo, decideRequest, grantBeta, pendingRequests } from './receipts/access.ts';
 import { grantReceipts, revokeReceipts, setBudgetNotifier } from './receipts/limits.ts';
 import {
   type ExpenseRow,
@@ -56,19 +57,29 @@ export type ChatMemberLookup = (chatId: number, userId: number) => Promise<strin
 
 export type PrepareShare = (userId: number, result: InlineQueryResult, targets: SharePermissions) => Promise<string>;
 
+/** A private message to a user (access requests and their results). Tests capture these instead of calling Telegram. */
+export type SendMessage = (userId: number, text: string, extra?: { reply_markup?: InlineKeyboard }) => Promise<unknown>;
+
 export type PrepareChatButton = (userId: number, requestId: number, lang: Lang) => Promise<string>;
 
 let chatMemberLookup: ChatMemberLookup | null = null;
 let prepareShareHook: PrepareShare | null = null;
 let prepareChatButtonHook: PrepareChatButton | null = null;
+let sendMessageHook: SendMessage | null = null;
 
 /**
  * Tests replace the Bot API calls (user's role in a chat, savePreparedInlineMessage, savePreparedKeyboardButton).
  * Call with no argument to reset.
  */
 export function setBotTestHooks(
-  hooks: { chatMember?: ChatMemberLookup; prepareShare?: PrepareShare; prepareChatButton?: PrepareChatButton } = {},
+  hooks: {
+    chatMember?: ChatMemberLookup;
+    prepareShare?: PrepareShare;
+    prepareChatButton?: PrepareChatButton;
+    sendMessage?: SendMessage;
+  } = {},
 ) {
+  sendMessageHook = hooks.sendMessage ?? null;
   chatMemberLookup = hooks.chatMember ?? null;
   prepareShareHook = hooks.prepareShare ?? null;
   prepareChatButtonHook = hooks.prepareChatButton ?? null;
@@ -362,8 +373,8 @@ function registerChatHandlers(b: Bot) {
     await ctx.reply(buildStatsReport(pickLang(ctx.from?.language_code), collectStats()));
   });
 
-  // Owner only, private chat only, silent for everyone else (like /stats): give or take back the `receipts` right.
-  for (const command of ['grant', 'revoke'] as const) {
+  // Owner only, private chat only, silent for everyone else (like /stats): give or take back receipt rights.
+  for (const command of ['grant', 'revoke', 'beta'] as const) {
     b.command(command, async (ctx) => {
       const reply = ownerCommandReply(
         command,
@@ -375,6 +386,19 @@ function registerChatHandlers(b: Bot) {
       if (reply !== null) await ctx.reply(reply);
     });
   }
+
+  b.command('requests', async (ctx) => {
+    const reply = requestsReply(ctx.from?.id, ctx.chat.type, pickLang(ctx.from?.language_code));
+    if (reply !== null) await ctx.reply(reply);
+  });
+
+  // The owner's buttons under an access request: ✅ / ❌.
+  b.callbackQuery(/^rb:[ar]:\d+$/, async (ctx) => {
+    await handleAccessCallback(ctx.callbackQuery.data, ctx.from, {
+      answer: (text) => ctx.answerCallbackQuery(text ? { text, show_alert: true } : undefined),
+      edit: (text) => ctx.editMessageText(text),
+    });
+  });
 
   b.command('unlink', async (ctx) => {
     if (!ctx.from || !isGroupChat(ctx.chat.type)) return;
@@ -395,7 +419,7 @@ function registerChatHandlers(b: Bot) {
  * in a private chat (the command stays invisible to everyone else).
  */
 export function ownerCommandReply(
-  command: 'grant' | 'revoke',
+  command: 'grant' | 'revoke' | 'beta',
   args: string,
   userId: number | undefined,
   chatType: string,
@@ -405,6 +429,11 @@ export function ownerCommandReply(
   if (!canSeeStats(userId, chatType, admins) || userId === undefined) return null;
   const t = createT(lang);
   const [code, daysRaw, ...rest] = args.trim().split(/\s+/);
+  if (command === 'beta') {
+    if (!code || daysRaw !== undefined) return t('bot.betaUsage');
+    const g = grantBeta(code, userId);
+    return g ? t('bot.betaDone', { name: g.name }) : t('bot.grantNotFound');
+  }
   if (command === 'revoke') {
     if (!code || daysRaw !== undefined) return t('bot.revokeUsage');
     const g = revokeReceipts(code);
@@ -418,6 +447,116 @@ export function ownerCommandReply(
   if (!g) return t('bot.grantNotFound');
   const until = g.expiresAt === null ? t('bot.grantForever') : t('bot.grantUntil', { date: g.expiresAt.slice(0, 10) });
   return t('bot.grantDone', { name: g.name, until });
+}
+
+/** /requests: pending access requests for the owner; null (silence) for everyone else. */
+export function requestsReply(
+  userId: number | undefined,
+  chatType: string,
+  lang: Lang,
+  admins: Set<number> = config.adminUserIds,
+): string | null {
+  if (!canSeeStats(userId, chatType, admins)) return null;
+  const t = createT(lang);
+  const list = pendingRequests();
+  if (list.length === 0) return t('bot.requestsEmpty');
+  const lines = list.map((r) =>
+    t('bot.requestsLine', {
+      group: r.groupName,
+      who: requesterLabel(r.requesterName, r.requestedBy),
+      members: r.members,
+      expenses: r.expenses,
+      code: r.inviteCode,
+    }),
+  );
+  return `${t('bot.requestsTitle')}\n\n${lines.join('\n\n')}`;
+}
+
+const requesterLabel = (name: string, id: number) => name || `id ${id}`;
+
+/** A private message that never throws: the person may have blocked the bot. */
+async function dm(userId: number, text: string, extra?: { reply_markup?: InlineKeyboard }) {
+  try {
+    if (sendMessageHook) await sendMessageHook(userId, text, extra);
+    else if (bot && botReady) await bot.api.sendMessage(userId, text, extra);
+  } catch (e) {
+    logTelegramError('direct message failed', e);
+  }
+}
+
+const userLang = (userId: number) =>
+  pickLang(one<{ lang: string | null }>('SELECT lang FROM users WHERE id = ?', userId)?.lang);
+
+/** Text of the owner's message about a request (without the outcome line). */
+function accessRequestText(t: ReturnType<typeof createT>, r: NonNullable<ReturnType<typeof accessRequestInfo>>) {
+  return t('bot.accessRequest', {
+    group: r.groupName,
+    who: requesterLabel(r.requesterName, r.requestedBy),
+    members: r.members,
+    expenses: r.expenses,
+    code: r.inviteCode,
+  });
+}
+
+/** A group asked for receipt scanning: tell every owner, with ✅ / ❌ buttons. Fire-and-forget. */
+export function notifyAccessRequest(requestId: number) {
+  if (config.adminUserIds.size === 0) {
+    console.warn(`Receipt access request #${requestId} saved, but ADMIN_USER_IDS is empty: nobody was told`);
+    return;
+  }
+  if (!sendMessageHook && !(bot && botReady)) return;
+  const r = accessRequestInfo(requestId);
+  if (!r) return;
+  for (const id of config.adminUserIds) {
+    const t = createT(userLang(id));
+    // Short callback data (Telegram allows 64 bytes): rb:a:<id> approves, rb:r:<id> rejects.
+    const keyboard = new InlineKeyboard()
+      .text(t('bot.accessApprove'), `rb:a:${r.id}`)
+      .text(t('bot.accessReject'), `rb:r:${r.id}`);
+    void dm(id, accessRequestText(t, r), { reply_markup: keyboard });
+  }
+}
+
+export interface AccessCallbackIo {
+  /** answerCallbackQuery; with text it is shown as an alert. */
+  answer: (text?: string) => Promise<unknown>;
+  /** Replaces the text of the owner's message (and drops the buttons). */
+  edit: (text: string) => Promise<unknown>;
+}
+
+/**
+ * The owner pressed ✅ / ❌ (callback data `rb:a:<id>` / `rb:r:<id>`). Anyone else gets an error and nothing changes.
+ * After the decision the owner's message shows the outcome and the person who asked is told in their language.
+ */
+export async function handleAccessCallback(
+  data: string,
+  from: { id: number; first_name?: string; username?: string; language_code?: string },
+  io: AccessCallbackIo,
+  admins: Set<number> = config.adminUserIds,
+) {
+  const swallow = (e: unknown) => logTelegramError('access callback failed', e);
+  const t = createT(pickLang(from.language_code));
+  const m = /^rb:([ar]):(\d+)$/.exec(data);
+  if (!m) return void (await io.answer().catch(swallow));
+  if (!admins.has(from.id)) return void (await io.answer(t('bot.accessNotAdmin')).catch(swallow));
+  const approve = m[1] === 'a';
+  const decision = decideRequest(Number(m[2]), approve, from.id);
+  const status = (s: string) => t(s === 'approved' ? 'bot.accessStatusApproved' : 'bot.accessStatusRejected');
+  if (!decision.ok) {
+    if (decision.reason === 'notFound') return void (await io.answer(t('bot.accessGone')).catch(swallow));
+    await io.answer(t('bot.accessAlready', { result: status(decision.status ?? '') })).catch(swallow);
+    return;
+  }
+  const info = decision.info;
+  const admin = from.first_name || (from.username ? `@${from.username}` : `id ${from.id}`);
+  const result = t('bot.accessDecidedBy', { result: `${approve ? '✅' : '❌'} ${status(info.status)}`, admin });
+  await io.edit(`${accessRequestText(t, info)}\n\n${result}`).catch(swallow);
+  await io.answer().catch(swallow);
+  const rt = createT(userLang(info.requestedBy));
+  await dm(
+    info.requestedBy,
+    rt(approve ? 'bot.accessUserApproved' : 'bot.accessUserRejected', { group: info.groupName }),
+  );
 }
 
 /** After a successful link: confirmation in the chat in the linking user's language. Fire-and-forget. */

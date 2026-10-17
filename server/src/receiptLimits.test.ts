@@ -24,6 +24,8 @@ before(async () => {
   botModule = await import('./bot.ts');
   stats = await import('./stats.ts');
   account = await import('./account.ts');
+  // These tests are about limits and costs; the closed beta has its own file (receiptBeta.test.ts).
+  config.receiptsBeta = false;
 });
 after(() => provider.setReceiptProviderForTests());
 
@@ -387,7 +389,7 @@ test('/grant and /revoke: only an admin, only in a private chat, silent for ever
   assert.match(run('grant', `${g.inviteCode} abc`, 42)!, /Формат/);
   assert.match(run('grant', `${g.inviteCode} 0`, 42)!, /Формат/);
   assert.match(run('grant', 'nope', 42)!, /не найдена/);
-  assert.match(run('revoke', g.inviteCode, 42)!, /снят/);
+  assert.match(run('revoke', g.inviteCode, 42)!, /закрыт/);
   assert.equal(limits.hasReceiptsEntitlement(g.id), false);
   assert.match(run('revoke', 'nope', 42)!, /не найдена/);
 });

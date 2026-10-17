@@ -45,7 +45,41 @@ export function Receipt({ groupId }: { groupId: number }) {
   );
 }
 
+/** Closed beta: the group has not been approved yet. Ask for access, or wait for the owner's answer. */
+function AccessGate({ g }: { g: GroupDetail }) {
+  const access = g.receipts?.access ?? 'none';
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const ask = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await api.requestReceiptAccess(g.id);
+    } catch (e) {
+      haptic.error();
+      setError(e instanceof ApiError ? e.message : t('receipt.access.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <h2 className="page-title">{t('receipt.access.title')}</h2>
+      <p className="hint page-subtitle">{t(`receipt.access.${access === 'approved' ? 'none' : access}`)}</p>
+      {error && <ErrorView message={error} />}
+      {access !== 'pending' && (
+        <MainButton text={t('receipt.access.request')} loading={busy} onClick={() => void ask()} />
+      )}
+    </>
+  );
+}
+
 function Flow({ g }: { g: GroupDetail }) {
+  if (g.receipts?.beta && g.receipts.access !== 'approved') return <AccessGate g={g} />;
+  return <ScanFlow g={g} />;
+}
+
+function ScanFlow({ g }: { g: GroupDetail }) {
   const [stage, setStage] = useState<Stage>({ kind: 'pick' });
   // Whether the user has already agreed (from /me). Unknown or older server: the 409 from parse tells.
   const [consented, setConsented] = useState<boolean>();

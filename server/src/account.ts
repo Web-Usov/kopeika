@@ -66,6 +66,7 @@ export function deleteAccount(userId: number) {
     }
     // The scan ledger is only numbers, but it still points at a person: detach it. The spend stays in the budget.
     run('UPDATE receipt_scans SET user_id = ? WHERE user_id = ?', DELETED_USER_ID, userId);
+    run('UPDATE receipt_access_requests SET requested_by = ? WHERE requested_by = ?', DELETED_USER_ID, userId);
     run('DELETE FROM chat_links WHERE created_by_user = ?', userId);
     // A template would keep creating expenses on behalf of a person who is gone: stop it, the group can resume it.
     run('UPDATE recurring SET active = 0, created_by = ? WHERE created_by = ?', DELETED_USER_ID, userId);

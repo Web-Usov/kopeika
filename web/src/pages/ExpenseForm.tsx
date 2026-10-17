@@ -94,9 +94,10 @@ type RateInfo = { status: 'idle' | 'loading' | 'ok' | 'error'; date?: string; er
 /** «Разобрать чек» for a new expense: only when the feature is on; shows what is left of the trial quota. */
 function ReceiptEntry({ g }: { g: GroupDetail }) {
   // Servers with quotas (#102) say it per group; older ones only in /me.
-  const [enabled, setEnabled] = useState<boolean | undefined>(g.receipts?.enabled);
+  const shown = (r: NonNullable<GroupDetail['receipts']>) => r.offered ?? r.enabled;
+  const [enabled, setEnabled] = useState<boolean | undefined>(g.receipts && shown(g.receipts));
   useEffect(() => {
-    if (g.receipts) return setEnabled(g.receipts.enabled);
+    if (g.receipts) return setEnabled(shown(g.receipts));
     api.me().then(
       (me) => setEnabled(Boolean(me.receiptsEnabled)),
       () => setEnabled(false),
@@ -105,7 +106,9 @@ function ReceiptEntry({ g }: { g: GroupDetail }) {
   if (!enabled) return null;
 
   const q = g.receipts;
-  const limited = Boolean(q && !q.unlimited && q.limit > 0);
+  // In the beta a group without approval has no quota to show yet.
+  const approved = !q?.beta || q.access === 'approved';
+  const limited = Boolean(q && approved && !q.unlimited && q.limit > 0);
   const left = q ? Math.max(0, q.limit - q.used) : 0;
   const exhausted = limited && left === 0;
   const reset = q?.resetsAt ? shortDate(q.resetsAt.slice(0, 10)) : '';
@@ -123,7 +126,7 @@ function ReceiptEntry({ g }: { g: GroupDetail }) {
     >
       <Row
         className="link"
-        title={t('receipt.button')}
+        title={t(q?.beta ? 'receipt.buttonBeta' : 'receipt.button')}
         onClick={
           exhausted
             ? undefined

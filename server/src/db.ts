@@ -231,6 +231,32 @@ const migrations = [
     used_at    TEXT
   );
   `,
+  // Closed beta of receipt scanning (#125): the owner opens it per group. A new right `receipts_beta` (the CHECK of
+  // group_entitlements has to be widened, so the table is rebuilt) and the access requests with the owner's decision.
+  `
+  CREATE TABLE group_entitlements_new (
+    group_id    INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    feature     TEXT NOT NULL CHECK (feature IN ('receipts', 'receipts_beta')),
+    source      TEXT NOT NULL CHECK (source IN ('trial', 'admin', 'stars')),
+    granted_at  TEXT NOT NULL,   -- UTC ISO
+    expires_at  TEXT,            -- UTC ISO; NULL = no end
+    granted_by  INTEGER,
+    PRIMARY KEY (group_id, feature)
+  );
+  INSERT INTO group_entitlements_new SELECT * FROM group_entitlements;
+  DROP TABLE group_entitlements;
+  ALTER TABLE group_entitlements_new RENAME TO group_entitlements;
+  CREATE TABLE receipt_access_requests (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id     INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    requested_by INTEGER NOT NULL,   -- 0 (the "deleted user") after account deletion; no foreign key on purpose
+    status       TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'rejected')),
+    created_at   TEXT NOT NULL,      -- UTC ISO
+    decided_at   TEXT,               -- UTC ISO
+    decided_by   INTEGER
+  );
+  CREATE INDEX receipt_access_requests_group ON receipt_access_requests(group_id, id);
+  `,
 ];
 
 const current = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
