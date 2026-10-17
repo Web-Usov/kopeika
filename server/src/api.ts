@@ -168,6 +168,8 @@ api.get('/me', (c) => {
     name: displayName(u),
     notify: u.notify === 1,
     receiptsEnabled: receiptsEnabled(),
+    // The privacy page and the consent screen name whoever reads the photos.
+    receiptsProvider: config.receiptsProvider,
     receiptConsent: hasReceiptConsent(u),
   });
 });

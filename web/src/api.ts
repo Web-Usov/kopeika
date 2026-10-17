@@ -3,6 +3,7 @@ import type { Achievement } from '../../shared/achievements.ts';
 import type { ActivityEntry } from '../../shared/activity.ts';
 import type { CategoryId, CategoryTotal } from '../../shared/categories.ts';
 import type { SplitMode } from '../../shared/money.ts';
+import type { ReceiptsProvider } from '../../shared/privacy.ts';
 import type { Period } from '../../shared/recurring.ts';
 import type { GroupSummary as GroupSummaryStats } from '../../shared/summary.ts';
 import { lang, t } from './i18n.ts';
@@ -305,7 +306,13 @@ export function clearCache() {
 export const api = {
   deleteMe: () => request<{ ok: true; groupsDeleted: number; groupsLeft: number }>('DELETE', '/me'),
   me: () =>
-    request<{ name: string; notify: boolean; receiptsEnabled?: boolean; receiptConsent?: boolean }>('GET', '/me'),
+    request<{
+      name: string;
+      notify: boolean;
+      receiptsEnabled?: boolean;
+      receiptsProvider?: ReceiptsProvider;
+      receiptConsent?: boolean;
+    }>('GET', '/me'),
   parseReceipt: (id: number, body: { image: string; mediaType: string }, signal?: AbortSignal) =>
     request<ParsedReceipt>('POST', `/groups/${id}/receipts/parse`, body, signal),
   requestReceiptAccess: (id: number) =>

@@ -1,9 +1,31 @@
-import { type Policy, policies } from '../../../shared/privacy.ts';
+import { useEffect, useState } from 'react';
+import { type Policy, policy, type ReceiptsProvider } from '../../../shared/privacy.ts';
+import { api } from '../api.ts';
 import { lang } from '../i18n.ts';
 import { navigate } from '../router.ts';
 import { BackButton } from '../tg.tsx';
+import { ErrorView, Loading } from '../ui.tsx';
 
-export const Privacy = () => <LegalPage doc={policies[lang]} />;
+/** The text names the receipt provider the server uses, so it waits for /me. */
+export function Privacy() {
+  const [provider, setProvider] = useState<ReceiptsProvider>();
+  const [error, setError] = useState<string>();
+  useEffect(() => {
+    api.me().then(
+      (me) => setProvider(me.receiptsProvider ?? 'anthropic'),
+      (e: Error) => setError(e.message),
+    );
+  }, []);
+  if (error)
+    return (
+      <>
+        <BackButton onClick={() => navigate('/', { replace: true })} />
+        <ErrorView message={error} />
+      </>
+    );
+  if (!provider) return <Loading />;
+  return <LegalPage doc={policy(lang, provider)} />;
+}
 
 /** Shared by the privacy policy and the terms: a structured text with a back button. */
 export function LegalPage({ doc: p }: { doc: Policy }) {
