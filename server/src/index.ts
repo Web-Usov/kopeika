@@ -6,6 +6,7 @@ import { startBot } from './bot.ts';
 import { config } from './config.ts';
 import { startDigestSchedule } from './digest.ts';
 import { startRecurringSchedule } from './recurring.ts';
+import { startStatsWeeklySchedule } from './statsWeekly.ts';
 import { version } from './version.ts';
 
 installProcessHandlers();
@@ -24,3 +25,4 @@ startBackupSchedule();
 startDigestSchedule();
 
 startRecurringSchedule();
+startStatsWeeklySchedule();
