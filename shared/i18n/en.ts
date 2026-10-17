@@ -29,7 +29,7 @@ export const en: Dict = {
     welcomeStep2Title: 'Invite your friends',
     welcomeStep2Text: 'Send a link — they pick themselves from the list.',
     welcomeStep3Title: 'Note down expenses',
-    welcomeStep3Text: 'In any currency, at the rate of the day. Kopeika works out who owes whom.',
+    welcomeStep3Text: 'In different currencies, at the rate of the day. Kopeika works out who owes whom.',
     seeExample: 'See an example',
     demoBadge: 'example',
     myGroups: 'My groups',
@@ -370,11 +370,11 @@ export const en: Dict = {
       'Split shared expenses without arguments or spreadsheets: on a trip, at a cabin, in a shared flat or with a group of friends.\n\n' +
       '• Free, no limits on expenses or people, no ads\n' +
       '• Works right in Telegram: nothing to install, friends join by a link\n' +
-      '• Any currency, central bank rate on the day of the expense\n' +
+      '• Expenses in different currencies at the central bank rate of the day\n' +
       '• Recurring expenses: rent and subscriptions add themselves\n' +
       '• The bot posts to your trip chat and reminds about debts\n\n' +
       'The app never touches your money: it only does the math.',
-    shortDescription: 'Shared expenses in Telegram: no limits, no ads, any currency, a bot in your chat',
+    shortDescription: 'Shared expenses in Telegram: no limits, no ads, multiple currencies, a bot in your chat',
     startText:
       'Hi! Kopeika helps you split shared expenses with friends: on a trip, at a cabin or in a shared flat.\n\n' +
       'Create a group, invite your friends with a link and note down who paid for what. ' +

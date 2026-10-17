@@ -73,15 +73,15 @@ npm run storefront:shots
 - языки интерфейса (RU, EN);
 - ваш контакт в Telegram (не публикуется).
 
-Подготовьте тексты заранее. Позиционирование везде одно: бесплатно, без лимитов и рекламы, прямо в Telegram, любые валюты с курсом на день траты, регулярные траты, бот в вашем чате. Источник правды — словари (`bot.description`, `bot.shortDescription`); если меняете там, обновите и этот раздел.
+Подготовьте тексты заранее. Позиционирование везде одно: бесплатно, без лимитов и рекламы, прямо в Telegram, разные валюты с курсом на день траты, регулярные траты, бот в вашем чате. Источник правды — словари (`bot.description`, `bot.shortDescription`); если меняете там, обновите и этот раздел.
 
 Короткое описание (до 20 слов, 15 слов):
 
-> Shared expenses in Telegram: no limits, no ads, any currency, a bot in your chat.
+> Shared expenses in Telegram: no limits, no ads, multiple currencies, a bot in your chat.
 
 Короткое, по-русски:
 
-> Общие траты в Telegram: без лимитов и рекламы, любые валюты, бот в вашем чате.
+> Общие траты в Telegram: без лимитов и рекламы, разные валюты, бот в вашем чате.
 
 Полное, по-английски (то же, что `bot.description` en):
 
@@ -89,7 +89,7 @@ npm run storefront:shots
 >
 > - Free, no limits on expenses or people, no ads
 > - Works right in Telegram: nothing to install, friends join by a link
-> - Any currency, central bank rate on the day of the expense
+> - Expenses in different currencies at the central bank rate of the day
 > - Recurring expenses: rent and subscriptions add themselves
 > - The bot posts to your trip chat and reminds about debts
 >
@@ -101,7 +101,7 @@ npm run storefront:shots
 >
 > - Бесплатно, без лимитов на траты и участников, без рекламы
 > - Работает прямо в Telegram: ничего не нужно ставить, друзья заходят по ссылке
-> - Любые валюты, курс ЦБ на день траты
+> - Траты в разных валютах по курсу ЦБ на день траты
 > - Регулярные траты: аренда и подписки сами попадают в счёт
 > - Бот пишет в чат поездки и напоминает о долгах
 >
