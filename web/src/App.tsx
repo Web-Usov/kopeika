@@ -7,6 +7,7 @@ import { Join } from './pages/Join.tsx';
 import { Link } from './pages/Link.tsx';
 import { NewGroup } from './pages/NewGroup.tsx';
 import { Privacy } from './pages/Privacy.tsx';
+import { Receipt } from './pages/Receipt.tsx';
 import { Settings } from './pages/Settings.tsx';
 import { Summary } from './pages/Summary.tsx';
 import { Terms } from './pages/Terms.tsx';
@@ -30,6 +31,7 @@ const routes: [pattern: string, render: (p: Params, query: Query) => ReactElemen
   ['/g/:id', (p, query) => <Group key={p.id} id={Number(p.id)} tab={groupTab(query.get('tab'))} />],
   ['/g/:id/settings', (p) => <Settings id={Number(p.id)} />],
   ['/g/:id/summary', (p) => <Summary id={Number(p.id)} />],
+  ['/g/:id/receipt', (p) => <Receipt key={p.id} groupId={Number(p.id)} />],
   ['/g/:id/expense/new', (p) => <ExpenseForm groupId={Number(p.id)} />],
   ['/g/:id/expense/:eid', (p) => <ExpenseForm key={p.eid} groupId={Number(p.id)} expenseId={Number(p.eid)} />],
   ['/g/:id/transfer/new', (p, query) => <TransferForm groupId={Number(p.id)} prefill={query} />],

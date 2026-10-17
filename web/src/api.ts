@@ -73,6 +73,30 @@ export interface GroupDetail {
   /** Computed by the server over all expenses. */
   achievements: Achievement[];
   settlements: { from: number; to: number; amount: number }[];
+  /** Receipt scanning for this user in this group (#102). Absent on older servers. */
+  receipts?: ReceiptQuota;
+}
+
+export interface ReceiptQuota {
+  enabled: boolean;
+  unlimited: boolean;
+  used: number;
+  limit: number;
+  /** ISO time when the quota resets. */
+  resetsAt: string | null;
+}
+
+/** The server's answer to a receipt photo (see server/src/receipts/normalize.ts). */
+export interface ParsedReceipt {
+  merchant: string | null;
+  date: string | null;
+  currency: string | null;
+  items: { id: string; name: string; quantity?: string; amount: number }[];
+  adjustments: { kind: string; label: string; amount: number; percent: string | null }[];
+  total: number | null;
+  mismatch: boolean;
+  confidence: 'high' | 'medium' | 'low';
+  warnings: string[];
 }
 
 export interface GroupSummary {
@@ -151,9 +175,10 @@ export class ApiError extends Error {
   }
 }
 
-export async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+export async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`/api${path}`, {
     method,
+    signal,
     headers: {
       Authorization: authHeader(),
       // Dev mode (no Telegram initData): tell the server which language to answer in.
@@ -273,7 +298,11 @@ export function clearCache() {
 
 export const api = {
   deleteMe: () => request<{ ok: true; groupsDeleted: number; groupsLeft: number }>('DELETE', '/me'),
-  me: () => request<{ name: string; notify: boolean }>('GET', '/me'),
+  me: () =>
+    request<{ name: string; notify: boolean; receiptsEnabled?: boolean; receiptConsent?: boolean }>('GET', '/me'),
+  parseReceipt: (id: number, body: { image: string; mediaType: string }, signal?: AbortSignal) =>
+    request<ParsedReceipt>('POST', `/groups/${id}/receipts/parse`, body, signal),
+  giveReceiptConsent: () => request<unknown>('POST', '/me/receipt-consent', {}),
   myPaymentInfo: () => request<PaymentInfo>('GET', '/me/payment-info'),
   setMyPaymentInfo: (info: PaymentInfo) => request<PaymentInfo>('PUT', '/me/payment-info', info),
   setMemberPaymentInfo: (id: number, memberId: number, paymentInfo: PaymentInfo) =>

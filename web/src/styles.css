@@ -1002,3 +1002,100 @@ select.field {
 .achievement.unlocked .achievement-title {
   color: var(--accent);
 }
+
+/* --- Receipt scan --- */
+.receipt-pick {
+  cursor: pointer;
+}
+
+.receipt-pick input[type="file"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.receipt-reading .spinner {
+  width: 32px;
+  height: 32px;
+  margin: 0 auto 16px;
+  border: 3px solid var(--separator);
+  border-top-color: var(--button);
+  border-radius: 50%;
+  animation: receipt-spin 0.9s linear infinite;
+}
+
+@keyframes receipt-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .receipt-reading .spinner {
+    animation-duration: 3s;
+  }
+}
+
+.receipt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.receipt-consent {
+  margin: 0;
+  display: block;
+}
+
+.receipt-warn {
+  margin-bottom: 16px;
+}
+
+.receipt-line {
+  gap: 8px;
+  padding-right: 8px;
+}
+
+.receipt-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.receipt-name {
+  padding: 6px 0;
+  min-height: 36px;
+}
+
+.receipt-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.receipt-sum {
+  font-weight: 600;
+}
+
+.receipt-line .field.exact,
+.row .field.exact {
+  flex: none;
+}
+
+.receipt-check {
+  font-size: 14px;
+}
+
+.receipt-fix {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.row.clickable.link {
+  width: 100%;
+}
