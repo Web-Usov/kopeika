@@ -85,17 +85,12 @@
   - `favicon.svg`, `favicon-32.png`, `apple-touch-icon-180.png`
   - `bot-avatar-640.png` (кремовый фон)
   - `miniapp-640x360.png` (без текста)
-  - `mascot/<имя>.svg` — образы для приложения в векторе (5–9 КБ), основной формат для интерфейса
+  - `mascot/<имя>.svg` — образы для приложения в векторе (32–37 КБ), основной формат для интерфейса
   - `mascot/<имя>.webp` — те же образы растром 512×512, прозрачные, — запасной вариант
 - `design/mascot/stickers/` — стикеры для Telegram (512×512, webp и png), в сборку приложения не входят
 - `design/mascot/animations/` — видеостикеры WEBM (`stickers/`), GIF-превью (`preview/`), параметры движений и CSS-ключи (`motion.md`)
-- `design/mascot/svg/` — SVG-образы, нарисованные вручную кодом (без автотрассировки):
-  - `rig.py` — каркас: палитра, монета, глаза, рты, руки, ноги, искорки, конфетти
-  - `poses/<имя>.py` — поза и лицо каждого образа
-  - `build.py` — сборка в `web/public/brand/mascot/<имя>.svg` (`python3 design/mascot/svg/build.py`)
-  - `compare.py` — сравнение с растровым мастером (`uv run --with pillow python design/mascot/svg/compare.py --out <папка>`)
-  - части фигуры размечены классами для CSS-анимации: `k-body`, `k-coin`, `k-face`, `k-eye`, `k-arm-left`, `k-arm-right`, `k-legs`, `k-hand-wave`, `k-sparkles`, `k-confetti`
-- `design/mascot/tools/` — скрипты пересборки: `cutout.py` (мастера), `export.py` (стикеры и webp), `animate.py` (анимации)
+- `design/mascot/tools/` — скрипты пересборки: `cutout.py` (мастера), `export.py` (стикеры и webp), `animate.py` (анимации), `trace.py` (SVG)
+  - SVG — трассировка мастеров, а не перерисовка: палитра гайда + potrace по слоям от тёмного к светлому, затем svgo (`svgo.config.mjs`). Команды — в шапке `trace.py`. Поменяли мастер — пересобираем SVG, руками SVG не правим.
 
 ## Права
 
