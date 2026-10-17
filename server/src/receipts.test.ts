@@ -194,6 +194,17 @@ test('without a key the feature is off: 503 and receiptsEnabled=false in /me', a
   assert.equal((await call(u, 'GET', '/me')).body.receiptsEnabled, true);
 });
 
+test('/me tells which provider reads the photos (for the consent screen and the policy)', async (t) => {
+  const u = newUser();
+  const saved = config.receiptsProvider;
+  t.after(() => {
+    config.receiptsProvider = saved;
+  });
+  assert.equal((await call(u, 'GET', '/me')).body.receiptsProvider, 'anthropic');
+  config.receiptsProvider = 'openrouter';
+  assert.equal((await call(u, 'GET', '/me')).body.receiptsProvider, 'openrouter');
+});
+
 test('only members can scan: others get 404 and the provider is not called', async () => {
   const g = await createGroup(newUser());
   const calls = useProvider(() => raw());

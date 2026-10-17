@@ -1,5 +1,5 @@
 import { type Lang, pickLang } from '../../shared/i18n/index.ts';
-import { type Policy, policies } from '../../shared/privacy.ts';
+import { type Policy, policy, type ReceiptsProvider } from '../../shared/privacy.ts';
 import { terms } from '../../shared/terms.ts';
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -11,8 +11,9 @@ export function privacyLang(query: string | undefined, acceptLanguage: string | 
   return first ? pickLang(first) : 'ru';
 }
 
-/** A plain, self-contained page for the public policy URL (set in @BotFather). */
-export const renderPrivacyHtml = (lang: Lang): string => renderDocHtml(policies[lang], lang);
+/** A plain, self-contained page for the public policy URL (set in @BotFather). Names the receipt provider in use. */
+export const renderPrivacyHtml = (lang: Lang, receipts: ReceiptsProvider): string =>
+  renderDocHtml(policy(lang, receipts), lang);
 
 /** The same for the public Terms of Service URL. */
 export const renderTermsHtml = (lang: Lang): string => renderDocHtml(terms[lang], lang);

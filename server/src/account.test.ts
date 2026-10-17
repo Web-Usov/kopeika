@@ -7,11 +7,13 @@ delete process.env.BOT_TOKEN;
 
 let api: typeof import('./api.ts').api;
 let createApp: typeof import('./app.ts').createApp;
+let config: typeof import('./config.ts').config;
 let db: typeof import('./db.ts');
 let chatLink: typeof import('./chatLink.ts');
 before(async () => {
   ({ api } = await import('./api.ts'));
   ({ createApp } = await import('./app.ts'));
+  ({ config } = await import('./config.ts'));
   db = await import('./db.ts');
   chatLink = await import('./chatLink.ts');
 });
@@ -288,4 +290,23 @@ test('GET /privacy: public HTML in both languages, not cached', async () => {
   // ?lang beats the header
   const forced = await (await app.request('/privacy?lang=ru', { headers: { 'Accept-Language': 'en' } })).text();
   assert.match(forced, /<html lang="ru">/);
+});
+
+test('GET /privacy names the receipt provider from RECEIPTS_PROVIDER and only that one', async (t) => {
+  const app = createApp('/nonexistent-static-dir');
+  const saved = config.receiptsProvider;
+  t.after(() => {
+    config.receiptsProvider = saved;
+  });
+  for (const lang of ['ru', 'en']) {
+    config.receiptsProvider = 'anthropic';
+    const anthropic = await (await app.request(`/privacy?lang=${lang}`)).text();
+    assert.match(anthropic, /Anthropic/, lang);
+    assert.doesNotMatch(anthropic, /OpenRouter/, lang);
+
+    config.receiptsProvider = 'openrouter';
+    const openrouter = await (await app.request(`/privacy?lang=${lang}`)).text();
+    assert.match(openrouter, /OpenRouter/, lang);
+    assert.doesNotMatch(openrouter, /Anthropic/, lang);
+  }
 });

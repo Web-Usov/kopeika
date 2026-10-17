@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { CURRENCIES, formatMoney } from '../../../shared/money.ts';
+import type { ReceiptsProvider } from '../../../shared/privacy.ts';
 import {
   adjustForKind,
   DRAFT_ADJUSTMENT_KINDS,
@@ -83,9 +84,14 @@ function ScanFlow({ g }: { g: GroupDetail }) {
   const [stage, setStage] = useState<Stage>({ kind: 'pick' });
   // Whether the user has already agreed (from /me). Unknown or older server: the 409 from parse tells.
   const [consented, setConsented] = useState<boolean>();
+  // Named on the consent screen; unknown (no /me answer) gets the text that points to the policy.
+  const [provider, setProvider] = useState<ReceiptsProvider>();
   useEffect(() => {
     api.me().then(
-      (me) => setConsented(me.receiptConsent),
+      (me) => {
+        setConsented(me.receiptConsent);
+        setProvider(me.receiptsProvider);
+      },
       () => {},
     );
   }, []);
@@ -189,7 +195,15 @@ function ScanFlow({ g }: { g: GroupDetail }) {
       <>
         <h2 className="page-title">{t('receipt.consentTitle')}</h2>
         <Section>
-          <p className="row receipt-consent">{t('receipt.consentText')}</p>
+          <p className="row receipt-consent">
+            {t(
+              provider === 'openrouter'
+                ? 'receipt.consentTextOpenrouter'
+                : provider === 'anthropic'
+                  ? 'receipt.consentTextAnthropic'
+                  : 'receipt.consentText',
+            )}
+          </p>
           <button
             type="button"
             className="row clickable link"
