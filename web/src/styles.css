@@ -270,6 +270,15 @@ button:disabled {
   color: var(--neg);
 }
 
+.row.center {
+  justify-content: center;
+  text-align: center;
+}
+
+.row.center .row-main {
+  flex: none;
+}
+
 .row-left {
   flex: none;
   display: flex;
@@ -763,25 +772,6 @@ select.field {
   margin: 6px 0;
 }
 
-.footer-link {
-  display: block;
-  margin: 16px auto 0;
-  color: var(--hint);
-  font-size: 13px;
-  text-decoration: underline;
-}
-
-.footer-link-next {
-  margin-top: 8px;
-}
-
-.app-version {
-  color: var(--hint);
-  font-size: 12px;
-  text-align: center;
-  margin: 24px 0 8px;
-}
-
 /* --- Categories --- */
 .chips-caption {
   color: var(--hint);
@@ -1023,33 +1013,88 @@ select.field {
   opacity: 0.85;
 }
 
-/* --- First launch: three steps --- */
-.welcome-title {
-  margin: 0 4px 12px;
-  font-size: 20px;
-  text-align: center;
-}
-
-.steps {
-  list-style: none;
-  margin: 0 0 12px;
-  padding: 0;
+/* --- Шаги (Steps): карточка с номерами и линией --- */
+.card.steps {
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-1) 0;
 }
 
 .step {
   display: flex;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 8px;
-  padding: 12px 14px;
-  border-radius: var(--r-m);
-  background: var(--sec);
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  position: relative;
 }
 
-.step-icon {
+.step-n {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
   flex: none;
-  font-size: 28px;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  background: var(--tint);
+  color: var(--link);
+}
+
+.step-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.step + .step::before {
+  content: "";
+  position: absolute;
+  left: 31px;
+  top: calc(var(--sp-3) * -1 - 2px);
+  height: 28px;
+  border-left: 2px solid var(--tint);
+}
+
+/* --- Форма реквизитов: поля, две кнопки поровну, подпись --- */
+.pay-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.pay-form > .section {
+  margin: 0;
+}
+
+.pay-buttons {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.pay-buttons > .btn {
+  flex: 1;
+}
+
+/* --- Подвал главной --- */
+.legal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.links {
+  display: flex;
+  justify-content: center;
+  gap: var(--sp-5);
+  font-size: var(--fs-footnote);
+  color: var(--hint);
+}
+
+.ver {
+  margin: 0;
+  color: var(--hint);
+  font-size: var(--fs-caption);
+  text-align: center;
 }
 
 /* --- Demo group --- */
