@@ -2336,3 +2336,60 @@ select.field {
   padding: 0 var(--sp-2);
   border-radius: var(--r-xs);
 }
+
+/* --- Траты: строка, предпросмотр быстрой траты --- */
+.rr-line {
+  display: block;
+}
+
+.qp {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.qp-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.qp-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.qp-title {
+  font-size: var(--fs-body);
+  overflow-wrap: anywhere;
+}
+
+.qp-tail {
+  color: var(--sub);
+  font-size: var(--fs-callout);
+  overflow-wrap: anywhere;
+}
+
+.qp-actions {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.qp-actions > .btn {
+  flex: 1;
+}
+
+.quick-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-6);
+}
+
+.quick-note {
+  color: var(--sub);
+  font-size: var(--fs-callout);
+  padding: 0 var(--sp-1);
+}

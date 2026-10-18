@@ -16,8 +16,8 @@ test('быстрая трата: «1200 такси» добавляется ср
 
   const quick = page.getByLabel('Быстрая трата');
   await quick.fill('1200 такси');
-  const chip = page.locator('.quick-chip');
-  await expect(chip).toContainText('🚕 Такси');
+  const chip = page.locator('.qp');
+  await expect(chip).toContainText('Такси');
   await expect(chip).toContainText('1 200');
   await expect(chip).toContainText('поровну на всех · платили вы');
   await quick.press('Enter');
@@ -25,7 +25,7 @@ test('быстрая трата: «1200 такси» добавляется ср
   const row = page.locator('.row', { hasText: 'Такси' });
   await expect(row).toBeVisible();
   await expect(row).toContainText('1 200');
-  await expect(row.locator('.expense-icon')).toHaveText('🚕');
+  await expect(row.locator('.tile')).toBeVisible();
   await expect(quick).toHaveValue('');
 
   // Не распознали сумму — подсказка, кнопок нет.

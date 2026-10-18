@@ -857,6 +857,90 @@ export function formatDay(iso: string): string {
   }).format(date);
 }
 
+/* ---------- Траты ---------- */
+
+/** День в списке трат: заголовок секции с суммой трат за день справа (переводы в сумму не входят). */
+export function DayHeader({ day, total, children }: { day: string; total?: ReactNode; children: ReactNode }) {
+  return (
+    <Section title={day} aside={total} inset={68}>
+      {children}
+    </Section>
+  );
+}
+
+/**
+ * Строка траты: плитка категории, название, «Платил(а) X», справа сумма и подписи («доля X» или «вы не участвуете»).
+ * Перевод — `transfer`: плитка со стрелками, без категории.
+ */
+export function ExpenseRow({
+  category,
+  transfer = false,
+  title,
+  subtitle,
+  amount,
+  captions,
+  onClick,
+}: {
+  category?: CategoryId | string;
+  transfer?: boolean;
+  title: ReactNode;
+  subtitle: ReactNode;
+  amount: ReactNode;
+  /** Подписи под суммой, по строке на элемент. */
+  captions?: ReactNode[];
+  onClick?: () => void;
+}) {
+  return (
+    <Row
+      onClick={onClick}
+      left={transfer ? <Tile icon="transfer" tone="gray" /> : <CategoryTile category={category ?? 'other'} />}
+      title={title}
+      subtitle={subtitle}
+      right={
+        <RowValue
+          amount={amount}
+          caption={captions?.map((c, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: подписи статичны, порядок не меняется
+            <span className="rr-line" key={i}>
+              {c}
+            </span>
+          ))}
+        />
+      }
+    />
+  );
+}
+
+/** Предпросмотр быстрой траты: плитка категории, «Категория · сумма», хвост и две кнопки поровну (children). */
+export function QuickPreview({
+  category,
+  title,
+  amount,
+  tail,
+  children,
+}: {
+  category: CategoryId | string;
+  title: ReactNode;
+  amount: ReactNode;
+  tail: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <Card className="qp">
+      <div className="qp-head">
+        <CategoryTile category={category} />
+        <div className="qp-text">
+          <div className="qp-title">
+            <b>{title}</b> · {amount}
+          </div>
+          <div className="qp-tail">{tail}</div>
+        </div>
+      </div>
+      <div className="qp-actions">{children}</div>
+    </Card>
+  );
+}
+
 /* ---------- Шапка группы ---------- */
 
 /** Шапка группы: `Card` с названием, подписью, кнопкой настроек и содержимым (`BalanceBlock`, `GroupActions`). Одинакова на всех вкладках. */

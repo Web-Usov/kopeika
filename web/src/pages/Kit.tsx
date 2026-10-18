@@ -22,10 +22,12 @@ import {
   Check,
   Chip,
   Chips,
+  DayHeader,
   DemoNote,
   Emblem,
   EmptyState,
   ErrorView,
+  ExpenseRow,
   FieldRow,
   GroupActions,
   GroupHeader,
@@ -36,6 +38,7 @@ import {
   OkLine,
   PickRow,
   QuickInput,
+  QuickPreview,
   Radio,
   Row,
   RowValue,
@@ -693,6 +696,36 @@ export function Kit() {
             </GroupHeader>
           </Variant>
         ))}
+        <Variant label="DayHeader · ExpenseRow">
+          <DayHeader day={t('common.yesterday')} total={<Money value={120000} currency="RUB" />}>
+            <ExpenseRow
+              category="taxi"
+              title={t('kit.sampleQuickValue')}
+              subtitle={t('group.paidByMe')}
+              amount={<Money value={120000} currency="RUB" />}
+              captions={[t('group.notInvolved')]}
+              onClick={noop}
+            />
+            <ExpenseRow
+              transfer
+              title="→"
+              subtitle={t('group.transfer')}
+              amount={<Money value={300000} currency="RUB" />}
+              onClick={noop}
+            />
+          </DayHeader>
+        </Variant>
+        <Variant label="QuickPreview">
+          <QuickPreview
+            category="taxi"
+            title={t(categoryKey('transport'))}
+            amount={<Money value={120000} currency="RUB" />}
+            tail={t('quick.tail')}
+          >
+            <Button>{t('quick.add')}</Button>
+            <Button variant="fill">{t('quick.edit')}</Button>
+          </QuickPreview>
+        </Variant>
         <Variant label="OkLine">
           <OkLine>{t('kit.sampleOk')}</OkLine>
         </Variant>

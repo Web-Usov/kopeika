@@ -37,13 +37,18 @@ import {
   Avatar,
   BalanceBlock,
   Button,
+  DayHeader,
   DemoNote,
+  EmptyState,
   ErrorView,
+  ExpenseRow,
   formatDay,
   GroupActions,
   GroupHeader,
   Loading,
   Money,
+  QuickInput,
+  QuickPreview,
   Row,
   Section,
   Segmented,
@@ -213,11 +218,7 @@ function ExpensesTab({ g }: { g: GroupDetail }) {
     return (
       <>
         <QuickAdd g={g} />
-        <div className="empty">
-          <div className="empty-emoji">🧾</div>
-          <p>{t('group.noExpenses')}</p>
-          <p className="hint">{t('group.noExpensesHint')}</p>
-        </div>
+        <EmptyState icon="receipt" tone="gray" title={t('group.noExpenses')} hint={t('group.noExpensesHint')} />
         {solo && <InviteHint g={g} />}
       </>
     );
@@ -231,49 +232,53 @@ function ExpensesTab({ g }: { g: GroupDetail }) {
     <>
       <QuickAdd g={g} />
       {solo && <InviteHint g={g} />}
-      {[...byDay].map(([day, list]) => (
-        <Section key={day} title={formatDay(day)}>
-          {list.map((e) => {
-            if (e.kind === 'transfer') {
-              const to = e.shares[0]?.memberId;
+      {[...byDay].map(([day, list]) => {
+        // The day total counts expenses only, not transfers.
+        const total = list.reduce((sum, e) => (e.kind === 'transfer' ? sum : sum + e.amount), 0);
+        return (
+          <DayHeader
+            key={day}
+            day={formatDay(day)}
+            total={total > 0 ? <Money value={total} currency={g.currency} /> : undefined}
+          >
+            {list.map((e) => {
+              if (e.kind === 'transfer') {
+                const to = e.shares[0]?.memberId;
+                return (
+                  <ExpenseRow
+                    key={e.id}
+                    transfer
+                    onClick={() => navigate(`/g/${g.id}/transfer/${e.id}`)}
+                    title={`${name(e.payerId)} → ${name(to)}`}
+                    subtitle={t('group.transfer')}
+                    amount={<Money value={e.amount} currency={g.currency} />}
+                  />
+                );
+              }
+              const myShare = e.shares.find((s) => s.memberId === g.meId)?.amount ?? 0;
+              const paidByMe = e.payerId === g.meId;
               return (
-                <Row
+                <ExpenseRow
                   key={e.id}
-                  onClick={() => navigate(`/g/${g.id}/transfer/${e.id}`)}
-                  left={<span className="expense-icon">💸</span>}
-                  title={`${name(e.payerId)} → ${name(to)}`}
-                  subtitle={t('group.transfer')}
-                  right={<Money value={e.amount} currency={g.currency} />}
+                  category={e.category ?? 'other'}
+                  onClick={() => navigate(`/g/${g.id}/expense/${e.id}`)}
+                  title={e.title}
+                  subtitle={paidByMe ? t('group.paidByMe') : t('group.paidBy', { name: name(e.payerId) })}
+                  amount={<Money value={e.amount} currency={g.currency} />}
+                  captions={[
+                    ...(e.originalAmount !== null && e.originalCurrency
+                      ? [formatMoney(e.originalAmount, e.originalCurrency, lang)]
+                      : []),
+                    myShare
+                      ? rich('group.myShare', { amount: <Money value={myShare} currency={g.currency} /> })
+                      : t('group.notInvolved'),
+                  ]}
                 />
               );
-            }
-            const myShare = e.shares.find((s) => s.memberId === g.meId)?.amount ?? 0;
-            const paidByMe = e.payerId === g.meId;
-            return (
-              <Row
-                key={e.id}
-                onClick={() => navigate(`/g/${g.id}/expense/${e.id}`)}
-                left={<span className="expense-icon">{categoryEmoji(e.category ?? 'other')}</span>}
-                title={e.title}
-                subtitle={paidByMe ? t('group.paidByMe') : t('group.paidBy', { name: name(e.payerId) })}
-                right={
-                  <span className="stack-right">
-                    <Money value={e.amount} currency={g.currency} />
-                    {e.originalAmount !== null && e.originalCurrency && (
-                      <span className="hint small">{formatMoney(e.originalAmount, e.originalCurrency, lang)}</span>
-                    )}
-                    <span className="hint small">
-                      {myShare
-                        ? rich('group.myShare', { amount: <Money value={myShare} currency={g.currency} /> })
-                        : t('group.notInvolved')}
-                    </span>
-                  </span>
-                }
-              />
-            );
-          })}
-        </Section>
-      ))}
+            })}
+          </DayHeader>
+        );
+      })}
       {g.hasMoreExpenses && <LoadMore groupId={g.id} />}
     </>
   );
@@ -320,14 +325,13 @@ function QuickAdd({ g }: { g: GroupDetail }) {
 
   return (
     <form
-      className="quick-add"
+      className="quick-form"
       onSubmit={(e) => {
         e.preventDefault();
         void add();
       }}
     >
-      <input
-        className="quick-input"
+      <QuickInput
         aria-label={t('quick.label')}
         placeholder={t('quick.placeholder')}
         value={text}
@@ -336,32 +340,23 @@ function QuickAdd({ g }: { g: GroupDetail }) {
         onChange={(e) => setText(e.target.value)}
       />
       {parsed ? (
-        <div className="quick-preview">
-          <span className="quick-chip">
-            {[
-              `${categoryEmoji(parsed.category)} ${capitalize(parsed.title)}`,
-              formatMoney(parsed.amount, parsed.currency, lang),
-              foreign ? t('quick.foreignTail') : t('quick.tail'),
-            ].join(' · ')}
-          </span>
-          <span className="quick-actions">
-            {!foreign && (
-              <button type="submit" className="small-btn primary" disabled={busy}>
-                {t('quick.add')}
-              </button>
-            )}
-            <button
-              type="button"
-              className={`small-btn ${foreign ? 'primary' : ''}`}
-              disabled={busy}
-              onClick={foreign ? () => void add() : edit}
-            >
-              {foreign ? t('quick.setRate') : t('quick.edit')}
-            </button>
-          </span>
-        </div>
+        <QuickPreview
+          category={parsed.category}
+          title={capitalize(parsed.title)}
+          amount={formatMoney(parsed.amount, parsed.currency, lang)}
+          tail={foreign ? t('quick.foreignTail') : t('quick.tail')}
+        >
+          {!foreign && (
+            <Button type="submit" variant="primary" disabled={busy}>
+              {t('quick.add')}
+            </Button>
+          )}
+          <Button variant={foreign ? 'primary' : 'fill'} disabled={busy} onClick={foreign ? () => void add() : edit}>
+            {foreign ? t('quick.setRate') : t('quick.edit')}
+          </Button>
+        </QuickPreview>
       ) : (
-        text.trim() && <div className="hint small quick-hint">{t('quick.noAmount')}</div>
+        text.trim() && <div className="quick-note">{t('quick.noAmount')}</div>
       )}
     </form>
   );
@@ -370,7 +365,7 @@ function QuickAdd({ g }: { g: GroupDetail }) {
 /** «Показать ещё»: loads the next page of older expenses; also fires by itself when scrolled into view. */
 function LoadMore({ groupId }: { groupId: number }) {
   const [busy, setBusy] = useState(false);
-  const ref = useRef<HTMLButtonElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
   const more = async () => {
     if (busy) return;
     setBusy(true);
@@ -395,21 +390,21 @@ function LoadMore({ groupId }: { groupId: number }) {
     return () => io.disconnect();
   }, [busy]);
   return (
-    <button type="button" ref={ref} className="text-btn" disabled={busy} onClick={more}>
-      {busy ? t('common.loading') : t('group.showMore')}
-    </button>
+    <div ref={ref}>
+      <Button variant="ghost" wide disabled={busy} onClick={more}>
+        {busy ? t('common.loading') : t('group.showMore')}
+      </Button>
+    </div>
   );
 }
 
 function InviteHint({ g }: { g: GroupDetail }) {
   return (
-    <div className="empty">
-      <p>{t('group.soloTitle')}</p>
-      <p className="hint">{t('group.soloHint')}</p>
-      <button type="button" className="small-btn primary" onClick={() => invite(g)}>
+    <EmptyState icon="userplus" title={t('group.soloTitle')} hint={t('group.soloHint')}>
+      <Button variant="tint" onClick={() => invite(g)}>
         {t('group.soloInvite')}
-      </button>
-    </div>
+      </Button>
+    </EmptyState>
   );
 }
 
