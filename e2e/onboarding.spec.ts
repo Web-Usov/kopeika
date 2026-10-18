@@ -19,7 +19,7 @@ test('первый запуск: шаги, пример с тратами, уд�
   // Удаление примера возвращает шаги.
   await page.getByText('Дача на выходные').click();
   page.once('dialog', (d) => d.accept());
-  await page.getByRole('button', { name: 'Удалить пример' }).click();
+  await page.getByRole('button', { name: 'Удалить', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Посмотреть на примере' })).toBeVisible();
 });
 

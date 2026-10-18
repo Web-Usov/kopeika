@@ -679,3 +679,92 @@ export function formatDay(iso: string): string {
     ...(yy !== new Date().getFullYear() ? { year: 'numeric' } : {}),
   }).format(date);
 }
+
+/* ---------- Шапка группы ---------- */
+
+/** Шапка группы: `Card` с названием, подписью, кнопкой настроек и содержимым (`BalanceBlock`, `GroupActions`). Одинакова на всех вкладках. */
+export function GroupHeader({
+  title,
+  subtitle,
+  settingsLabel,
+  onSettings,
+  children,
+}: {
+  title: string;
+  subtitle: ReactNode;
+  settingsLabel: string;
+  onSettings: () => void;
+  children?: ReactNode;
+}) {
+  return (
+    <Card className="hdr">
+      <div className="hdr-top">
+        <div className="hdr-text">
+          <h1>{title}</h1>
+          <div className="hdr-sub">{subtitle}</div>
+        </div>
+        <IconButton icon="settings" label={settingsLabel} variant="fill" onClick={onSettings} />
+      </div>
+      {children}
+    </Card>
+  );
+}
+
+/**
+ * Блок баланса: подпись, сумма 26 px, фон по знаку (`pos` — вам должны, `neg` — вы должны, `zero` — в расчёте или пусто).
+ * `action` — малая кнопка справа. Вместо суммы можно передать `text` («Вы в расчёте») — тогда слева галочка в плитке.
+ */
+export function BalanceBlock({
+  tone,
+  label,
+  amount,
+  text,
+  action,
+}: {
+  tone: 'pos' | 'neg' | 'zero';
+  label: string;
+  amount?: ReactNode;
+  text?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className={cx('bal', tone)}>
+      {text && <Tile icon="check" tone="pos" />}
+      <div className="bal-main">
+        <div className="bal-l">{label}</div>
+        <div className={cx('bal-v', text && 'sm')}>{text ?? amount}</div>
+      </div>
+      {action}
+    </div>
+  );
+}
+
+export type GroupAction = { icon: IconName; label: string; onClick: () => void; badge?: string };
+
+/** Ряд действий плитками 60 px: иконка над подписью, у действия может быть счётчик медью. */
+export function GroupActions({ items }: { items: GroupAction[] }) {
+  return (
+    <div className={cx('acts', items.length === 2 ? 'n2' : 'n3')}>
+      {items.map((a) => (
+        <button key={a.icon} type="button" className="act" onClick={a.onClick}>
+          <Icon name={a.icon} size={22} stroke={1.9} />
+          {a.label}
+          {a.badge && <span className="bdg">{a.badge}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Плашка «пример»: медный фон, плитка-иконка, текст и малая красная кнопка. */
+export function DemoNote({ text, actionLabel, onAction }: { text: string; actionLabel: string; onAction: () => void }) {
+  return (
+    <div className="note">
+      <Tile icon="info" tone="brand" size="s" />
+      <div className="note-text">{text}</div>
+      <button type="button" className="btn sm note-btn" onClick={onAction}>
+        {actionLabel}
+      </button>
+    </div>
+  );
+}

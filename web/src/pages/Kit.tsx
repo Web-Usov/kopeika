@@ -11,6 +11,7 @@ import {
   Avatar,
   AvatarStack,
   Badge,
+  BalanceBlock,
   BigField,
   Box,
   Button,
@@ -19,10 +20,13 @@ import {
   Check,
   Chip,
   Chips,
+  DemoNote,
   Emblem,
   EmptyState,
   ErrorView,
   FieldRow,
+  GroupActions,
+  GroupHeader,
   IconButton,
   LegalLinks,
   Loading,
@@ -588,6 +592,45 @@ export function Kit() {
             version={t('common.version', { version: 'v0.9.0' })}
           />
         </Variant>
+        <Variant label="DemoNote">
+          <DemoNote text={t('group.demoBanner')} actionLabel={t('group.demoDelete')} onAction={noop} />
+        </Variant>
+        {(['pos', 'neg', 'zero', 'empty'] as const).map((k) => (
+          <Variant key={k} label={`GroupHeader · BalanceBlock ${k}`}>
+            <GroupHeader
+              title={t('kit.sampleGroupName')}
+              subtitle={t('group.headerSub', { members: t('common.members', { count: 4 }), amount: '34 890 ₽' })}
+              settingsLabel={t('group.settings')}
+              onSettings={noop}
+            >
+              {k === 'pos' || k === 'neg' ? (
+                <BalanceBlock
+                  tone={k}
+                  label={k === 'pos' ? t('group.owedLabel') : t('group.oweLabel')}
+                  amount="15 273,33 ₽"
+                  action={
+                    <Button variant="fill" size="s" onClick={noop}>
+                      {k === 'pos' ? t('group.remind') : t('group.settle')}
+                    </Button>
+                  }
+                />
+              ) : (
+                <BalanceBlock
+                  tone="zero"
+                  label={t('group.balance')}
+                  {...(k === 'zero' ? { text: t('group.settled') } : { amount: '0 ₽' })}
+                />
+              )}
+              <GroupActions
+                items={[
+                  { icon: 'userplus', label: t('group.tileInvite'), onClick: noop },
+                  { icon: 'chat', label: t('group.tileChat'), onClick: noop },
+                  { icon: 'trophy', label: t('group.tileSummary'), onClick: noop, badge: '3/9' },
+                ]}
+              />
+            </GroupHeader>
+          </Variant>
+        ))}
         <Variant label="OkLine">
           <OkLine>{t('kit.sampleOk')}</OkLine>
         </Variant>

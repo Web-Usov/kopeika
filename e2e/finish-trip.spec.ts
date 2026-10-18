@@ -18,7 +18,7 @@ test('все в расчёте: плашка, «Не сейчас» до сле�
   await page.getByPlaceholder('За что? Например, ужин').fill('Билеты');
   await page.getByPlaceholder('0').fill('1000');
   await page.getByRole('button', { name: 'Добавить трату' }).click();
-  await expect(page.locator('.my-balance')).toContainText('Вам должны');
+  await expect(page.locator('.bal-main')).toContainText('Вам должны');
   await expect(banner).toHaveCount(0);
 
   // Маша вернула долг: все в расчёте.
