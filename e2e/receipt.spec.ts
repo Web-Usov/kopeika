@@ -235,7 +235,7 @@ test('чек: кто что ел → трата, доли ровно, балан
   await expect(page.getByRole('heading', { name: 'Ужин' })).toBeVisible();
   await expect(page.getByText('Хинкальная')).toBeVisible();
   // I paid 31,90 and my share is 13,20.
-  await expect.poll(async () => text(await page.locator('.my-balance').textContent())).toBe('Вам должны 18,70 ₽');
+  await expect.poll(async () => text(await page.locator('.bal-main').innerText())).toBe('Вам должны 18,70 ₽');
 });
 
 test('чек: чек в другой валюте идёт по курсу, доли в оригинале', async ({ page }) => {
@@ -247,7 +247,7 @@ test('чек: чек в другой валюте идёт по курсу, до
   await create.click();
   await expect(page.getByText('Хинкальная')).toBeVisible();
   // 31,90 GEL = 957 ₽, my share 13,20 GEL = 396 ₽.
-  await expect.poll(async () => text(await page.locator('.my-balance').textContent())).toBe('Вам должны 561 ₽');
+  await expect.poll(async () => text(await page.locator('.bal-main').innerText())).toBe('Вам должны 561 ₽');
 });
 
 test('бета: нет доступа → запрос → «запрос отправлен»; после одобрения обычный поток', async ({ page }) => {

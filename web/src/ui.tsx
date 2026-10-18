@@ -31,11 +31,20 @@ export function Screen({
 }
 
 /** Заголовок экрана (`.ttl`) и необязательный подзаголовок `lead`. */
-export function ScreenTitle({ children, lead }: { children: ReactNode; lead?: ReactNode }) {
+export function ScreenTitle({
+  children,
+  lead,
+  center = false,
+}: {
+  children: ReactNode;
+  lead?: ReactNode;
+  /** По центру — шапка главной. */
+  center?: boolean;
+}) {
   return (
     <>
-      <h1 className="ttl">{children}</h1>
-      {lead && <p className="lead">{lead}</p>}
+      <h1 className={cx('ttl', center && 'center')}>{children}</h1>
+      {lead && <p className={cx('lead', center && 'center')}>{lead}</p>}
     </>
   );
 }
@@ -84,6 +93,48 @@ export function Section({
 /** Поверхность с отступом `--sp-4` — для содержимого, которое не список. */
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cx('card', className)}>{children}</div>;
+}
+
+/**
+ * Шаги (`.steps`) — `Card` с номерами в кружках и линией между ними; над карточкой заголовок секции.
+ * Первый запуск: «Как это работает».
+ */
+export function Steps({ title, items }: { title?: ReactNode; items: { title: ReactNode; text: ReactNode }[] }) {
+  return (
+    <section className="section">
+      {title && <div className="section-title">{title}</div>}
+      <Card className="steps">
+        {items.map((item, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: шаги статичны, порядок не меняется
+          <div className="step" key={i}>
+            <span className="step-n" aria-hidden="true">
+              {i + 1}
+            </span>
+            <span className="step-body">
+              <b>{item.title}</b>
+              <span className="hint">{item.text}</span>
+            </span>
+          </div>
+        ))}
+      </Card>
+    </section>
+  );
+}
+
+/** Подвал главной: ссылки в одну строку (`.links`) и версия (`.ver`). */
+export function LegalLinks({ links, version }: { links: { label: string; onClick: () => void }[]; version: string }) {
+  return (
+    <footer className="legal">
+      <div className="links">
+        {links.map((l) => (
+          <button type="button" key={l.label} onClick={l.onClick}>
+            {l.label}
+          </button>
+        ))}
+      </div>
+      <p className="ver">{version}</p>
+    </footer>
+  );
 }
 
 /* ---------- Плитки, аватары, плашки ---------- */
@@ -804,4 +855,93 @@ export function formatDay(iso: string): string {
     month: 'long',
     ...(yy !== new Date().getFullYear() ? { year: 'numeric' } : {}),
   }).format(date);
+}
+
+/* ---------- Шапка группы ---------- */
+
+/** Шапка группы: `Card` с названием, подписью, кнопкой настроек и содержимым (`BalanceBlock`, `GroupActions`). Одинакова на всех вкладках. */
+export function GroupHeader({
+  title,
+  subtitle,
+  settingsLabel,
+  onSettings,
+  children,
+}: {
+  title: string;
+  subtitle: ReactNode;
+  settingsLabel: string;
+  onSettings: () => void;
+  children?: ReactNode;
+}) {
+  return (
+    <Card className="hdr">
+      <div className="hdr-top">
+        <div className="hdr-text">
+          <h1>{title}</h1>
+          <div className="hdr-sub">{subtitle}</div>
+        </div>
+        <IconButton icon="settings" label={settingsLabel} variant="fill" onClick={onSettings} />
+      </div>
+      {children}
+    </Card>
+  );
+}
+
+/**
+ * Блок баланса: подпись, сумма 26 px, фон по знаку (`pos` — вам должны, `neg` — вы должны, `zero` — в расчёте или пусто).
+ * `action` — малая кнопка справа. Вместо суммы можно передать `text` («Вы в расчёте») — тогда слева галочка в плитке.
+ */
+export function BalanceBlock({
+  tone,
+  label,
+  amount,
+  text,
+  action,
+}: {
+  tone: 'pos' | 'neg' | 'zero';
+  label: string;
+  amount?: ReactNode;
+  text?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className={cx('bal', tone)}>
+      {text && <Tile icon="check" tone="pos" />}
+      <div className="bal-main">
+        <div className="bal-l">{label}</div>
+        <div className={cx('bal-v', text && 'sm')}>{text ?? amount}</div>
+      </div>
+      {action}
+    </div>
+  );
+}
+
+export type GroupAction = { icon: IconName; label: string; onClick: () => void; badge?: string };
+
+/** Ряд действий плитками 60 px: иконка над подписью, у действия может быть счётчик медью. */
+export function GroupActions({ items }: { items: GroupAction[] }) {
+  return (
+    <div className={cx('acts', items.length === 2 ? 'n2' : 'n3')}>
+      {items.map((a) => (
+        <button key={a.icon} type="button" className="act" onClick={a.onClick}>
+          <Icon name={a.icon} size={22} stroke={1.9} />
+          {a.label}
+          {a.badge && <span className="bdg">{a.badge}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Плашка «пример»: медный фон, плитка-иконка, текст и малая красная кнопка. */
+export function DemoNote({ text, actionLabel, onAction }: { text: string; actionLabel: string; onAction: () => void }) {
+  return (
+    <div className="note">
+      <Tile icon="info" tone="brand" size="s" />
+      <div className="note-text">{text}</div>
+      <button type="button" className="btn sm note-btn" onClick={onAction}>
+        {actionLabel}
+      </button>
+    </div>
+  );
 }
