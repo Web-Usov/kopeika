@@ -11,10 +11,29 @@ import {
 } from '../api.ts';
 import { finishTrip } from '../finish.ts';
 import { t } from '../i18n.ts';
+import { Icon } from '../icons.tsx';
 import { scheduleText, shortDate } from '../recurring.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, canRequestChat, confirmDialog, haptic, requestChat, shareLink } from '../tg.tsx';
-import { Avatar, ErrorView, Loading, Money, Row, Section, Segmented } from '../ui.tsx';
+import {
+  Avatar,
+  AvatarAdd,
+  BigField,
+  Button,
+  DemoNote,
+  ErrorView,
+  IconButton,
+  InviteCard,
+  Loading,
+  Money,
+  Row,
+  Screen,
+  ScreenTitle,
+  Section,
+  Segmented,
+  Switch,
+  Tile,
+} from '../ui.tsx';
 import { PaymentForm } from './PaymentForm.tsx';
 
 const FEED_FOOTER = {
@@ -28,16 +47,16 @@ export function Settings({ id }: { id: number }) {
   const back = <BackButton onClick={() => navigate(`/g/${id}`, { replace: true })} />;
   if (!g)
     return (
-      <div className="page">
+      <Screen>
         {back}
         {error ? <ErrorView message={error} /> : <Loading />}
-      </div>
+      </Screen>
     );
   return (
-    <div className="page">
+    <Screen>
       {back}
       <SettingsView g={g} />
-    </div>
+    </Screen>
   );
 }
 
@@ -77,7 +96,10 @@ function SettingsView({ g }: { g: GroupDetail }) {
   };
 
   const deleteGroup = async () => {
-    if (!(await confirmDialog(t('settings.confirmDeleteGroup', { name: g.name })))) return;
+    if (
+      !(await confirmDialog(t(g.isDemo ? 'group.demoConfirmDelete' : 'settings.confirmDeleteGroup', { name: g.name })))
+    )
+      return;
     try {
       await api.deleteGroup(g.id);
       forgetGroup(g.id);
@@ -165,75 +187,117 @@ function SettingsView({ g }: { g: GroupDetail }) {
     }
   };
 
+  const nameDirty = name.trim() !== '' && name.trim() !== g.name;
+  const rename = () => run(() => api.renameGroup(g.id, name.trim()));
+  const chatFooter = [
+    g.chat ? t(FEED_FOOTER[g.chat.feed]) : t('settings.chatNone'),
+    t('settings.autoRemindFooter'),
+  ].join(' ');
+  const groupFooter = g.isDemo ? undefined : t(g.archived ? 'settings.groupFooterShort' : 'settings.groupFooter');
+  const inviteFooter = g.isOwner
+    ? `${t('settings.inviteFooter')} ${t('settings.inviteRotateNote')}`
+    : t('settings.inviteFooter');
+
   return (
     <>
-      <h2 className="page-title">{t('settings.title')}</h2>
+      <ScreenTitle>{t('settings.title')}</ScreenTitle>
 
-      <Section title={t('settings.nameSection')}>
-        <div className="row">
-          <input className="field inline" value={name} maxLength={64} onChange={(e) => setName(e.target.value)} />
-          {name.trim() && name.trim() !== g.name && (
-            <button type="button" className="small-btn" onClick={() => run(() => api.renameGroup(g.id, name.trim()))}>
+      {g.isDemo && (
+        <DemoNote
+          text={t('group.demoBanner')}
+          actionLabel={t('group.demoDelete')}
+          onAction={() => void deleteGroup()}
+        />
+      )}
+
+      <Section>
+        <BigField
+          label={t('settings.nameLabel')}
+          value={name}
+          maxLength={64}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && nameDirty && void rename()}
+        />
+        {nameDirty && (
+          <div className="save-row">
+            <Button variant="tint" wide onClick={() => void rename()}>
               {t('common.save')}
-            </button>
-          )}
-        </div>
+            </Button>
+          </div>
+        )}
       </Section>
 
       {!g.isDemo && (
-        <Section title={t('settings.inviteSection')} footer={t('settings.inviteFooter')}>
+        <Section title={t('settings.inviteSection')} footer={inviteFooter}>
           {g.inviteLink ? (
-            <>
-              <div className="row invite-link">{g.inviteLink}</div>
-              <div className="row buttons">
-                <button type="button" className="small-btn" onClick={copy}>
-                  {copied ? t('settings.copied') : t('settings.copy')}
-                </button>
-                <button
-                  type="button"
-                  className="small-btn primary"
-                  onClick={() => shareLink(g.inviteLink!, t('settings.shareText', { name: g.name }))}
-                >
-                  {t('settings.share')}
-                </button>
-              </div>
-            </>
+            <InviteCard
+              link={g.inviteLink}
+              copyLabel={copied ? t('settings.copied') : t('settings.copy')}
+              shareLabel={t('settings.share')}
+              onCopy={() => void copy()}
+              onShare={() => shareLink(g.inviteLink!, t('settings.shareText', { name: g.name }))}
+              rotateLabel={g.isOwner ? t('settings.rotateInvite') : undefined}
+              onRotate={() => void rotateInvite()}
+            />
           ) : (
-            <div className="row hint">{t('settings.noLink', { code: g.inviteCode })}</div>
+            <>
+              <Row
+                className="wrap"
+                title={<span className="hint">{t('settings.noLink', { code: g.inviteCode })}</span>}
+              />
+              {g.isOwner && (
+                <Row
+                  tone="link"
+                  left={<Icon name="repeat" size={22} stroke={1.9} />}
+                  title={t('settings.rotateInvite')}
+                  onClick={() => void rotateInvite()}
+                />
+              )}
+            </>
           )}
-          {g.isOwner && <Row title={t('settings.rotateInvite')} onClick={() => void rotateInvite()} />}
         </Section>
       )}
 
-      <Section title={t('settings.membersSection', { count: g.members.length })} footer={t('settings.membersFooter')}>
+      <Section
+        title={t('settings.membersSection', { count: g.members.length })}
+        footer={g.isDemo ? t('settings.demoMembersFooter') : t('settings.membersFooter')}
+        inset={64}
+      >
         {g.members.map((m) => (
           <MemberRow key={m.id} g={g} m={m} />
         ))}
-        <div className="row">
-          <input
-            className="field inline"
-            placeholder={t('settings.newMemberPlaceholder')}
-            value={newMember}
-            maxLength={64}
-            onChange={(e) => setNewMember(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && addMember()}
-          />
-          <button type="button" className="small-btn" disabled={!newMember.trim()} onClick={addMember}>
-            {t('common.add')}
-          </button>
-        </div>
+        <Row
+          left={<AvatarAdd />}
+          title={
+            <input
+              className="row-input"
+              aria-label={t('settings.newMemberPlaceholder')}
+              placeholder={t('settings.newMemberPlaceholder')}
+              value={newMember}
+              maxLength={64}
+              onChange={(e) => setNewMember(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addMember()}
+            />
+          }
+          right={
+            <Button variant="tint" size="s" disabled={!newMember.trim()} onClick={addMember}>
+              {t('common.add')}
+            </Button>
+          }
+        />
       </Section>
 
       {!g.isDemo && (
-        <Section title={t('settings.chatSection')} footer={g.chat ? t(FEED_FOOTER[g.chat.feed]) : undefined}>
+        <Section title={t('settings.chatRemindSection')} footer={chatFooter} inset={60}>
           {g.chat ? (
             <>
               <Row
+                left={<Tile icon="chat" tone="solid-blue" size="s" />}
                 title={t('settings.chatLinked', { title: g.chat.title })}
                 right={
-                  <button type="button" className="small-btn" onClick={() => void unlinkChat()}>
+                  <Button variant="fill" size="s" onClick={() => void unlinkChat()}>
                     {t('settings.chatUnlink')}
-                  </button>
+                  </Button>
                 }
               />
               <Segmented<ChatFeed>
@@ -247,54 +311,69 @@ function SettingsView({ g }: { g: GroupDetail }) {
               />
             </>
           ) : (
-            <>
-              <div className="row hint">{waitingChat ? t('settings.chatPickWaiting') : t('settings.chatNone')}</div>
-              {canRequestChat() && (
-                <Row title={t('settings.chatPick')} onClick={waitingChat ? undefined : () => void pickChat()} />
-              )}
-            </>
+            <Row
+              left={<Tile icon="chat" tone="solid-blue" size="s" />}
+              title={t('settings.chatPickTitle')}
+              right={
+                <span className="hint">
+                  {waitingChat ? t('settings.chatPickWaiting') : t('settings.chatStatusNone')}
+                </span>
+              }
+              chevron={canRequestChat()}
+              onClick={canRequestChat() && !waitingChat ? () => void pickChat() : undefined}
+            />
           )}
-        </Section>
-      )}
-
-      {!g.isDemo && (
-        <Section footer={t('settings.autoRemindFooter')}>
           <Row
+            left={<Tile icon="bell" tone="solid-orange" size="s" />}
+            wrap
             title={t('settings.autoRemindTitle')}
             onClick={() => void run(() => api.setAutoRemind(g.id, !g.autoRemind))}
-            right={<span className={`switch ${g.autoRemind ? 'on' : ''}`} />}
+            right={<Switch on={g.autoRemind} />}
           />
         </Section>
       )}
 
       {!g.isDemo && <RecurringSection g={g} />}
 
-      <Section title={t('settings.exportSection')} footer={t('settings.exportFooter')}>
+      <Section footer={groupFooter} inset={60}>
         <Row
+          left={<Tile icon="download" tone="solid-green" size="s" />}
           title={exporting ? t('settings.exporting') : t('settings.exportCsv')}
           onClick={exporting ? undefined : exportCsv}
+          chevron
+        />
+        {!g.archived && !g.isDemo && (
+          <Row
+            left={<Tile icon="flag" tone="solid-purple" size="s" />}
+            title={t('settings.finishTrip')}
+            onClick={finish}
+            chevron
+          />
+        )}
+        <Row
+          left={<Tile icon="archive" tone="solid-gray" size="s" />}
+          title={g.archived ? t('settings.unarchiveGroup') : t('settings.archiveGroup')}
+          onClick={toggleArchive}
+          chevron
         />
       </Section>
 
-      {!g.archived && !g.isDemo && (
-        <Section footer={t('settings.finishFooter')}>
-          <Row title={t('settings.finishTrip')} onClick={finish} />
-        </Section>
-      )}
-
-      <Section footer={t('settings.archiveFooter')}>
-        <Row title={g.archived ? t('settings.unarchiveGroup') : t('settings.archiveGroup')} onClick={toggleArchive} />
+      <Section inset={60}>
+        <Row
+          tone="danger"
+          left={<Tile icon="logout" tone="solid-red" size="s" />}
+          title={t('settings.leaveGroup')}
+          onClick={leaveGroup}
+        />
+        {g.isOwner && (
+          <Row
+            tone="danger"
+            left={<Tile icon="trash" tone="solid-red" size="s" />}
+            title={g.isDemo ? t('settings.deleteDemo') : t('settings.deleteGroup')}
+            onClick={deleteGroup}
+          />
+        )}
       </Section>
-
-      <button type="button" className="danger-btn" onClick={leaveGroup}>
-        {t('settings.leaveGroup')}
-      </button>
-
-      {g.isOwner && (
-        <button type="button" className="danger-btn" onClick={deleteGroup}>
-          {t('settings.deleteGroup')}
-        </button>
-      )}
     </>
   );
 }
@@ -311,20 +390,26 @@ function MemberRow({ g, m }: { g: GroupDetail; m: Member }) {
     };
     return (
       <>
-        <div className="row">
-          <input
-            className="field inline"
-            value={name}
-            maxLength={64}
-            // biome-ignore lint/a11y/noAutofocus: поле появляется по нажатию «изменить» — фокус нужен сразу
-            autoFocus
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && save()}
-          />
-          <button type="button" className="small-btn" onClick={save}>
-            {t('common.done')}
-          </button>
-        </div>
+        <Row
+          left={<Avatar member={m} />}
+          title={
+            <input
+              className="row-input"
+              aria-label={t('settings.nameLabel')}
+              value={name}
+              maxLength={64}
+              // biome-ignore lint/a11y/noAutofocus: поле появляется по нажатию «изменить» — фокус нужен сразу
+              autoFocus
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && save()}
+            />
+          }
+          right={
+            <Button variant="tint" size="s" onClick={save}>
+              {t('common.done')}
+            </Button>
+          }
+        />
         {!m.hasTelegram && (
           <PaymentForm
             bare
@@ -350,31 +435,20 @@ function MemberRow({ g, m }: { g: GroupDetail; m: Member }) {
       await run(() => api.removeMember(g.id, m.id));
   };
 
+  const isMe = m.id === g.meId;
   return (
     <Row
       left={<Avatar member={m} />}
-      title={
-        <>
-          {m.id === g.meId ? t('common.youParen', { name: m.name }) : m.name}
-          {m.hasTelegram && (
-            <span className="hint" aria-hidden="true">
-              {' '}
-              ✎
-            </span>
-          )}
-        </>
-      }
+      title={isMe ? t('common.youParen', { name: m.name }) : m.name}
       subtitle={m.hasTelegram ? (m.username ? `@${m.username}` : t('settings.telegram')) : t('settings.noTelegram')}
       onClick={() => setEditing(true)}
       action={
         !m.hasTelegram ? (
-          <button type="button" className="icon-btn" aria-label={t('common.delete')} onClick={() => void remove()}>
-            ✕
-          </button>
-        ) : g.isOwner && !g.isDemo && m.id !== g.meId ? (
-          <button type="button" className="small-btn" onClick={() => void kick()}>
-            {t('settings.removeMember')}
-          </button>
+          <IconButton icon="x" variant="mute" label={t('common.delete')} onClick={() => void remove()} />
+        ) : g.isOwner && !g.isDemo && !isMe ? (
+          <IconButton icon="x" variant="mute" label={t('settings.removeMember')} onClick={() => void kick()} />
+        ) : isMe ? (
+          <IconButton icon="pencil" variant="mute" label={t('settings.editName')} onClick={() => setEditing(true)} />
         ) : undefined
       }
     />
@@ -413,12 +487,19 @@ function RecurringSection({ g }: { g: GroupDetail }) {
   };
 
   return (
-    <Section title={t('recurring.section')} footer={t('recurring.footer')}>
-      {items.length === 0 && <div className="row hint">{t('recurring.empty')}</div>}
+    <Section title={t('recurring.section')} footer={items.length > 0 ? t('recurring.footer') : undefined} inset={60}>
+      {items.length === 0 && (
+        <Row
+          className="wrap"
+          left={<Tile icon="repeat" tone="solid-gray" size="s" />}
+          title={<span className="hint">{t('recurring.empty')}</span>}
+        />
+      )}
       {items.map((r) => (
         <Row
           key={r.id}
           className="wrap"
+          left={<Tile icon="repeat" tone="solid-gray" size="s" />}
           title={r.title}
           subtitle={
             <>
@@ -429,12 +510,10 @@ function RecurringSection({ g }: { g: GroupDetail }) {
           }
           right={
             <>
-              <button type="button" className="small-btn" onClick={() => void toggle(r)}>
+              <Button variant="fill" size="s" onClick={() => void toggle(r)}>
                 {r.active ? t('recurring.pause') : t('recurring.resume')}
-              </button>
-              <button type="button" className="icon-btn" aria-label={t('common.delete')} onClick={() => void remove(r)}>
-                ✕
-              </button>
+              </Button>
+              <IconButton icon="x" variant="mute" label={t('common.delete')} onClick={() => void remove(r)} />
             </>
           }
         />

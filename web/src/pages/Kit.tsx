@@ -11,6 +11,7 @@ import {
   AmountAction,
   AmountCard,
   Avatar,
+  AvatarAdd,
   AvatarStack,
   Badge,
   BalanceBlock,
@@ -32,6 +33,7 @@ import {
   GroupActions,
   GroupHeader,
   IconButton,
+  InviteCard,
   LegalLinks,
   Loading,
   Money,
@@ -442,6 +444,11 @@ export function Kit() {
             <Avatar member={members[1]} badge={{ icon: 'users', tone: 'brand' }} />
           </div>
         </Variant>
+        <Variant label="AvatarAdd">
+          <Card>
+            <AvatarAdd />
+          </Card>
+        </Variant>
         <Variant label="AvatarStack">
           <Card>
             <AvatarStack members={members} />
@@ -656,6 +663,19 @@ export function Kit() {
             ]}
             version={t('common.version', { version: 'v0.9.0' })}
           />
+        </Variant>
+        <Variant label="InviteCard">
+          <Section>
+            <InviteCard
+              link="t.me/kopeika_bot?startapp=EhRarscTLEGL"
+              copyLabel={t('settings.copy')}
+              shareLabel={t('settings.share')}
+              onCopy={noop}
+              onShare={noop}
+              rotateLabel={t('settings.rotateInvite')}
+              onRotate={noop}
+            />
+          </Section>
         </Variant>
         <Variant label="DemoNote">
           <DemoNote text={t('group.demoBanner')} actionLabel={t('group.demoDelete')} onAction={noop} />

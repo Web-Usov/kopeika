@@ -301,7 +301,7 @@ button:disabled {
 
 .section-body {
   background: var(--sec);
-  border-radius: var(--r-m);
+  border-radius: var(--r-l);
   overflow: hidden;
 }
 
@@ -324,6 +324,7 @@ button:disabled {
 }
 
 .row + .row::before,
+.invite + .row::before,
 .segmented + .row::before,
 .blk + .blk::before,
 .row + .blk::before,
@@ -499,10 +500,59 @@ button:disabled {
   background: currentColor;
 }
 
+.invite {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+}
+
 .invite-link {
   font-family: ui-monospace, Menlo, monospace;
-  font-size: 13px;
+  font-size: var(--fs-callout);
   word-break: break-all;
+}
+
+.btn-pair {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.btn-pair > .btn {
+  flex: 1;
+}
+
+.avatar.add {
+  background: var(--fill);
+  color: var(--hint);
+}
+
+.row-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+}
+
+.row-input::placeholder {
+  color: var(--hint);
+}
+
+.row-input:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+
+.row.split > .ibtn {
+  margin-left: var(--sp-3);
+}
+
+.save-row {
+  padding: 0 var(--sp-4) var(--sp-3);
 }
 
 .row.buttons {
