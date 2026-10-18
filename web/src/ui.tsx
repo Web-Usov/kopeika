@@ -31,11 +31,20 @@ export function Screen({
 }
 
 /** Заголовок экрана (`.ttl`) и необязательный подзаголовок `lead`. */
-export function ScreenTitle({ children, lead }: { children: ReactNode; lead?: ReactNode }) {
+export function ScreenTitle({
+  children,
+  lead,
+  center = false,
+}: {
+  children: ReactNode;
+  lead?: ReactNode;
+  /** По центру — шапка главной. */
+  center?: boolean;
+}) {
   return (
     <>
-      <h1 className="ttl">{children}</h1>
-      {lead && <p className="lead">{lead}</p>}
+      <h1 className={cx('ttl', center && 'center')}>{children}</h1>
+      {lead && <p className={cx('lead', center && 'center')}>{lead}</p>}
     </>
   );
 }
@@ -78,6 +87,48 @@ export function Section({
 /** Поверхность с отступом `--sp-4` — для содержимого, которое не список. */
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cx('card', className)}>{children}</div>;
+}
+
+/**
+ * Шаги (`.steps`) — `Card` с номерами в кружках и линией между ними; над карточкой заголовок секции.
+ * Первый запуск: «Как это работает».
+ */
+export function Steps({ title, items }: { title?: ReactNode; items: { title: ReactNode; text: ReactNode }[] }) {
+  return (
+    <section className="section">
+      {title && <div className="section-title">{title}</div>}
+      <Card className="steps">
+        {items.map((item, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: шаги статичны, порядок не меняется
+          <div className="step" key={i}>
+            <span className="step-n" aria-hidden="true">
+              {i + 1}
+            </span>
+            <span className="step-body">
+              <b>{item.title}</b>
+              <span className="hint">{item.text}</span>
+            </span>
+          </div>
+        ))}
+      </Card>
+    </section>
+  );
+}
+
+/** Подвал главной: ссылки в одну строку (`.links`) и версия (`.ver`). */
+export function LegalLinks({ links, version }: { links: { label: string; onClick: () => void }[]; version: string }) {
+  return (
+    <footer className="legal">
+      <div className="links">
+        {links.map((l) => (
+          <button type="button" key={l.label} onClick={l.onClick}>
+            {l.label}
+          </button>
+        ))}
+      </div>
+      <p className="ver">{version}</p>
+    </footer>
+  );
 }
 
 /* ---------- Плитки, аватары, плашки ---------- */

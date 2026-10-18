@@ -28,6 +28,7 @@ import {
   GroupActions,
   GroupHeader,
   IconButton,
+  LegalLinks,
   Loading,
   Money,
   OkLine,
@@ -40,6 +41,7 @@ import {
   Section,
   Segmented,
   Stepper,
+  Steps,
   Switch,
   Tile,
   type TileTone,
@@ -571,6 +573,25 @@ export function Kit() {
       </Block>
 
       <Block id="patterns" title={t('kit.patterns')}>
+        <Variant label="Steps">
+          <Steps
+            title={t('home.welcomeTitle')}
+            items={[
+              { title: t('home.welcomeStep1Title'), text: t('home.welcomeStep1Text') },
+              { title: t('home.welcomeStep2Title'), text: t('home.welcomeStep2Text') },
+              { title: t('home.welcomeStep3Title'), text: t('home.welcomeStep3Text') },
+            ]}
+          />
+        </Variant>
+        <Variant label="LegalLinks">
+          <LegalLinks
+            links={[
+              { label: t('account.privacy'), onClick: noop },
+              { label: t('account.termsShort'), onClick: noop },
+            ]}
+            version={t('common.version', { version: 'v0.9.0' })}
+          />
+        </Variant>
         <Variant label="DemoNote">
           <DemoNote text={t('group.demoBanner')} actionLabel={t('group.demoDelete')} onAction={noop} />
         </Variant>
