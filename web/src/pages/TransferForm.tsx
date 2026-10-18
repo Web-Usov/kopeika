@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { amountToInput, parseAmount } from '../../../shared/money.ts';
-import { api, type Expense, type GroupDetail, setGroup, useGroup } from '../api.ts';
+import { api, type Expense, type GroupDetail, useExpense, useGroup } from '../api.ts';
+import { applySavedGroup } from '../celebration.ts';
 import { t } from '../i18n.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, confirmDialog, haptic, MainButton } from '../tg.tsx';
@@ -16,8 +17,9 @@ export function TransferForm({
   prefill: URLSearchParams;
 }) {
   const { data: g, error } = useGroup(groupId);
+  const { expense: found, loading } = useExpense(groupId, expenseId, g);
   const back = <BackButton onClick={() => navigate(`/g/${groupId}?tab=balances`, { replace: true })} />;
-  if (!g)
+  if (!g || loading)
     return (
       <div className="page">
         {back}
@@ -25,7 +27,7 @@ export function TransferForm({
       </div>
     );
 
-  const transfer = expenseId ? g.expenses.find((e) => e.id === expenseId && e.kind === 'transfer') : undefined;
+  const transfer = found?.kind === 'transfer' ? found : undefined;
   if (expenseId && !transfer)
     return (
       <div className="page">
@@ -87,7 +89,7 @@ function Editor({ g, transfer, prefill }: { g: GroupDetail; transfer?: Expense; 
       shares: [{ memberId: to, value: amount }],
     };
     try {
-      setGroup(transfer ? await api.updateExpense(g.id, transfer.id, body) : await api.addExpense(g.id, body));
+      applySavedGroup(transfer ? await api.updateExpense(g.id, transfer.id, body) : await api.addExpense(g.id, body));
       haptic.success();
       navigate(`/g/${g.id}?tab=balances`, { replace: true });
     } catch (e) {
@@ -100,7 +102,7 @@ function Editor({ g, transfer, prefill }: { g: GroupDetail; transfer?: Expense; 
   const remove = async () => {
     if (!transfer || !(await confirmDialog(t('transfer.confirmDelete')))) return;
     try {
-      setGroup(await api.deleteExpense(g.id, transfer.id));
+      applySavedGroup(await api.deleteExpense(g.id, transfer.id));
       navigate(`/g/${g.id}?tab=balances`, { replace: true });
     } catch (e) {
       await alertDialog((e as Error).message);

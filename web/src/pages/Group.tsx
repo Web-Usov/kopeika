@@ -1,21 +1,54 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { type ActivityEntry, activityText } from '../../../shared/activity.ts';
-import { type CategoryId, categoryEmoji, categoryKey, categoryTotals } from '../../../shared/categories.ts';
+import { type CategoryId, type CategoryTotal, categoryEmoji, categoryKey } from '../../../shared/categories.ts';
 import { formatMoney } from '../../../shared/money.ts';
+import { parseQuickExpense } from '../../../shared/quickExpense.ts';
 import {
   type ApiError,
   api,
   type Expense,
+  forgetGroup,
   type GroupDetail,
   hasPaymentInfo,
+  loadMoreExpenses,
   type Member,
   type PaymentInfo,
   useGroup,
 } from '../api.ts';
+import { Celebration } from '../Celebration.tsx';
+import { applySavedGroup } from '../celebration.ts';
+import { dismissFinishOffer, finishOfferDismissed, finishTrip, isAllSettled } from '../finish.ts';
 import { dateLocale, lang, rich, t } from '../i18n.ts';
+import { setQuickDraft } from '../quickDraft.ts';
 import { navigate } from '../router.ts';
-import { alertDialog, BackButton, copyText, haptic, MainButton, openLink, shareLink } from '../tg.tsx';
-import { Avatar, ErrorView, formatDay, Loading, Money, Row, Section, Segmented } from '../ui.tsx';
+import {
+  alertDialog,
+  BackButton,
+  canShareMessage,
+  confirmDialog,
+  copyText,
+  haptic,
+  MainButton,
+  openLink,
+  shareLink,
+  shareMessage,
+} from '../tg.tsx';
+import {
+  Avatar,
+  BalanceBlock,
+  Button,
+  DemoNote,
+  ErrorView,
+  formatDay,
+  GroupActions,
+  GroupHeader,
+  Loading,
+  Money,
+  Row,
+  Section,
+  Segmented,
+  todayIso,
+} from '../ui.tsx';
 
 export type Tab = 'expenses' | 'balances' | 'history';
 
@@ -32,31 +65,39 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
     );
 
   const me = g.members.find((m) => m.id === g.meId)!;
+  const achievementList = g.achievements;
+  const unlockedCount = achievementList.filter((a) => a.unlocked).length;
 
   return (
     <div className="page">
       {back}
-      <header className="group-header">
-        <h2>{g.name}</h2>
-        <div className="hint">
-          {rich('group.totalSpent', { amount: <Money value={g.totalSpent} currency={g.currency} /> })}
-        </div>
-        <div className={`my-balance ${me.balance > 0 ? 'pos' : me.balance < 0 ? 'neg' : ''}`}>
-          {me.balance === 0
-            ? t('group.settled')
-            : me.balance > 0
-              ? rich('group.owedToYou', { amount: <Money value={me.balance} currency={g.currency} /> })
-              : rich('group.youOwe', { amount: <Money value={-me.balance} currency={g.currency} /> })}
-        </div>
-        <div className="header-actions">
-          <button type="button" onClick={() => invite(g)}>
-            {t('group.invite')}
-          </button>
-          <button type="button" onClick={() => navigate(`/g/${g.id}/settings`)}>
-            {t('group.settings')}
-          </button>
-        </div>
-      </header>
+      {g.isDemo && <DemoBanner g={g} />}
+      {!g.isDemo && !g.archived && isAllSettled(g) && <FinishBanner g={g} />}
+      <GroupHeader
+        title={g.name}
+        subtitle={rich('group.headerSub', {
+          members: t('common.members', { count: g.members.length }),
+          amount: <Money value={g.totalSpent} currency={g.currency} />,
+        })}
+        settingsLabel={t('group.settings')}
+        onSettings={() => navigate(`/g/${g.id}/settings`)}
+      >
+        <GroupBalance g={g} balance={me.balance} />
+        <GroupActions
+          items={[
+            { icon: 'userplus', label: t('group.tileInvite'), onClick: () => invite(g) },
+            ...(g.isDemo
+              ? []
+              : [{ icon: 'chat' as const, label: t('group.tileChat'), onClick: () => void shareBalance(g) }]),
+            {
+              icon: 'trophy',
+              label: t('group.tileSummary'),
+              onClick: () => navigate(`/g/${g.id}/summary`),
+              badge: t('achievements.counter', { done: unlockedCount, total: achievementList.length }),
+            },
+          ]}
+        />
+      </GroupHeader>
 
       <Segmented<Tab>
         value={tab}
@@ -74,8 +115,86 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
       {tab === 'expenses' ? <ExpensesTab g={g} /> : tab === 'balances' ? <BalancesTab g={g} /> : <HistoryTab g={g} />}
 
       <MainButton text={t('group.addExpense')} onClick={() => navigate(`/g/${g.id}/expense/new`)} />
+      <Celebration groupId={g.id} />
     </div>
   );
+}
+
+/** Баланс в шапке: сумма по знаку и кнопка, которая ведёт на «Балансы». */
+function GroupBalance({ g, balance }: { g: GroupDetail; balance: number }) {
+  const toBalances = () => navigate(`/g/${g.id}?tab=balances`, { replace: true });
+  if (balance === 0) {
+    // Пустая группа — «Баланс / 0 ₽», группа с тратами — «Баланс / Вы в расчёте».
+    return g.expenses.length === 0 ? (
+      <BalanceBlock tone="zero" label={t('group.balance')} amount={<Money value={0} currency={g.currency} />} />
+    ) : (
+      <BalanceBlock tone="zero" label={t('group.balance')} text={t('group.settled')} />
+    );
+  }
+  const owed = balance > 0;
+  return (
+    <BalanceBlock
+      tone={owed ? 'pos' : 'neg'}
+      label={owed ? t('group.owedLabel') : t('group.oweLabel')}
+      amount={<Money value={Math.abs(balance)} currency={g.currency} />}
+      action={
+        <Button variant="fill" size="s" onClick={toBalances}>
+          {owed ? t('group.remind') : t('group.settle')}
+        </Button>
+      }
+    />
+  );
+}
+
+/** «Everyone is settled up. Finish the trip?»; «Not now» hides it until the next entry in the group. */
+function FinishBanner({ g }: { g: GroupDetail }) {
+  const [, rerender] = useState(0);
+  if (finishOfferDismissed(g)) return null;
+  return (
+    <div className="banner finish-banner">
+      <div>{t('group.allSettledBanner')}</div>
+      <div className="banner-actions">
+        <button type="button" className="chip finish-yes" onClick={() => void finishTrip(g)}>
+          {t('group.finish')}
+        </button>
+        <button
+          type="button"
+          className="chip"
+          onClick={() => {
+            dismissFinishOffer(g);
+            rerender((n) => n + 1);
+          }}
+        >
+          {t('group.finishLater')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function DemoBanner({ g }: { g: GroupDetail }) {
+  const remove = async () => {
+    if (!(await confirmDialog(t('group.demoConfirmDelete')))) return;
+    try {
+      await api.deleteGroup(g.id);
+      forgetGroup(g.id);
+      navigate('/', { replace: true });
+    } catch (e) {
+      await alertDialog((e as Error).message);
+    }
+  };
+  return <DemoNote text={t('group.demoBanner')} actionLabel={t('group.demoDelete')} onAction={() => void remove()} />;
+}
+
+/** Sends the balance card to a chosen chat; on clients without shareMessage falls back to the invite link share. */
+async function shareBalance(g: GroupDetail) {
+  if (!canShareMessage()) return invite(g);
+  try {
+    const { id } = await api.prepareShare(g.id, 'balance');
+    await shareMessage(id);
+  } catch (e) {
+    await alertDialog((e as Error).message);
+  }
 }
 
 function invite(g: GroupDetail) {
@@ -88,13 +207,19 @@ function invite(g: GroupDetail) {
 }
 
 function ExpensesTab({ g }: { g: GroupDetail }) {
+  // A real group with only its creator in it: the next step is inviting people.
+  const solo = !g.isDemo && g.members.length === 1;
   if (g.expenses.length === 0) {
     return (
-      <div className="empty">
-        <div className="empty-emoji">🧾</div>
-        <p>{t('group.noExpenses')}</p>
-        <p className="hint">{t('group.noExpensesHint')}</p>
-      </div>
+      <>
+        <QuickAdd g={g} />
+        <div className="empty">
+          <div className="empty-emoji">🧾</div>
+          <p>{t('group.noExpenses')}</p>
+          <p className="hint">{t('group.noExpensesHint')}</p>
+        </div>
+        {solo && <InviteHint g={g} />}
+      </>
     );
   }
   const byDay = new Map<string, Expense[]>();
@@ -104,6 +229,8 @@ function ExpensesTab({ g }: { g: GroupDetail }) {
 
   return (
     <>
+      <QuickAdd g={g} />
+      {solo && <InviteHint g={g} />}
       {[...byDay].map(([day, list]) => (
         <Section key={day} title={formatDay(day)}>
           {list.map((e) => {
@@ -147,7 +274,142 @@ function ExpensesTab({ g }: { g: GroupDetail }) {
           })}
         </Section>
       ))}
+      {g.hasMoreExpenses && <LoadMore groupId={g.id} />}
     </>
+  );
+}
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** «Быстрая трата»: a line like «1200 такси» becomes an equal-split expense paid by me, or opens the form. */
+function QuickAdd({ g }: { g: GroupDetail }) {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const parsed = parseQuickExpense(text, { lang, groupCurrency: g.currency });
+  const foreign = Boolean(parsed && parsed.currency !== g.currency);
+
+  const edit = () => {
+    if (!parsed) return;
+    setQuickDraft(g.id, { ...parsed, title: capitalize(parsed.title) });
+    navigate(`/g/${g.id}/expense/new`);
+  };
+  const add = async () => {
+    if (!parsed || busy) return;
+    if (foreign) return edit(); // the rate needs a look first
+    setBusy(true);
+    try {
+      const saved = await api.addExpense(g.id, {
+        title: capitalize(parsed.title),
+        amount: parsed.amount,
+        payerId: g.meId,
+        splitMode: 'equal',
+        spentOn: todayIso(),
+        category: parsed.category,
+        shares: g.members.map((m) => ({ memberId: m.id, value: 1 })),
+      });
+      applySavedGroup(saved);
+      haptic.success();
+      setText('');
+    } catch (e) {
+      haptic.error();
+      await alertDialog((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form
+      className="quick-add"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void add();
+      }}
+    >
+      <input
+        className="quick-input"
+        aria-label={t('quick.label')}
+        placeholder={t('quick.placeholder')}
+        value={text}
+        maxLength={140}
+        enterKeyHint="done"
+        onChange={(e) => setText(e.target.value)}
+      />
+      {parsed ? (
+        <div className="quick-preview">
+          <span className="quick-chip">
+            {[
+              `${categoryEmoji(parsed.category)} ${capitalize(parsed.title)}`,
+              formatMoney(parsed.amount, parsed.currency, lang),
+              foreign ? t('quick.foreignTail') : t('quick.tail'),
+            ].join(' · ')}
+          </span>
+          <span className="quick-actions">
+            {!foreign && (
+              <button type="submit" className="small-btn primary" disabled={busy}>
+                {t('quick.add')}
+              </button>
+            )}
+            <button
+              type="button"
+              className={`small-btn ${foreign ? 'primary' : ''}`}
+              disabled={busy}
+              onClick={foreign ? () => void add() : edit}
+            >
+              {foreign ? t('quick.setRate') : t('quick.edit')}
+            </button>
+          </span>
+        </div>
+      ) : (
+        text.trim() && <div className="hint small quick-hint">{t('quick.noAmount')}</div>
+      )}
+    </form>
+  );
+}
+
+/** «Показать ещё»: loads the next page of older expenses; also fires by itself when scrolled into view. */
+function LoadMore({ groupId }: { groupId: number }) {
+  const [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLButtonElement>(null);
+  const more = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await loadMoreExpenses(groupId);
+    } catch (e) {
+      await alertDialog((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const latest = useRef(more);
+  latest.current = more;
+  // Re-observed after each page (the button is re-created when the list grows past the viewport).
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) void latest.current();
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [busy]);
+  return (
+    <button type="button" ref={ref} className="text-btn" disabled={busy} onClick={more}>
+      {busy ? t('common.loading') : t('group.showMore')}
+    </button>
+  );
+}
+
+function InviteHint({ g }: { g: GroupDetail }) {
+  return (
+    <div className="empty">
+      <p>{t('group.soloTitle')}</p>
+      <p className="hint">{t('group.soloHint')}</p>
+      <button type="button" className="small-btn primary" onClick={() => invite(g)}>
+        {t('group.soloInvite')}
+      </button>
+    </div>
   );
 }
 
@@ -186,7 +448,7 @@ function HistoryTab({ g }: { g: GroupDetail }) {
   // Reload when the group changes under us (e.g. a rename), so fresh entries show up.
   useEffect(() => {
     load();
-  }, [g.id, g.expenses.length, g.name, g.members.length]);
+  }, [g.id, g.expensesTotal, g.name, g.members.length]);
 
   if (error && !items) return <ErrorView message={error} />;
   if (!items) return <Loading />;
@@ -295,7 +557,14 @@ function BalancesTab({ g }: { g: GroupDetail }) {
 }
 
 function Stats({ g }: { g: GroupDetail }) {
-  const { group, mine } = categoryTotals(g.expenses, g.meId);
+  // Category totals are computed by the server over all expenses, not from the loaded page.
+  const [totals, setTotals] = useState<{ group: CategoryTotal[]; mine: CategoryTotal[] }>();
+  const stamp = `${g.expensesTotal}:${g.totalSpent}`;
+  useEffect(() => {
+    api.stats(g.id).then(setTotals, () => {});
+  }, [g.id, stamp]);
+  if (!totals) return null;
+  const { group, mine } = totals;
   return (
     <>
       <Section title={`${t('group.statsTitle')} · ${t('group.statsGroup')}`}>

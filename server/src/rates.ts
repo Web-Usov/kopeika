@@ -8,6 +8,8 @@ const FETCH_TIMEOUT_MS = 5000;
 /** How many days back to look when the source has no rates for a day (weekends, holidays). */
 const MAX_FALLBACK_DAYS = 7;
 const TODAY_TTL_MS = 30 * 60 * 1000;
+/** Upper bound for the in-memory "today" tables (one per requested date, future dates included). */
+const TODAY_MEMO_MAX = 50;
 
 /** Carries a dictionary key: the API turns it into a translated message. */
 export class RatesError extends Error {
@@ -88,6 +90,21 @@ async function fetchDay(date: string, today: string): Promise<Day> {
 // Today's table can still change during the day, so it lives in memory for a while instead of the database.
 const todayMemo = new Map<string, { at: number; day: Day }>();
 
+/** Stores a table and keeps the memo bounded: expired entries go first, then the oldest ones. */
+function memoize(date: string, day: Day) {
+  const now = Date.now();
+  todayMemo.delete(date);
+  if (todayMemo.size >= TODAY_MEMO_MAX) {
+    for (const [k, v] of todayMemo) if (now - v.at >= TODAY_TTL_MS) todayMemo.delete(k);
+  }
+  // Map keeps insertion order, and entries are re-inserted on every refresh, so the first key is the oldest.
+  while (todayMemo.size >= TODAY_MEMO_MAX) todayMemo.delete(todayMemo.keys().next().value as string);
+  todayMemo.set(date, { at: now, day });
+}
+
+/** Tests only: current number of memoized "today" tables. */
+export const todayMemoSize = () => todayMemo.size;
+
 async function rubPerUnit(currency: string, date: string): Promise<{ value: string; sourceDate: string }> {
   if (currency === 'RUB') return { value: '1', sourceDate: date };
   const today = todayFn();
@@ -105,7 +122,7 @@ async function rubPerUnit(currency: string, date: string): Promise<{ value: stri
   if (isToday && memo && Date.now() - memo.at < TODAY_TTL_MS) day = memo.day;
   if (!day) {
     day = await fetchDay(date, today);
-    if (isToday) todayMemo.set(date, { at: Date.now(), day });
+    if (isToday) memoize(date, day);
     else {
       const stored = day;
       tx(() => {

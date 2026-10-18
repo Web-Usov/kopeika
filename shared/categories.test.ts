@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CATEGORIES, categoryTotals, suggestCategory } from './categories.ts';
+import { CATEGORIES, categoryIcon, categoryTone, categoryTotals, suggestCategory } from './categories.ts';
 import { dictionaries } from './i18n/index.ts';
 
 test('suggestCategory: Russian titles', () => {
@@ -58,4 +58,23 @@ test('categoryTotals: group and personal totals, transfers ignored, sorted', () 
     ],
   });
   assert.deepEqual(categoryTotals([], 1), { group: [], mine: [] });
+});
+
+test('каждая категория имеет иконку и тон; неизвестная — как «другое»', () => {
+  assert.deepEqual(
+    CATEGORIES.map((c) => [c.id, c.icon, c.tone]),
+    [
+      ['food', 'food', 'food'],
+      ['groceries', 'cart', 'groc'],
+      ['housing', 'home', 'home'],
+      ['transport', 'taxi', 'taxi'],
+      ['fun', 'fun', 'fun'],
+      ['shopping', 'bag', 'shop'],
+      ['other', 'receipt', 'other'],
+    ],
+  );
+  assert.equal(categoryIcon('groceries'), 'cart');
+  assert.equal(categoryTone('shopping'), 'shop');
+  assert.equal(categoryIcon('nope'), 'receipt');
+  assert.equal(categoryTone('nope'), 'other');
 });

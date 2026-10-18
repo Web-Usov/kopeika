@@ -10,7 +10,7 @@ export interface SplitInput {
   value: number;
 }
 
-type SplitKey =
+export type SplitKey =
   | 'errors.split.amountPositive'
   | 'errors.split.noParticipants'
   | 'errors.split.duplicateParticipant'
@@ -18,6 +18,10 @@ type SplitKey =
   | 'errors.split.sumMismatch'
   | 'errors.split.sharesInteger'
   | 'errors.split.sharesMissing'
+  | 'errors.receipt.unassigned'
+  | 'errors.receipt.discountTooBig'
+  | 'errors.receipt.badItem'
+  | 'errors.receipt.badAdjustment'
   | 'errors.rate.invalid'
   | 'errors.rate.tooSmall';
 
@@ -91,6 +95,30 @@ export function computeBalances(memberIds: number[], entries: LedgerEntry[]): Ma
     for (const s of e.shares) add(s.memberId, -s.amount);
   }
   return balances;
+}
+
+/**
+ * For each member who is in debt now: the moment (`at` of the ledger entry) their balance last went from >= 0 to < 0,
+ * i.e. since when they have been continuously in debt. Entries must come in chronological order. Members who are not
+ * in debt are absent from the result. Replaying the ledger keeps this exact: a debt that was fully repaid and
+ * came back later counts from the new start, and a debt only partly repaid keeps its original start.
+ */
+export function debtSince<T>(memberIds: number[], entries: (LedgerEntry & { at: T })[]): Map<number, T> {
+  const balances = new Map<number, number>(memberIds.map((id) => [id, 0]));
+  const since = new Map<number, T>();
+  for (const e of entries) {
+    const delta = new Map<number, number>();
+    delta.set(e.payerId, (delta.get(e.payerId) ?? 0) + e.amount);
+    for (const s of e.shares) delta.set(s.memberId, (delta.get(s.memberId) ?? 0) - s.amount);
+    for (const [id, d] of delta) {
+      const before = balances.get(id) ?? 0;
+      const after = before + d;
+      balances.set(id, after);
+      if (after < 0 && before >= 0) since.set(id, e.at);
+      else if (after >= 0) since.delete(id);
+    }
+  }
+  return since;
 }
 
 export interface Settlement {

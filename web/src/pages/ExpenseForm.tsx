@@ -18,16 +18,22 @@ import {
   type SplitInput,
   type SplitMode,
 } from '../../../shared/money.ts';
-import { api, type Expense, type GroupDetail, setGroup, useGroup } from '../api.ts';
+import { addDays, isoWeekday, nextOccurrence, type Period } from '../../../shared/recurring.ts';
+import { api, type Expense, type GroupDetail, useExpense, useGroup } from '../api.ts';
+import { applySavedGroup } from '../celebration.ts';
 import { dateLocale, errorText, lang, rich, t } from '../i18n.ts';
+import { clearQuickDraft, peekQuickDraft } from '../quickDraft.ts';
+import { setReceiptDraft } from '../receiptDraft.ts';
+import { scheduleText, shortDate } from '../recurring.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, confirmDialog, haptic, MainButton } from '../tg.tsx';
 import { Avatar, ErrorView, Loading, Money, Row, Section, Segmented, todayIso } from '../ui.tsx';
 
 export function ExpenseForm({ groupId, expenseId }: { groupId: number; expenseId?: number }) {
   const { data: g, error } = useGroup(groupId);
+  const { expense: found, loading } = useExpense(groupId, expenseId, g);
   const back = <BackButton onClick={() => navigate(`/g/${groupId}`, { replace: true })} />;
-  if (!g)
+  if (!g || loading)
     return (
       <div className="page">
         {back}
@@ -35,7 +41,7 @@ export function ExpenseForm({ groupId, expenseId }: { groupId: number; expenseId
       </div>
     );
 
-  const expense = expenseId ? g.expenses.find((e) => e.id === expenseId && e.kind === 'expense') : undefined;
+  const expense = found?.kind === 'expense' ? found : undefined;
   if (expenseId && !expense)
     return (
       <div className="page">
@@ -71,7 +77,7 @@ function initialParticipants(g: GroupDetail, e?: Expense): Record<number, Partic
 }
 
 /** "12 октября" (with the year if it is not the current one) for the rate caption. */
-function rateDay(iso: string): string {
+export function rateDay(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number);
   return new Intl.DateTimeFormat(dateLocale, {
     day: 'numeric',
@@ -81,27 +87,83 @@ function rateDay(iso: string): string {
 }
 
 /** Rate for the input and the caption: a decimal comma in Russian. */
-const showRate = (rate: string) => (lang === 'ru' ? rate.replace('.', ',') : rate);
+export const showRate = (rate: string) => (lang === 'ru' ? rate.replace('.', ',') : rate);
 
 type RateInfo = { status: 'idle' | 'loading' | 'ok' | 'error'; date?: string; error?: string };
 
+/** «Разобрать чек» for a new expense: only when the feature is on; shows what is left of the trial quota. */
+function ReceiptEntry({ g }: { g: GroupDetail }) {
+  // Servers with quotas (#102) say it per group; older ones only in /me.
+  const shown = (r: NonNullable<GroupDetail['receipts']>) => r.offered ?? r.enabled;
+  const [enabled, setEnabled] = useState<boolean | undefined>(g.receipts && shown(g.receipts));
+  useEffect(() => {
+    if (g.receipts) return setEnabled(shown(g.receipts));
+    api.me().then(
+      (me) => setEnabled(Boolean(me.receiptsEnabled)),
+      () => setEnabled(false),
+    );
+  }, [g.receipts]);
+  if (!enabled) return null;
+
+  const q = g.receipts;
+  // In the beta a group without approval has no quota to show yet.
+  const approved = !q?.beta || q.access === 'approved';
+  const limited = Boolean(q && approved && !q.unlimited && q.limit > 0);
+  const left = q ? Math.max(0, q.limit - q.used) : 0;
+  const exhausted = limited && left === 0;
+  const reset = q?.resetsAt ? shortDate(q.resetsAt.slice(0, 10)) : '';
+  return (
+    <Section
+      footer={
+        exhausted
+          ? reset
+            ? t('receipt.buttonLimitReset', { date: reset })
+            : t('receipt.buttonLimit')
+          : limited && q
+            ? t('receipt.buttonLeft', { left, limit: q.limit })
+            : undefined
+      }
+    >
+      <Row
+        className="link"
+        title={t(q?.beta ? 'receipt.buttonBeta' : 'receipt.button')}
+        onClick={
+          exhausted
+            ? undefined
+            : () => {
+                setReceiptDraft(g.id, null);
+                navigate(`/g/${g.id}/receipt`);
+              }
+        }
+      />
+    </Section>
+  );
+}
+
 function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
-  const [title, setTitle] = useState(expense?.title ?? '');
-  const [currency, setCurrency] = useState(expense?.originalCurrency ?? g.currency);
+  // «Быстрая трата» hands over what it parsed; only a new expense takes it.
+  const [quick] = useState(() => (expense ? undefined : peekQuickDraft(g.id)));
+  useEffect(() => clearQuickDraft(), []);
+  const [title, setTitle] = useState(expense?.title ?? quick?.title ?? '');
+  const [currency, setCurrency] = useState(expense?.originalCurrency ?? quick?.currency ?? g.currency);
   const foreign = currency !== g.currency;
   // An existing foreign expense keeps its saved rate until the currency changes.
   const [rateStr, setRateStr] = useState(expense?.rate ? showRate(expense.rate) : '');
   const [rateManual, setRateManual] = useState(Boolean(expense?.rate));
   const [rateInfo, setRateInfo] = useState<RateInfo>({ status: 'idle' });
-  const [amountStr, setAmountStr] = useState(expense ? amountToInput(expense.originalAmount ?? expense.amount) : '');
+  const [amountStr, setAmountStr] = useState(
+    expense ? amountToInput(expense.originalAmount ?? expense.amount) : quick ? amountToInput(quick.amount) : '',
+  );
   const [payerId, setPayerId] = useState(expense?.payerId ?? g.meId);
   const [spentOn, setSpentOn] = useState(expense?.spentOn ?? todayIso());
   const [mode, setMode] = useState<SplitMode>(expense?.splitMode ?? 'equal');
   const [parts, setParts] = useState(() => initialParticipants(g, expense));
-  const [category, setCategory] = useState<CategoryId>(expense?.category ?? DEFAULT_CATEGORY);
+  const [category, setCategory] = useState<CategoryId>(expense?.category ?? quick?.category ?? DEFAULT_CATEGORY);
   // Until the user picks a category by hand, it follows the title; an existing expense keeps its own.
-  const [categoryPicked, setCategoryPicked] = useState(Boolean(expense));
+  const [categoryPicked, setCategoryPicked] = useState(Boolean(expense || quick));
   const [saving, setSaving] = useState(false);
+  // New expenses only: also create a recurring template (same day of month / weekday as the expense date).
+  const [repeat, setRepeat] = useState<Period | 'none'>('none');
 
   const chipsRef = useRef<HTMLDivElement>(null);
   // Keep the selected chip visible in the scrollable row. A new expense starts at the beginning of the row.
@@ -196,7 +258,27 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
       shares: inputs,
     };
     try {
-      setGroup(expense ? await api.updateExpense(g.id, expense.id, body) : await api.addExpense(g.id, body));
+      const saved = expense ? await api.updateExpense(g.id, expense.id, body) : await api.addExpense(g.id, body);
+      if (!expense && repeat !== 'none' && !foreign) {
+        try {
+          // The expense above is the first one; the template takes over from tomorrow.
+          await api.addRecurring(g.id, {
+            title: body.title,
+            amount: body.amount,
+            payerId,
+            splitMode: mode,
+            category,
+            shares: inputs,
+            period: repeat,
+            day: repeatDay,
+            startDate: addDays(todayIso(), 1),
+          });
+        } catch (e) {
+          haptic.error();
+          await alertDialog((e as Error).message);
+        }
+      }
+      applySavedGroup(saved);
       haptic.success();
       navigate(`/g/${g.id}`, { replace: true });
     } catch (e) {
@@ -209,18 +291,23 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
   const remove = async () => {
     if (!expense || !(await confirmDialog(t('expense.confirmDelete', { title: expense.title })))) return;
     try {
-      setGroup(await api.deleteExpense(g.id, expense.id));
+      applySavedGroup(await api.deleteExpense(g.id, expense.id));
       navigate(`/g/${g.id}`, { replace: true });
     } catch (e) {
       await alertDialog((e as Error).message);
     }
   };
 
+  const repeatDay = repeat === 'weekly' ? isoWeekday(spentOn) : Number(spentOn.slice(8, 10));
+  const repeatNext = repeat === 'none' ? null : nextOccurrence(repeat, repeatDay, todayIso());
+
   const allOn = g.members.every((m) => parts[m.id].on);
 
   return (
     <>
       <h2 className="page-title">{expense ? t('expense.titleEdit') : t('expense.titleNew')}</h2>
+
+      {!expense && <ReceiptEntry g={g} />}
 
       <Section>
         <input
@@ -447,6 +534,34 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
           );
         })}
       </Section>
+
+      {!expense && (
+        <Section
+          title={t('recurring.repeat')}
+          footer={
+            foreign
+              ? t('recurring.foreignHint')
+              : repeatNext
+                ? `${t('recurring.hint', { date: shortDate(repeatNext) })}${repeat === 'monthly' && repeatDay >= 29 ? ` ${t('recurring.shortMonthHint')}` : ''}`
+                : undefined
+          }
+        >
+          <Segmented<Period | 'none'>
+            value={foreign ? 'none' : repeat}
+            onChange={(r) => {
+              if (foreign) return;
+              haptic.tap();
+              setRepeat(r);
+            }}
+            options={[
+              { value: 'none', label: t('recurring.none') },
+              { value: 'monthly', label: t('recurring.monthly') },
+              { value: 'weekly', label: t('recurring.weekly') },
+            ]}
+          />
+          {!foreign && repeat !== 'none' && <div className="row hint">{scheduleText(repeat, repeatDay)}</div>}
+        </Section>
+      )}
 
       {expense && (
         <button type="button" className="danger-btn" onClick={remove}>

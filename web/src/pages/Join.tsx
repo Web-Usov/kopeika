@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { api, type InvitePreview } from '../api.ts';
 import { t } from '../i18n.ts';
+import { joinSource } from '../joinSource.ts';
 import { askNotifyOnce } from '../notify.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, haptic, MainButton } from '../tg.tsx';
 import { ErrorView, Loading, Row, Section } from '../ui.tsx';
 
-export function Join({ code }: { code: string }) {
+/** `to`: where a member lands (the bot's «Open the summary» button points at the summary). */
+export function Join({ code, to }: { code: string; to?: 'summary' }) {
   const [invite, setInvite] = useState<InvitePreview>();
   const [error, setError] = useState<string>();
   const [claim, setClaim] = useState<number | null>(null);
@@ -16,7 +18,7 @@ export function Join({ code }: { code: string }) {
     api.invite(code).then(
       (inv) => {
         // Already in the group (e.g. opened from a notification): go straight there.
-        if (inv.isMember) navigate(`/g/${inv.group.id}`, { replace: true });
+        if (inv.isMember) navigate(`/g/${inv.group.id}${to === 'summary' ? '/summary' : ''}`, { replace: true });
         else setInvite(inv);
       },
       (e: Error) => setError(e.message),
@@ -26,7 +28,7 @@ export function Join({ code }: { code: string }) {
   const join = async () => {
     setSaving(true);
     try {
-      const { groupId } = await api.join(code, claim ?? undefined);
+      const { groupId } = await api.join(code, claim ?? undefined, joinSource.value);
       haptic.success();
       navigate(`/g/${groupId}`, { replace: true });
       void askNotifyOnce();

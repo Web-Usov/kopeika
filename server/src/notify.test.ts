@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { buildChangeMessage, buildRemindMessage, changeAudience, type ExpenseSnap } from './notify.ts';
+import {
+  buildChangeMessage,
+  buildChatAddedMessage,
+  buildRemindMessage,
+  changeAudience,
+  type ExpenseSnap,
+} from './notify.ts';
 
 const names = new Map([
   [1, 'Маша'],
@@ -104,4 +110,49 @@ test('remind message (ru, en)', () => {
   const en = buildRemindMessage({ ...input, lang: 'en', hasPaymentInfo: true });
   assert.ok(en.includes('Маша is reminding you about a debt: '), en);
   assert.ok(en.endsWith('\nPayment details are in the app'));
+});
+
+const chatBase = { currency: 'RUB', memberNames: names };
+const forChat = { forChat: true, recipientMemberId: -1 };
+
+test('chat: new expense has no group header and no personal share (ru)', () => {
+  const text = nbsp(buildChatAddedMessage({ ...chatBase, lang: 'ru', authorName: 'Маша', expense: dinner }));
+  assert.equal(text, '🧾 Маша добавил(а) «Ужин» на 3 000 ₽ (Делим на 3)');
+});
+
+test('chat: new expense (en) and transfer (ru)', () => {
+  const en = buildChatAddedMessage({ ...chatBase, lang: 'en', authorName: 'Masha', expense: dinner });
+  assert.ok(en.startsWith('🧾 Masha added “Ужин” for'), en);
+  assert.ok(en.endsWith('(Split 3 ways)'), en);
+  const transfer: ExpenseSnap = {
+    ...dinner,
+    kind: 'transfer',
+    title: '',
+    amount: 50000,
+    shares: [{ memberId: 2, amount: 50000 }],
+  };
+  const ru = nbsp(buildChatAddedMessage({ ...chatBase, lang: 'ru', authorName: 'Маша', expense: transfer }));
+  assert.equal(ru, '💸 Маша записал(а) перевод: Маша → Петя, 500 ₽');
+});
+
+test('chat: changes and deletions, no "your share"', () => {
+  const after = { ...dinner, amount: 350000 };
+  const text = nbsp(buildChangeMessage({ ...base, ...forChat, lang: 'ru', before: dinner, after }));
+  assert.equal(text, '🧾 Маша изменил(а) «Ужин»: 3 000 ₽ → 3 500 ₽');
+  const del = nbsp(buildChangeMessage({ ...base, ...forChat, lang: 'ru', before: dinner, after: null }));
+  assert.equal(del, '🧾 Маша удалил(а) «Ужин» на 3 000 ₽');
+});
+
+test('chat: a changed split is reported, a changed date alone is not', () => {
+  const resplit = {
+    ...dinner,
+    shares: [
+      { memberId: 1, amount: 150000 },
+      { memberId: 2, amount: 150000 },
+    ],
+  };
+  const text = buildChangeMessage({ ...base, ...forChat, lang: 'ru', before: dinner, after: resplit });
+  assert.ok(text?.includes('доли'), text ?? '');
+  const moved = { ...dinner, spentOn: '2026-05-02' };
+  assert.equal(buildChangeMessage({ ...base, ...forChat, lang: 'ru', before: dinner, after: moved }), null);
 });

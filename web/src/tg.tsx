@@ -1,6 +1,6 @@
 // Thin typed wrapper around the official telegram-web-app.js (loaded in index.html).
 // Outside Telegram (plain browser during development) everything degrades to HTML fallbacks.
-import { useEffect, useRef } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 import { t } from './i18n.ts';
 
 interface BottomButton {
@@ -21,8 +21,10 @@ interface WebApp {
   version: string;
   colorScheme: 'light' | 'dark';
   isVersionAtLeast(v: string): boolean;
+  onEvent?(event: string, cb: () => void): void;
   ready(): void;
   expand(): void;
+  close(): void;
   disableVerticalSwipes?(): void;
   MainButton: BottomButton;
   BackButton: { show(): void; hide(): void; onClick(cb: () => void): void; offClick(cb: () => void): void };
@@ -36,6 +38,8 @@ interface WebApp {
   openTelegramLink(url: string): void;
   openLink(url: string): void;
   requestWriteAccess(cb: (allowed: boolean) => void): void;
+  shareMessage?(id: string, cb?: (sent: boolean) => void): void;
+  requestChat?(id: string, cb?: (ok: boolean) => void): void;
 }
 
 declare global {
@@ -49,6 +53,22 @@ export const tg: WebApp | undefined = window.Telegram?.WebApp;
 export const inTelegram = Boolean(tg?.initData);
 const atLeast = (v: string) => inTelegram && tg!.isVersionAtLeast(v);
 
+/** Тема интерфейса: в Telegram — по colorScheme клиента, вне Telegram — по prefers-color-scheme. */
+function currentScheme(): 'light' | 'dark' {
+  if (inTelegram && tg!.colorScheme) return tg!.colorScheme;
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+/** Ставит data-scheme на <html>: от него включается тёмная пара токенов (tokens.css). */
+export function applyScheme(scheme: 'light' | 'dark' = currentScheme()) {
+  document.documentElement.dataset.scheme = scheme;
+}
+
+// Тема нужна до первой отрисовки, поэтому выставляем её при загрузке модуля и следим за сменой.
+applyScheme();
+if (inTelegram) tg!.onEvent?.('themeChanged', () => applyScheme());
+else window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', () => applyScheme());
+
 export function initTelegram() {
   if (!inTelegram) return;
   tg!.ready();
@@ -59,6 +79,11 @@ export function initTelegram() {
 const devParams = new URLSearchParams(location.search);
 /** In a plain browser: ?dev=2 pretends to be user #2, ?startapp=CODE simulates an invite link. */
 export const devUserId = devParams.get('dev') ?? '1';
+/**
+ * Служебные экраны (каталог компонентов #/kit): только вне Telegram и только с явным ?dev=… в адресе.
+ * Настоящие пользователи всегда открывают приложение внутри Telegram (initData есть), поэтому им каталог недоступен.
+ */
+export const devTools = !inTelegram && devParams.has('dev');
 
 export function startParam(): string | undefined {
   return inTelegram ? tg!.initDataUnsafe.start_param : (devParams.get('startapp') ?? undefined);
@@ -90,10 +115,31 @@ export function requestWriteAccess(): Promise<boolean> {
   return new Promise((resolve) => tg!.requestWriteAccess(resolve));
 }
 
+/** Closes the Mini App; outside Telegram there is nothing to close, so the page is left as is. */
+export function closeApp() {
+  if (inTelegram) tg!.close();
+}
+
 export function shareLink(url: string, text: string) {
   const share = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
   if (inTelegram) tg!.openTelegramLink(share);
   else window.open(share, '_blank');
+}
+
+/** Native «send this prepared card to a chat» (WebApp 8.0+). False outside Telegram and on older clients. */
+export const canShareMessage = () => atLeast('8.0') && typeof tg!.shareMessage === 'function';
+
+/** Opens Telegram's chat picker for a message prepared with savePreparedInlineMessage; resolves true if it was sent. */
+export function shareMessage(id: string): Promise<boolean> {
+  return new Promise((resolve) => tg!.shareMessage!(id, (sent) => resolve(sent)));
+}
+
+/** Telegram's chat picker (WebApp.requestChat, Bot API 9.6). False outside Telegram and on older clients. */
+export const canRequestChat = () => atLeast('9.6') && typeof tg!.requestChat === 'function';
+
+/** Opens the picker for a button saved with savePreparedKeyboardButton; the pick goes to the bot, not to the app. */
+export function requestChat(id: string): Promise<boolean> {
+  return new Promise((resolve) => tg!.requestChat!(id, (ok) => resolve(ok !== false)));
 }
 
 /** Copies text to the clipboard; if that is blocked, shows the text in a dialog so it can be copied by hand. */
@@ -114,8 +160,17 @@ export function openLink(url: string) {
   else window.open(url, '_blank', 'noopener');
 }
 
-/** Telegram's native bottom button; renders a regular button outside Telegram. */
-export function MainButton(props: { text: string; onClick: () => void; disabled?: boolean; loading?: boolean }) {
+/**
+ * Telegram's native bottom button; outside Telegram renders the stand-in (`.mbar` / `.mbtn`).
+ * `above` — одна текстовая кнопка (`Button variant="ghost"`) над нижней: рисуется и в Telegram, над его кнопкой.
+ */
+export function MainButton(props: {
+  text: string;
+  onClick: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  above?: ReactNode;
+}) {
   const { text, disabled = false, loading = false } = props;
   const handler = useRef(props.onClick);
   handler.current = props.onClick;
@@ -135,11 +190,19 @@ export function MainButton(props: { text: string; onClick: () => void; disabled?
 
   useEffect(() => () => (inTelegram ? tg!.MainButton.hide() : undefined), []);
 
-  if (inTelegram) return null;
+  if (inTelegram) return props.above ? <div className="mbar mbar-above">{props.above}</div> : null;
   return (
-    <div className="main-button-bar">
-      <button type="button" className="main-button" disabled={disabled || loading} onClick={() => handler.current()}>
-        {loading ? '…' : text}
+    <div className="mbar">
+      {props.above}
+      <button
+        type="button"
+        className="mbtn"
+        disabled={disabled || loading}
+        aria-busy={loading || undefined}
+        onClick={() => handler.current()}
+      >
+        {loading ? <span className="spin" aria-hidden="true" /> : null}
+        {text}
       </button>
     </div>
   );

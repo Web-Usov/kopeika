@@ -73,5 +73,14 @@ test('members and group', () => {
 test('debt reminder', () => {
   const e = entry('debt.remind', { memberId: 3, name: 'Петя', amount: 150000 });
   assert.equal(text('ru', e), 'Маша напомнил(а) о долге: Петя, 1 500 ₽');
-  assert.match(text('en', e), /^Маша sent a debt reminder: Петя, /);
+  assert.match(text('en', e), /^Маша reminded Петя about /);
+});
+
+test('chat link / unlink entries', () => {
+  const link = entry('group.chat_link', { name: 'Друзья' });
+  assert.equal(text('ru', link), 'Маша привязал(а) чат «Друзья»');
+  assert.equal(text('en', link), 'Маша linked the chat “Друзья”');
+  const unlink = entry('group.chat_unlink', { name: 'Друзья' });
+  assert.equal(text('ru', unlink), 'Маша отвязал(а) чат «Друзья»');
+  assert.equal(text('en', unlink), 'Маша unlinked the chat “Друзья”');
 });

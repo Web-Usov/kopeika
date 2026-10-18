@@ -13,12 +13,17 @@ export type ActivityAction =
   | 'member.claim'
   | 'member.payment_info'
   | 'member.leave'
+  | 'member.remove'
+  | 'group.invite_rotate'
   | 'group.archive'
   | 'group.unarchive'
   | 'expense.create'
   | 'expense.update'
   | 'expense.delete'
-  | 'debt.remind';
+  | 'debt.remind'
+  | 'group.auto_remind'
+  | 'group.chat_link'
+  | 'group.chat_unlink';
 
 export interface PersonRef {
   id: number;
@@ -44,6 +49,10 @@ export interface ActivityPayload {
   before?: ExpenseSnapshot;
   after?: ExpenseSnapshot;
   expense?: ExpenseSnapshot;
+  /** group.auto_remind: the new state of the setting. */
+  enabled?: boolean;
+  /** The expense was created by a recurring template. */
+  recurring?: boolean;
 }
 
 export interface ActivityEntry {
@@ -64,6 +73,10 @@ export function activityText(lang: Lang, entry: ActivityEntry, currency: string)
       return t(lang, 'activity.groupCreate', { actor, name: p.name ?? '' });
     case 'group.rename':
       return t(lang, 'activity.groupRename', { actor, from: p.from ?? '', to: p.to ?? '' });
+    case 'group.chat_link':
+      return t(lang, 'activity.chatLink', { actor, name: p.name ?? '' });
+    case 'group.chat_unlink':
+      return t(lang, 'activity.chatUnlink', { actor, name: p.name ?? '' });
     case 'member.add':
       return t(lang, 'activity.memberAdd', { actor, name: p.name ?? '' });
     case 'member.rename':
@@ -74,6 +87,10 @@ export function activityText(lang: Lang, entry: ActivityEntry, currency: string)
       return t(lang, 'activity.memberJoin', { actor });
     case 'member.leave':
       return t(lang, 'activity.memberLeave', { actor });
+    case 'member.remove':
+      return t(lang, 'activity.memberRemove', { actor, name: p.name ?? '' });
+    case 'group.invite_rotate':
+      return t(lang, 'activity.inviteRotate', { actor });
     case 'group.archive':
       return t(lang, 'activity.groupArchive', { actor });
     case 'group.unarchive':
@@ -84,6 +101,8 @@ export function activityText(lang: Lang, entry: ActivityEntry, currency: string)
       return t(lang, 'activity.paymentInfo', { actor, name: p.name ?? '' });
     case 'debt.remind':
       return t(lang, 'activity.remind', { actor, name: p.name ?? '', amount: money(p.amount ?? 0) });
+    case 'group.auto_remind':
+      return t(lang, p.enabled ? 'activity.autoRemindOn' : 'activity.autoRemindOff', { actor });
     case 'expense.create': {
       const e = p.expense;
       if (!e) return actor;
@@ -94,7 +113,11 @@ export function activityText(lang: Lang, entry: ActivityEntry, currency: string)
           to: e.to?.name ?? '?',
           amount: money(e.amount),
         });
-      return t(lang, 'activity.expenseCreate', { actor, title: e.title, amount: money(e.amount) });
+      return t(lang, p.recurring ? 'activity.expenseCreateRecurring' : 'activity.expenseCreate', {
+        actor,
+        title: e.title,
+        amount: money(e.amount),
+      });
     }
     case 'expense.delete': {
       const e = p.expense;
