@@ -33,7 +33,22 @@ import {
   shareLink,
   shareMessage,
 } from '../tg.tsx';
-import { Avatar, ErrorView, formatDay, Loading, Money, Row, Section, Segmented, todayIso } from '../ui.tsx';
+import {
+  Avatar,
+  BalanceBlock,
+  Button,
+  DemoNote,
+  ErrorView,
+  formatDay,
+  GroupActions,
+  GroupHeader,
+  Loading,
+  Money,
+  Row,
+  Section,
+  Segmented,
+  todayIso,
+} from '../ui.tsx';
 
 export type Tab = 'expenses' | 'balances' | 'history';
 
@@ -58,52 +73,31 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
       {back}
       {g.isDemo && <DemoBanner g={g} />}
       {!g.isDemo && !g.archived && isAllSettled(g) && <FinishBanner g={g} />}
-      <header className="group-header">
-        <button
-          type="button"
-          className="header-gear"
-          aria-label={t('group.settings')}
-          onClick={() => navigate(`/g/${g.id}/settings`)}
-        >
-          ⚙️
-        </button>
-        <h2>{g.name}</h2>
-        <div className="hint">
-          {rich('group.totalSpent', { amount: <Money value={g.totalSpent} currency={g.currency} /> })}
-        </div>
-        <div className={`my-balance ${me.balance > 0 ? 'pos' : me.balance < 0 ? 'neg' : ''}`}>
-          {me.balance === 0
-            ? t('group.settled')
-            : me.balance > 0
-              ? rich('group.owedToYou', { amount: <Money value={me.balance} currency={g.currency} /> })
-              : rich('group.youOwe', { amount: <Money value={-me.balance} currency={g.currency} /> })}
-        </div>
-        <div className="header-actions">
-          <button type="button" onClick={() => invite(g)}>
-            <span className="tile-icon" aria-hidden="true">
-              👋
-            </span>
-            {t('group.tileInvite')}
-          </button>
-          {!g.isDemo && (
-            <button type="button" onClick={() => void shareBalance(g)}>
-              <span className="tile-icon" aria-hidden="true">
-                💬
-              </span>
-              {t('group.tileChat')}
-            </button>
-          )}
-          <button type="button" onClick={() => navigate(`/g/${g.id}/summary`)}>
-            <span className="tile-icon" aria-hidden="true">
-              🏆
-            </span>
-            {t('group.tileSummary')}
-            <span className="tile-badge">
-              {t('achievements.counter', { done: unlockedCount, total: achievementList.length })}
-            </span>
-          </button>
-        </div>
-      </header>
+      <GroupHeader
+        title={g.name}
+        subtitle={rich('group.headerSub', {
+          members: t('common.members', { count: g.members.length }),
+          amount: <Money value={g.totalSpent} currency={g.currency} />,
+        })}
+        settingsLabel={t('group.settings')}
+        onSettings={() => navigate(`/g/${g.id}/settings`)}
+      >
+        <GroupBalance g={g} balance={me.balance} />
+        <GroupActions
+          items={[
+            { icon: 'userplus', label: t('group.tileInvite'), onClick: () => invite(g) },
+            ...(g.isDemo
+              ? []
+              : [{ icon: 'chat' as const, label: t('group.tileChat'), onClick: () => void shareBalance(g) }]),
+            {
+              icon: 'trophy',
+              label: t('group.tileSummary'),
+              onClick: () => navigate(`/g/${g.id}/summary`),
+              badge: t('achievements.counter', { done: unlockedCount, total: achievementList.length }),
+            },
+          ]}
+        />
+      </GroupHeader>
 
       <Segmented<Tab>
         value={tab}
@@ -123,6 +117,32 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
       <MainButton text={t('group.addExpense')} onClick={() => navigate(`/g/${g.id}/expense/new`)} />
       <Celebration groupId={g.id} />
     </div>
+  );
+}
+
+/** Баланс в шапке: сумма по знаку и кнопка, которая ведёт на «Балансы». */
+function GroupBalance({ g, balance }: { g: GroupDetail; balance: number }) {
+  const toBalances = () => navigate(`/g/${g.id}?tab=balances`, { replace: true });
+  if (balance === 0) {
+    // Пустая группа — «Баланс / 0 ₽», группа с тратами — «Баланс / Вы в расчёте».
+    return g.expenses.length === 0 ? (
+      <BalanceBlock tone="zero" label={t('group.balance')} amount={<Money value={0} currency={g.currency} />} />
+    ) : (
+      <BalanceBlock tone="zero" label={t('group.balance')} text={t('group.settled')} />
+    );
+  }
+  const owed = balance > 0;
+  return (
+    <BalanceBlock
+      tone={owed ? 'pos' : 'neg'}
+      label={owed ? t('group.owedLabel') : t('group.oweLabel')}
+      amount={<Money value={Math.abs(balance)} currency={g.currency} />}
+      action={
+        <Button variant="fill" size="s" onClick={toBalances}>
+          {owed ? t('group.remind') : t('group.settle')}
+        </Button>
+      }
+    />
   );
 }
 
@@ -163,14 +183,7 @@ function DemoBanner({ g }: { g: GroupDetail }) {
       await alertDialog((e as Error).message);
     }
   };
-  return (
-    <div className="banner">
-      {t('group.demoBanner')}{' '}
-      <button type="button" className="link-btn" onClick={() => void remove()}>
-        {t('group.demoDelete')}
-      </button>
-    </div>
-  );
+  return <DemoNote text={t('group.demoBanner')} actionLabel={t('group.demoDelete')} onAction={() => void remove()} />;
 }
 
 /** Sends the balance card to a chosen chat; on clients without shareMessage falls back to the invite link share. */

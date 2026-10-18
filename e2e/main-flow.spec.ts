@@ -24,8 +24,8 @@ test('создать группу, добавить трату, присоеди
   await page.getByPlaceholder('За что? Например, ужин').fill('Ужин');
   await page.getByPlaceholder('0').fill('1000');
   await page.getByRole('button', { name: 'Добавить трату' }).click();
-  const balance = page.locator('.my-balance');
-  await expect.poll(async () => text(await balance.textContent())).toBe('Вам должны 666,66 ₽');
+  const balance = page.locator('.bal-main');
+  await expect.poll(async () => text(await balance.innerText())).toBe('Вам должны 666,66 ₽');
 
   // В «Истории» видно, что трата добавлена.
   await page.getByRole('button', { name: 'История' }).click();
@@ -53,7 +53,7 @@ test('создать группу, добавить трату, присоеди
   await page2.goto(`/?dev=2&startapp=${inviteCode}`);
   await page2.getByText('Маша', { exact: true }).click();
   await page2.getByRole('button', { name: 'Присоединиться' }).click();
-  await expect.poll(async () => text(await page2.locator('.my-balance').textContent())).toBe('Вы должны 333,33 ₽');
+  await expect.poll(async () => text(await page2.locator('.bal-main').innerText())).toBe('Вы должны 333,33 ₽');
 
   // 4. Вкладка «Балансы»: «Вернул» у своего долга.
   await page2.getByRole('button', { name: 'Балансы' }).click();
@@ -61,7 +61,7 @@ test('создать группу, добавить трату, присоеди
   await expect(page2.getByRole('button', { name: 'Скопировать номер' })).toBeVisible();
   await page2.locator('.row', { hasText: /^Вы →/ }).getByRole('button', { name: 'Вернул' }).click();
   await page2.getByRole('button', { name: 'Сохранить перевод' }).click();
-  await expect.poll(async () => text(await page2.locator('.my-balance').textContent())).toBe('Вы в расчёте');
+  await expect.poll(async () => text(await page2.locator('.bal-main').innerText())).toBe('Баланс Вы в расчёте');
   // Долги закрылись — праздничный оверлей; закрывается тапом и не возвращается.
   const celebration = page2.getByRole('dialog');
   await expect(celebration).toContainText('в расчёте');
