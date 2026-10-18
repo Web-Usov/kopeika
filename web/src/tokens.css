@@ -75,7 +75,7 @@
 
   /* производные */
   --link-strong: color-mix(in srgb, var(--link) 80%, var(--text));
-  --sub-strong: color-mix(in srgb, var(--sub) 35%, var(--text));
+  --sub-strong: color-mix(in srgb, var(--sub) 75%, var(--text));
   --line: color-mix(in srgb, var(--hint) 27%, transparent);
   --line2: color-mix(in srgb, var(--hint) 55%, transparent);
   --fill: color-mix(in srgb, var(--hint) 15%, transparent);
