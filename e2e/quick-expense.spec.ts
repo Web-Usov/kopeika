@@ -47,5 +47,5 @@ test('быстрая трата: «1200 такси» добавляется ср
   await expect(page.getByPlaceholder('За что? Например, ужин')).toHaveValue('Ужин');
   await expect(page.getByPlaceholder('0').first()).toHaveValue('50');
   await expect(page.getByLabel('Валюта траты')).toHaveValue('EUR');
-  await expect(page.locator('input.rate')).toHaveValue('100');
+  await expect(page.getByLabel('Курс')).toHaveValue('100');
 });

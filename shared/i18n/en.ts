@@ -354,6 +354,21 @@ export const en: Dict = {
   expense: {
     titleNew: 'New expense',
     titleEdit: 'Expense',
+    amountLabel: 'Amount',
+    categoryAuto: 'picked by the name',
+    scan: 'Scan a receipt',
+    scanBeta: 'Scan a receipt · beta',
+    scanLeft: '{left} of {limit} left',
+    scanLimit: 'this month’s limit is used up',
+    scanLimitReset: 'limit used up, resets {date}',
+    okEven: {
+      one: '{amount} each for {count} person — adds up exactly',
+      other: '{amount} each for {count} people — adds up exactly',
+    },
+    okUneven: {
+      one: '{amount} for {count} person — adds up exactly',
+      other: '{amount} for {count} people — adds up exactly',
+    },
     notFound: 'Expense not found',
     titlePlaceholder: 'What was it for? e.g. Dinner',
     categorySection: 'Category',
@@ -375,7 +390,7 @@ export const en: Dict = {
     modeEqual: 'Equally',
     modeShares: 'By shares',
     modeExact: 'By amounts',
-    exactDone: '✓ The whole amount is assigned',
+    exactDone: 'The whole amount is assigned',
     exactLeft: '{amount} left to assign',
     exactOver: '{amount} over the total',
     sharesHint: 'e.g. give yourself 2 shares to cover you and your partner.',
@@ -385,12 +400,7 @@ export const en: Dict = {
     save: 'Save',
   },
   receipt: {
-    button: '📷 Scan a receipt',
-    buttonLeft: '{left} of {limit} left this month',
-    buttonLimit: 'This month’s limit is used up',
-    buttonLimitReset: 'Limit used up, resets {date}',
     title: 'Receipt',
-    buttonBeta: '📷 Scan a receipt · beta',
     access: {
       title: 'Receipt scanning · beta',
       none: 'Receipt scanning is in beta. Request access and we’ll open it for your group.',

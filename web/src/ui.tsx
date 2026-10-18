@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, CSSProperties, InputHTMLAttributes, ReactNode } from 'react';
+import { type ButtonHTMLAttributes, type CSSProperties, type InputHTMLAttributes, type ReactNode, useId } from 'react';
 import { type CategoryId, categoryIcon, categoryTone } from '../../shared/categories.ts';
 import { formatMoney } from '../../shared/money.ts';
 import type { Member } from './api.ts';
@@ -52,12 +52,15 @@ export function Section({
   children,
   footer,
   inset,
+  bare = false,
 }: {
   title?: ReactNode;
   aside?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
   inset?: InsetPx;
+  /** Без поверхности: содержимое (чипы) лежит прямо на фоне экрана. */
+  bare?: boolean;
 }) {
   return (
     <section className="section">
@@ -67,7 +70,10 @@ export function Section({
           {aside && <span className="aside">{aside}</span>}
         </div>
       )}
-      <div className="section-body" style={inset ? ({ '--inset': `${inset}px` } as CSSProperties) : undefined}>
+      <div
+        className={cx('section-body', bare && 'bare')}
+        style={inset ? ({ '--inset': `${inset}px` } as CSSProperties) : undefined}
+      >
         {children}
       </div>
       {footer && <div className="section-footer">{footer}</div>}
@@ -253,6 +259,8 @@ export function Row(props: {
   tone?: 'link' | 'danger';
   wrap?: boolean;
   chevron?: boolean;
+  /** Прозрачный нативный контрол (select, input date) поверх строки: строка выбора, см. `PickRow`. */
+  native?: ReactNode;
   forceState?: ForceState;
 }) {
   const content = (
@@ -277,6 +285,15 @@ export function Row(props: {
     props.forceState && `is-${props.forceState}`,
     props.className,
   );
+  if (props.native) {
+    return (
+      // biome-ignore lint/a11y/noLabelWithoutControl: нативный контрол приходит в props.native
+      <label className={cx('row', 'clickable', 'pick', cls)}>
+        {content}
+        {props.native}
+      </label>
+    );
+  }
   if (props.onClick && props.action) {
     return (
       <div className={cx('row', 'clickable', 'split', cls)}>
@@ -295,6 +312,38 @@ export function Row(props: {
     );
   }
   return <div className={cx('row', cls)}>{content}</div>;
+}
+
+/**
+ * Строка выбора («Кто платил», «Когда», «Повторять»): плитка-иконка, значение справа и шеврон.
+ * Сам выбор — нативный контрол в `native` (класс `pick-native`): он лежит прозрачным поверх строки.
+ */
+export function PickRow({
+  icon,
+  title,
+  subtitle,
+  value,
+  muted = false,
+  native,
+}: {
+  icon: IconName;
+  title: ReactNode;
+  subtitle?: ReactNode;
+  value: ReactNode;
+  /** Значение по умолчанию («Не повторять») — подсказочным цветом. */
+  muted?: boolean;
+  native: ReactNode;
+}) {
+  return (
+    <Row
+      left={<Tile icon={icon} tone="gray" size="s" />}
+      title={title}
+      subtitle={subtitle}
+      right={<span className={cx('pick-value', muted && 'muted')}>{value}</span>}
+      chevron
+      native={native}
+    />
+  );
 }
 
 /* ---------- Кнопки и выбор ---------- */
@@ -474,6 +523,7 @@ export function Stepper({
 export function Chip({
   selected = false,
   icon,
+  tone,
   avatar,
   dashed = false,
   onClick,
@@ -483,6 +533,8 @@ export function Chip({
 }: {
   selected?: boolean;
   icon?: IconName;
+  /** Цвет иконки (категория), по умолчанию — цвет текста чипа. */
+  tone?: TileTone;
   avatar?: AvatarMember;
   dashed?: boolean;
   onClick?: () => void;
@@ -499,7 +551,11 @@ export function Chip({
       disabled={disabled}
     >
       {avatar && <Avatar member={avatar} size="xs" />}
-      {icon && <Icon name={icon} size={18} stroke={2.2} />}
+      {icon && (
+        <span className={cx('chip-ic', tone && `tone-${tone}`)}>
+          <Icon name={icon} size={18} stroke={2.2} />
+        </span>
+      )}
       {children}
     </button>
   );
@@ -514,12 +570,22 @@ export function Chips({ children }: { children: ReactNode }) {
 type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'className'>;
 
 /** Подпись слева 104 px, поле справа (реквизиты). */
-export function FieldRow({ label, error, ...input }: InputProps & { label: string; error?: string }) {
+export function FieldRow({
+  label,
+  error,
+  suffix,
+  ...input
+}: InputProps & {
+  label: string;
+  error?: string /** Единица справа от поля («₽/GEL»): значение выравнивается вправо. */;
+  suffix?: ReactNode;
+}) {
   return (
     <>
-      <label className="row field-row">
+      <label className={cx('row', 'field-row', suffix ? 'has-suffix' : false)}>
         <span className="field-label">{label}</span>
         <input {...input} className={error ? 'input-err' : undefined} aria-invalid={error ? true : undefined} />
+        {suffix && <span className="field-suffix">{suffix}</span>}
       </label>
       {error && <div className="err">{error}</div>}
     </>
@@ -553,6 +619,117 @@ export function QuickInput({ forceFocus = false, ...input }: InputProps & { forc
       <Icon name="bolt" size={20} stroke={2.2} />
       <input {...input} />
     </label>
+  );
+}
+
+/** Знак валюты для плашки: «₽», «$», «₾»; если знака нет — код. */
+function currencySign(code: string): string {
+  try {
+    const parts = new Intl.NumberFormat(dateLocale, {
+      style: 'currency',
+      currency: code,
+      currencyDisplay: 'narrowSymbol',
+    }).formatToParts(0);
+    return parts.find((p) => p.type === 'currency')?.value ?? code;
+  } catch {
+    return code;
+  }
+}
+
+/**
+ * Карточка суммы (форма траты и перевода): подпись, число 44 px по центру, валюта плашкой (нативный выбор),
+ * название под чертой, ниже — строки-`children` (курс, «Разобрать чек» — `AmountAction`, чип «Весь долг»).
+ * `error` — текст под числом. Без `currency` плашки нет (перевод в валюте группы).
+ */
+export function AmountCard({
+  label,
+  value,
+  onChange,
+  placeholder = '0',
+  error,
+  currency,
+  title,
+  children,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  error?: string;
+  currency?: { value: string; options: string[]; onChange: (c: string) => void; label: string };
+  /** Название под чертой (поле по центру). */
+  title?: InputProps;
+  children?: ReactNode;
+}) {
+  const id = useId();
+  return (
+    <div className="amt">
+      <div className="amt-main">
+        <label className="amt-label" htmlFor={id}>
+          {label}
+        </label>
+        <div className="amt-line">
+          <input
+            id={id}
+            className={cx('amt-input', error && 'input-err')}
+            inputMode="decimal"
+            size={Math.max(1, value.length)}
+            placeholder={placeholder}
+            value={value}
+            aria-invalid={error ? true : undefined}
+            onChange={(e) => onChange(e.target.value)}
+          />
+          {currency && (
+            <label className="amt-cur">
+              <span aria-hidden="true">{currencySign(currency.value)}</span>
+              <Icon name="down" size={16} stroke={2.2} />
+              <select
+                className="pick-native"
+                aria-label={currency.label}
+                value={currency.value}
+                onChange={(e) => currency.onChange(e.target.value)}
+              >
+                {currency.options.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+        {error && <div className="amt-error">{error}</div>}
+      </div>
+      {title && (
+        <div className="amt-title">
+          <input {...title} className="amt-name" />
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
+
+/** Строка действия внутри `AmountCard` («Разобрать чек · осталось 3 из 5»): ссылка по центру и подпись. */
+export function AmountAction({
+  icon,
+  caption,
+  onClick,
+  disabled,
+  children,
+}: {
+  icon: IconName;
+  caption?: ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <button type="button" className="amt-act" onClick={onClick} disabled={disabled}>
+      <Icon name={icon} size={20} stroke={2} />
+      <span>{children}</span>
+      {caption && <small>· {caption}</small>}
+    </button>
   );
 }
 

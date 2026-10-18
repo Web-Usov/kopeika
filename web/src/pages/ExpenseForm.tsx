@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import {
   CATEGORIES,
   type CategoryId,
+  categoryIcon,
   categoryKey,
+  categoryTone,
   DEFAULT_CATEGORY,
   suggestCategory,
 } from '../../../shared/categories.ts';
@@ -22,12 +24,36 @@ import { addDays, isoWeekday, nextOccurrence, type Period } from '../../../share
 import { api, type Expense, type GroupDetail, useExpense, useGroup } from '../api.ts';
 import { applySavedGroup } from '../celebration.ts';
 import { dateLocale, errorText, lang, rich, t } from '../i18n.ts';
+import { Icon } from '../icons.tsx';
 import { clearQuickDraft, peekQuickDraft } from '../quickDraft.ts';
 import { setReceiptDraft } from '../receiptDraft.ts';
 import { scheduleText, shortDate } from '../recurring.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, confirmDialog, haptic, MainButton } from '../tg.tsx';
-import { Avatar, ErrorView, Loading, Money, Row, Section, Segmented, todayIso } from '../ui.tsx';
+import {
+  AmountAction,
+  AmountCard,
+  Avatar,
+  Box,
+  Button,
+  Check,
+  Chip,
+  Chips,
+  ErrorView,
+  FieldRow,
+  formatDay,
+  Loading,
+  Money,
+  OkLine,
+  PickRow,
+  Row,
+  Screen,
+  ScreenTitle,
+  Section,
+  Segmented,
+  Stepper,
+  todayIso,
+} from '../ui.tsx';
 
 export function ExpenseForm({ groupId, expenseId }: { groupId: number; expenseId?: number }) {
   const { data: g, error } = useGroup(groupId);
@@ -50,10 +76,10 @@ export function ExpenseForm({ groupId, expenseId }: { groupId: number; expenseId
       </div>
     );
   return (
-    <div className="page">
+    <Screen>
       {back}
       <Editor g={g} expense={expense} />
-    </div>
+    </Screen>
   );
 }
 
@@ -91,7 +117,7 @@ export const showRate = (rate: string) => (lang === 'ru' ? rate.replace('.', ','
 
 type RateInfo = { status: 'idle' | 'loading' | 'ok' | 'error'; date?: string; error?: string };
 
-/** «Разобрать чек» for a new expense: only when the feature is on; shows what is left of the trial quota. */
+/** «Разобрать чек» строкой в карточке суммы (new expense): only when the feature is on; shows what is left of the trial quota. */
 function ReceiptEntry({ g }: { g: GroupDetail }) {
   // Servers with quotas (#102) say it per group; older ones only in /me.
   const shown = (r: NonNullable<GroupDetail['receipts']>) => r.offered ?? r.enabled;
@@ -113,30 +139,25 @@ function ReceiptEntry({ g }: { g: GroupDetail }) {
   const exhausted = limited && left === 0;
   const reset = q?.resetsAt ? shortDate(q.resetsAt.slice(0, 10)) : '';
   return (
-    <Section
-      footer={
+    <AmountAction
+      icon="camera"
+      disabled={exhausted}
+      caption={
         exhausted
           ? reset
-            ? t('receipt.buttonLimitReset', { date: reset })
-            : t('receipt.buttonLimit')
+            ? t('expense.scanLimitReset', { date: reset })
+            : t('expense.scanLimit')
           : limited && q
-            ? t('receipt.buttonLeft', { left, limit: q.limit })
+            ? t('expense.scanLeft', { left, limit: q.limit })
             : undefined
       }
+      onClick={() => {
+        setReceiptDraft(g.id, null);
+        navigate(`/g/${g.id}/receipt`);
+      }}
     >
-      <Row
-        className="link"
-        title={t(q?.beta ? 'receipt.buttonBeta' : 'receipt.button')}
-        onClick={
-          exhausted
-            ? undefined
-            : () => {
-                setReceiptDraft(g.id, null);
-                navigate(`/g/${g.id}/receipt`);
-              }
-        }
-      />
-    </Section>
+      {t(q?.beta ? 'expense.scanBeta' : 'expense.scan')}
+    </AmountAction>
   );
 }
 
@@ -164,27 +185,6 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
   const [saving, setSaving] = useState(false);
   // New expenses only: also create a recurring template (same day of month / weekday as the expense date).
   const [repeat, setRepeat] = useState<Period | 'none'>('none');
-
-  const chipsRef = useRef<HTMLDivElement>(null);
-  // Keep the selected chip visible in the scrollable row. A new expense starts at the beginning of the row.
-  const firstRun = useRef(true);
-  useEffect(() => {
-    const row = chipsRef.current;
-    const first = firstRun.current;
-    firstRun.current = false;
-    if (!row || (first && !expense)) return;
-    const chip = row.querySelector<HTMLElement>('.chip.active');
-    if (!chip) return;
-    const pad = 16;
-    const rowRect = row.getBoundingClientRect();
-    const chipRect = chip.getBoundingClientRect();
-    const start = chipRect.left - rowRect.left + row.scrollLeft;
-    const end = start + chipRect.width;
-    let left = row.scrollLeft;
-    if (start - pad < left) left = start - pad;
-    else if (end + pad > left + row.clientWidth) left = end + pad - row.clientWidth;
-    if (left !== row.scrollLeft) row.scrollTo({ left, behavior: first ? 'auto' : 'smooth' });
-  }, [category]);
 
   // Suggested rate for the expense date; a rate typed by hand is never overwritten.
   useEffect(() => {
@@ -303,72 +303,91 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
 
   const allOn = g.members.every((m) => parts[m.id].on);
 
+  const payer = g.members.find((m) => m.id === payerId) ?? g.members[0];
+  const nameOf = (m: { id: number; name: string }) =>
+    m.id === g.meId ? t('common.youParen', { name: m.name }) : m.name;
+  const repeatLabel: Record<Period | 'none', string> = {
+    none: t('recurring.none'),
+    monthly: t('recurring.monthly'),
+    weekly: t('recurring.weekly'),
+  };
+  const shownRepeat = foreign ? 'none' : repeat;
+  const categoryAuto = !categoryPicked && Boolean(suggestCategory(title, lang));
+
+  // Under the split: the total "По 800 ₽ на 4 человека — сходится до копейки" or the old messages about a mismatch.
+  let splitFooter: ReactNode;
+  if (mode === 'exact' && amount) {
+    if (exactSum === amount) splitFooter = <OkLine>{t('expense.exactDone')}</OkLine>;
+    else if (exactSum < amount)
+      splitFooter = rich('expense.exactLeft', { amount: <Money value={amount - exactSum} currency={currency} /> });
+    else
+      splitFooter = (
+        <span className="neg">
+          {rich('expense.exactOver', { amount: <Money value={exactSum - amount} currency={currency} /> })}
+        </span>
+      );
+  } else if (splitError && amount) splitFooter = <span className="neg">{splitError}</span>;
+  else if (mode === 'shares') splitFooter = t('expense.sharesHint');
+  else if (mode === 'equal' && computed && converted && computed.size > 1) {
+    const values = [...computed.values()];
+    const even = values.every((v) => v === values[0]);
+    splitFooter = (
+      <OkLine>
+        {t(even ? 'expense.okEven' : 'expense.okUneven', {
+          amount: formatMoney(even ? values[0] : converted, g.currency, lang),
+          count: computed.size,
+        })}
+      </OkLine>
+    );
+  }
+
   return (
     <>
-      <h2 className="page-title">{expense ? t('expense.titleEdit') : t('expense.titleNew')}</h2>
+      <ScreenTitle>{expense ? t('expense.titleEdit') : t('expense.titleNew')}</ScreenTitle>
 
-      {!expense && <ReceiptEntry g={g} />}
-
-      <Section>
-        <input
-          className="field"
-          placeholder={t('expense.titlePlaceholder')}
-          value={title}
-          maxLength={100}
-          onChange={(e) => {
+      <AmountCard
+        label={t('expense.amountLabel')}
+        value={amountStr}
+        onChange={setAmountStr}
+        error={amountStr && amount === null ? t('expense.amountError') : undefined}
+        currency={{
+          value: currency,
+          options: [g.currency, ...CURRENCIES.filter((c) => c !== g.currency)],
+          label: t('expense.currencyLabel'),
+          onChange: (c) => {
+            setCurrency(c);
+            setRateManual(false);
+            setRateStr('');
+            setRateInfo({ status: 'idle' });
+          },
+        }}
+        title={{
+          placeholder: t('expense.titlePlaceholder'),
+          value: title,
+          maxLength: 100,
+          'aria-label': t('expense.titlePlaceholder'),
+          onChange: (e) => {
             setTitle(e.target.value);
             if (!categoryPicked) setCategory(suggestCategory(e.target.value, lang) ?? DEFAULT_CATEGORY);
-          }}
-        />
-        <div className="amount-field">
-          <input
-            className="field amount"
-            inputMode="decimal"
-            placeholder="0"
-            value={amountStr}
-            onChange={(e) => setAmountStr(e.target.value)}
-          />
-          <select
-            className="currency-select"
-            aria-label={t('expense.currencyLabel')}
-            value={currency}
-            onChange={(e) => {
-              setCurrency(e.target.value);
-              setRateManual(false);
-              setRateStr('');
-              setRateInfo({ status: 'idle' });
-            }}
-          >
-            {[g.currency, ...CURRENCIES.filter((c) => c !== g.currency)].map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </div>
-        {amountStr && amount === null && <div className="field-error">{t('expense.amountError')}</div>}
+          },
+        }}
+      >
         {foreign && (
           <>
-            <div className="amount-field rate-field">
-              <span className="rate-label">{t('expense.rateLabel')}</span>
-              <input
-                className="field rate"
-                inputMode="decimal"
-                placeholder={rateInfo.status === 'error' ? t('expense.rateEnter') : t('expense.ratePlaceholder')}
-                value={rateStr}
-                onChange={(e) => {
-                  setRateStr(e.target.value);
-                  setRateManual(true);
-                }}
-              />
-              <span className="currency">
-                {g.currency}/{currency}
-              </span>
-            </div>
-            {rateStr.trim() && !rate ? (
-              <div className="field-error">{t('expense.rateError')}</div>
-            ) : (
-              <div className="rate-hint hint">
+            <FieldRow
+              label={t('expense.rateLabel')}
+              inputMode="decimal"
+              placeholder={rateInfo.status === 'error' ? t('expense.rateEnter') : t('expense.ratePlaceholder')}
+              value={rateStr}
+              error={rateStr.trim() && !rate ? t('expense.rateError') : undefined}
+              suffix={`${g.currency}/${currency}`}
+              onChange={(e) => {
+                setRateStr(e.target.value);
+                setRateManual(true);
+              }}
+            />
+            {!(rateStr.trim() && !rate) && (rateInfo.status !== 'idle' || (rate && converted)) && (
+              <div className="amt-note">
                 {rateInfo.status === 'loading' && t('expense.rateLoading')}
                 {rateInfo.status === 'error' && !rate && rateInfo.error}
                 {rate &&
@@ -380,84 +399,139 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
                   })}
               </div>
             )}
-            {mode === 'exact' && <div className="rate-hint hint">{t('expense.exactForeignHint', { currency })}</div>}
+            {mode === 'exact' && <div className="amt-note">{t('expense.exactForeignHint', { currency })}</div>}
           </>
         )}
-        <div className="chips-caption">{t('expense.categorySection')}</div>
-        <div className="chips" ref={chipsRef}>
+        {!expense && <ReceiptEntry g={g} />}
+      </AmountCard>
+
+      <Section
+        bare
+        title={t('expense.categorySection')}
+        aside={categoryAuto ? <span className="hint">{t('expense.categoryAuto')}</span> : undefined}
+      >
+        <Chips>
           {CATEGORIES.map((c) => (
-            <button
+            <Chip
               key={c.id}
-              type="button"
-              className={`chip ${category === c.id ? 'active' : ''}`}
-              aria-pressed={category === c.id}
+              selected={category === c.id}
+              icon={categoryIcon(c.id)}
+              tone={categoryTone(c.id)}
               onClick={() => {
                 haptic.tap();
                 setCategory(c.id);
                 setCategoryPicked(true);
               }}
             >
-              <span aria-hidden="true">{c.emoji}</span>
               {t(categoryKey(c.id))}
-            </button>
+            </Chip>
           ))}
-        </div>
-      </Section>
-
-      <Section title={t('expense.whoPaid')}>
-        <select className="field" value={payerId} onChange={(e) => setPayerId(Number(e.target.value))}>
-          {g.members.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.id === g.meId ? t('common.youParen', { name: m.name }) : m.name}
-            </option>
-          ))}
-        </select>
-      </Section>
-
-      <Section title={t('expense.when')}>
-        <input
-          className="field"
-          type="date"
-          value={spentOn}
-          max={todayIso()}
-          onChange={(e) => setSpentOn(e.target.value || todayIso())}
-        />
+        </Chips>
       </Section>
 
       <Section
-        title={
-          <span className="section-title-row">
-            {t('expense.splitWith')}
-            {mode === 'equal' && (
-              <button
-                type="button"
-                className="text-btn small"
-                onClick={() =>
-                  setParts((p) => Object.fromEntries(g.members.map((m) => [m.id, { ...p[m.id], on: !allOn }])))
-                }
-              >
-                {allOn ? t('expense.deselectAll') : t('expense.selectAll')}
-              </button>
-            )}
-          </span>
-        }
+        inset={60}
         footer={
-          mode === 'exact' && amount ? (
-            exactSum === amount ? (
-              <span className="pos">{t('expense.exactDone')}</span>
-            ) : exactSum < amount ? (
-              rich('expense.exactLeft', { amount: <Money value={amount - exactSum} currency={currency} /> })
-            ) : (
-              <span className="neg">
-                {rich('expense.exactOver', { amount: <Money value={exactSum - amount} currency={currency} /> })}
-              </span>
-            )
-          ) : splitError && amount ? (
-            <span className="neg">{splitError}</span>
-          ) : mode === 'shares' ? (
-            t('expense.sharesHint')
+          !expense
+            ? foreign
+              ? t('recurring.foreignHint')
+              : repeatNext
+                ? `${scheduleText(repeat as Period, repeatDay).replace(/^./, (c) => c.toUpperCase())}. ${t('recurring.hint', { date: shortDate(repeatNext) })}${repeat === 'monthly' && repeatDay >= 29 ? ` ${t('recurring.shortMonthHint')}` : ''}`
+                : undefined
+            : undefined
+        }
+      >
+        <PickRow
+          icon="users"
+          title={t('expense.whoPaid')}
+          value={
+            <>
+              <Avatar member={payer} size="xs" />
+              {payer.id === g.meId ? t('common.you') : payer.name}
+            </>
+          }
+          native={
+            <select
+              className="pick-native"
+              aria-label={t('expense.whoPaid')}
+              value={payerId}
+              onChange={(e) => setPayerId(Number(e.target.value))}
+            >
+              {g.members.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {nameOf(m)}
+                </option>
+              ))}
+            </select>
+          }
+        />
+        <PickRow
+          icon="calendar"
+          title={t('expense.when')}
+          value={formatDay(spentOn)}
+          native={
+            <input
+              className="pick-native"
+              type="date"
+              aria-label={t('expense.when')}
+              value={spentOn}
+              max={todayIso()}
+              onChange={(e) => setSpentOn(e.target.value || todayIso())}
+              onClick={(e) => {
+                try {
+                  e.currentTarget.showPicker?.();
+                } catch {
+                  // the native picker opens on its own where showPicker is unavailable
+                }
+              }}
+            />
+          }
+        />
+        {!expense && (
+          <PickRow
+            icon="repeat"
+            title={t('recurring.repeat')}
+            value={repeatLabel[shownRepeat]}
+            muted={shownRepeat === 'none'}
+            native={
+              <select
+                className="pick-native"
+                aria-label={t('recurring.repeat')}
+                disabled={foreign}
+                value={shownRepeat}
+                onChange={(e) => {
+                  haptic.tap();
+                  setRepeat(e.target.value as Period | 'none');
+                }}
+              >
+                {(['none', 'monthly', 'weekly'] as const).map((r) => (
+                  <option key={r} value={r}>
+                    {repeatLabel[r]}
+                  </option>
+                ))}
+              </select>
+            }
+          />
+        )}
+      </Section>
+
+      <Section
+        inset={64}
+        title={t('expense.splitWith')}
+        aside={
+          mode === 'equal' ? (
+            <Button
+              variant="ghost"
+              size="s"
+              onClick={() =>
+                setParts((p) => Object.fromEntries(g.members.map((m) => [m.id, { ...p[m.id], on: !allOn }])))
+              }
+            >
+              {allOn ? t('expense.deselectAll') : t('expense.selectAll')}
+            </Button>
           ) : undefined
         }
+        footer={splitFooter}
       >
         <Segmented<SplitMode>
           value={mode}
@@ -475,7 +549,7 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
           const p = parts[m.id];
           const share = computed?.get(m.id);
           const shareView = share ? <Money value={share} currency={g.currency} /> : <span className="hint">—</span>;
-          const name = m.id === g.meId ? t('common.youParen', { name: m.name }) : m.name;
+          const left = <Avatar member={m} size="m" />;
 
           if (mode === 'equal') {
             return (
@@ -485,9 +559,14 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
                   haptic.tap();
                   update(m.id, { on: !p.on });
                 }}
-                left={<span className={`check ${p.on ? 'on' : ''}`} />}
-                title={name}
-                right={p.on ? shareView : <span className="hint">—</span>}
+                left={left}
+                title={nameOf(m)}
+                right={
+                  <span className="pick-value">
+                    {p.on ? shareView : <span className="hint">—</span>}
+                    <Check on={p.on} />
+                  </span>
+                }
               />
             );
           }
@@ -495,37 +574,24 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
             return (
               <Row
                 key={m.id}
-                left={<Avatar member={m} size={32} />}
-                title={name}
+                left={left}
+                title={nameOf(m)}
                 subtitle={shareView}
-                right={
-                  <span className="stepper">
-                    <button
-                      type="button"
-                      onClick={() => update(m.id, { weight: Math.max(0, p.weight - 1) })}
-                      disabled={p.weight === 0}
-                    >
-                      −
-                    </button>
-                    <span>{p.weight}</span>
-                    <button type="button" onClick={() => update(m.id, { weight: Math.min(99, p.weight + 1) })}>
-                      +
-                    </button>
-                  </span>
-                }
+                right={<Stepper value={p.weight} onChange={(weight) => update(m.id, { weight })} />}
               />
             );
           }
           return (
             <Row
               key={m.id}
-              left={<Avatar member={m} size={32} />}
-              title={name}
+              left={left}
+              title={nameOf(m)}
               right={
-                <input
-                  className={`field exact ${p.exact.trim() && parseAmount(p.exact) === null ? 'invalid' : ''}`}
+                <Box
                   inputMode="decimal"
                   placeholder="0"
+                  aria-label={nameOf(m)}
+                  invalid={Boolean(p.exact.trim() && parseAmount(p.exact) === null)}
                   value={p.exact}
                   onChange={(e) => update(m.id, { exact: e.target.value })}
                 />
@@ -535,38 +601,16 @@ function Editor({ g, expense }: { g: GroupDetail; expense?: Expense }) {
         })}
       </Section>
 
-      {!expense && (
-        <Section
-          title={t('recurring.repeat')}
-          footer={
-            foreign
-              ? t('recurring.foreignHint')
-              : repeatNext
-                ? `${t('recurring.hint', { date: shortDate(repeatNext) })}${repeat === 'monthly' && repeatDay >= 29 ? ` ${t('recurring.shortMonthHint')}` : ''}`
-                : undefined
-          }
-        >
-          <Segmented<Period | 'none'>
-            value={foreign ? 'none' : repeat}
-            onChange={(r) => {
-              if (foreign) return;
-              haptic.tap();
-              setRepeat(r);
-            }}
-            options={[
-              { value: 'none', label: t('recurring.none') },
-              { value: 'monthly', label: t('recurring.monthly') },
-              { value: 'weekly', label: t('recurring.weekly') },
-            ]}
-          />
-          {!foreign && repeat !== 'none' && <div className="row hint">{scheduleText(repeat, repeatDay)}</div>}
-        </Section>
-      )}
-
       {expense && (
-        <button type="button" className="danger-btn" onClick={remove}>
-          {t('expense.delete')}
-        </button>
+        <Section>
+          <Row
+            tone="danger"
+            className="center"
+            left={<Icon name="trash" size={20} />}
+            title={t('expense.delete')}
+            onClick={remove}
+          />
+        </Section>
       )}
 
       <MainButton

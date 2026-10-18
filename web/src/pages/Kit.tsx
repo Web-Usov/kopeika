@@ -2,12 +2,14 @@
 // Служебный экран: маршрут #/kit регистрируется только при devTools (см. App.tsx), ссылок на него нет.
 // Тексты — через словари kit.* (ru/en). Правила и имена — design/v1/README.md.
 import { type ReactNode, useEffect, useState } from 'react';
-import { CATEGORIES, categoryKey } from '../../../shared/categories.ts';
+import { CATEGORIES, categoryKey, categoryTone } from '../../../shared/categories.ts';
 import { lang, t } from '../i18n.ts';
 import { ICON_NAMES, Icon } from '../icons.tsx';
 import { navigate } from '../router.ts';
 import { applyScheme, BackButton, MainButton } from '../tg.tsx';
 import {
+  AmountAction,
+  AmountCard,
   Avatar,
   AvatarStack,
   Badge,
@@ -27,6 +29,7 @@ import {
   Loading,
   Money,
   OkLine,
+  PickRow,
   QuickInput,
   Radio,
   Row,
@@ -123,6 +126,8 @@ export function Kit() {
   const [step, setStep] = useState(2);
   const [chip, setChip] = useState<string | null>('food');
   const [loading, setLoading] = useState(false);
+  const [amount, setAmount] = useState('3200');
+  const [cur, setCur] = useState('RUB');
 
   useEffect(() => {
     applyScheme(scheme);
@@ -314,6 +319,42 @@ export function Kit() {
             tone="danger"
             left={<Tile icon="trash" tone="neg" size="s" />}
             title={t('kit.sampleDelete')}
+            onClick={noop}
+          />
+        </Section>
+        <Section title="PickRow · Row danger center" inset={60}>
+          <PickRow
+            icon="users"
+            title={t('expense.whoPaid')}
+            value={
+              <>
+                <Avatar member={members[0]} size="xs" />
+                {t('common.you')}
+              </>
+            }
+            native={
+              <select className="pick-native" aria-label={t('expense.whoPaid')} defaultValue="a">
+                <option value="a">{t('common.you')}</option>
+              </select>
+            }
+          />
+          <PickRow
+            icon="repeat"
+            title={t('recurring.repeat')}
+            subtitle={t('kit.sampleSubtitle')}
+            value={t('recurring.none')}
+            muted
+            native={
+              <select className="pick-native" aria-label={t('recurring.repeat')} defaultValue="a">
+                <option value="a">{t('recurring.none')}</option>
+              </select>
+            }
+          />
+          <Row
+            tone="danger"
+            className="center"
+            left={<Icon name="trash" size={20} />}
+            title={t('expense.delete')}
             onClick={noop}
           />
         </Section>
@@ -519,6 +560,7 @@ export function Kit() {
               <Chip
                 key={c.id}
                 icon={c.icon}
+                tone={categoryTone(c.id)}
                 selected={chip === c.id}
                 onClick={() => setChip(chip === c.id ? null : c.id)}
               >
@@ -551,6 +593,26 @@ export function Kit() {
               error={t('kit.sampleFieldError')}
             />
           </Section>
+        </Variant>
+        <Variant label="AmountCard">
+          <AmountCard
+            label={t('expense.amountLabel')}
+            value={amount}
+            onChange={setAmount}
+            currency={{
+              value: cur,
+              options: ['RUB', 'USD', 'GEL'],
+              onChange: setCur,
+              label: t('expense.currencyLabel'),
+            }}
+            title={{ placeholder: t('expense.titlePlaceholder'), defaultValue: t('kit.sampleNameValue') }}
+          >
+            <FieldRow label={t('expense.rateLabel')} defaultValue="34,5" suffix="RUB/GEL" />
+            <AmountAction icon="camera" caption={t('expense.scanLeft', { left: 3, limit: 5 })} onClick={noop}>
+              {t('expense.scan')}
+            </AmountAction>
+          </AmountCard>
+          <AmountCard label={t('expense.amountLabel')} value="1,2,3" onChange={noop} error={t('expense.amountError')} />
         </Variant>
         <Variant label="Box">
           <Section>

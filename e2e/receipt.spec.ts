@@ -55,7 +55,7 @@ async function openReceipt(page: Page) {
   await page.getByRole('button', { name: 'Создать группу' }).click();
   await expect(page.getByRole('heading', { name: 'Ужин в Тбилиси' })).toBeVisible();
   await page.getByRole('button', { name: 'Добавить трату' }).click();
-  await page.getByText('📷 Разобрать чек').click();
+  await page.getByRole('button', { name: 'Разобрать чек' }).click();
 }
 
 test('чек: фото → черновик → правка → расхождение', async ({ page }) => {
@@ -120,7 +120,7 @@ test('чек: ручной ввод без фото, английский', asyn
   await page.getByRole('button', { name: 'Create group' }).click();
   await expect(page.getByRole('heading', { name: 'Cabin' })).toBeVisible();
   await page.getByRole('button', { name: 'Add expense' }).click();
-  await page.getByText('📷 Scan a receipt').click();
+  await page.getByRole('button', { name: 'Scan a receipt' }).click();
   await page.getByRole('button', { name: 'Enter manually' }).click();
 
   const next = page.getByRole('button', { name: 'Next' });
@@ -198,7 +198,7 @@ async function assignFlow(page: Page, currency: string) {
   await page.getByRole('button', { name: 'Создать группу' }).click();
   await expect(page.getByRole('heading', { name: 'Ужин' })).toBeVisible();
   await page.getByRole('button', { name: 'Добавить трату' }).click();
-  await page.getByText('📷 Разобрать чек').click();
+  await page.getByRole('button', { name: 'Разобрать чек' }).click();
   await page.locator('input[type="file"]:not([capture])').setInputFiles(photo);
   await page.getByRole('button', { name: 'Далее' }).click();
   await expect(page.getByRole('heading', { name: 'Кто что ел' })).toBeVisible();
@@ -293,7 +293,7 @@ test('бета: нет доступа → запрос → «запрос отп
   await page.getByRole('button', { name: 'Создать группу' }).click();
   await expect(page.getByRole('heading', { name: 'Бета' })).toBeVisible();
   await page.getByRole('button', { name: 'Добавить трату' }).click();
-  await page.getByText('📷 Разобрать чек · бета').click();
+  await page.getByRole('button', { name: 'Разобрать чек · бета' }).click();
 
   await expect(page.getByText('Разбор чеков в бета-тесте. Запросите доступ')).toBeVisible();
   await page.getByRole('button', { name: 'Запросить доступ' }).click();
