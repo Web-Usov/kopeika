@@ -1,6 +1,6 @@
 // Thin typed wrapper around the official telegram-web-app.js (loaded in index.html).
 // Outside Telegram (plain browser during development) everything degrades to HTML fallbacks.
-import { useEffect, useRef } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 import { t } from './i18n.ts';
 
 interface BottomButton {
@@ -21,6 +21,7 @@ interface WebApp {
   version: string;
   colorScheme: 'light' | 'dark';
   isVersionAtLeast(v: string): boolean;
+  onEvent?(event: string, cb: () => void): void;
   ready(): void;
   expand(): void;
   close(): void;
@@ -52,6 +53,22 @@ export const tg: WebApp | undefined = window.Telegram?.WebApp;
 export const inTelegram = Boolean(tg?.initData);
 const atLeast = (v: string) => inTelegram && tg!.isVersionAtLeast(v);
 
+/** Тема интерфейса: в Telegram — по colorScheme клиента, вне Telegram — по prefers-color-scheme. */
+function currentScheme(): 'light' | 'dark' {
+  if (inTelegram && tg!.colorScheme) return tg!.colorScheme;
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+/** Ставит data-scheme на <html>: от него включается тёмная пара токенов (tokens.css). */
+export function applyScheme(scheme: 'light' | 'dark' = currentScheme()) {
+  document.documentElement.dataset.scheme = scheme;
+}
+
+// Тема нужна до первой отрисовки, поэтому выставляем её при загрузке модуля и следим за сменой.
+applyScheme();
+if (inTelegram) tg!.onEvent?.('themeChanged', () => applyScheme());
+else window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', () => applyScheme());
+
 export function initTelegram() {
   if (!inTelegram) return;
   tg!.ready();
@@ -62,6 +79,11 @@ export function initTelegram() {
 const devParams = new URLSearchParams(location.search);
 /** In a plain browser: ?dev=2 pretends to be user #2, ?startapp=CODE simulates an invite link. */
 export const devUserId = devParams.get('dev') ?? '1';
+/**
+ * Служебные экраны (каталог компонентов #/kit): только вне Telegram и только с явным ?dev=… в адресе.
+ * Настоящие пользователи всегда открывают приложение внутри Telegram (initData есть), поэтому им каталог недоступен.
+ */
+export const devTools = !inTelegram && devParams.has('dev');
 
 export function startParam(): string | undefined {
   return inTelegram ? tg!.initDataUnsafe.start_param : (devParams.get('startapp') ?? undefined);
@@ -138,8 +160,17 @@ export function openLink(url: string) {
   else window.open(url, '_blank', 'noopener');
 }
 
-/** Telegram's native bottom button; renders a regular button outside Telegram. */
-export function MainButton(props: { text: string; onClick: () => void; disabled?: boolean; loading?: boolean }) {
+/**
+ * Telegram's native bottom button; outside Telegram renders the stand-in (`.mbar` / `.mbtn`).
+ * `above` — одна текстовая кнопка (`Button variant="ghost"`) над нижней: рисуется и в Telegram, над его кнопкой.
+ */
+export function MainButton(props: {
+  text: string;
+  onClick: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  above?: ReactNode;
+}) {
   const { text, disabled = false, loading = false } = props;
   const handler = useRef(props.onClick);
   handler.current = props.onClick;
@@ -159,11 +190,19 @@ export function MainButton(props: { text: string; onClick: () => void; disabled?
 
   useEffect(() => () => (inTelegram ? tg!.MainButton.hide() : undefined), []);
 
-  if (inTelegram) return null;
+  if (inTelegram) return props.above ? <div className="mbar mbar-above">{props.above}</div> : null;
   return (
-    <div className="main-button-bar">
-      <button type="button" className="main-button" disabled={disabled || loading} onClick={() => handler.current()}>
-        {loading ? '…' : text}
+    <div className="mbar">
+      {props.above}
+      <button
+        type="button"
+        className="mbtn"
+        disabled={disabled || loading}
+        aria-busy={loading || undefined}
+        onClick={() => handler.current()}
+      >
+        {loading ? <span className="spin" aria-hidden="true" /> : null}
+        {text}
       </button>
     </div>
   );

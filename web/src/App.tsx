@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react';
+import { lazy, type ReactElement, Suspense } from 'react';
 import { t } from './i18n.ts';
 import { ExpenseForm } from './pages/ExpenseForm.tsx';
 import { Group } from './pages/Group.tsx';
@@ -13,7 +13,8 @@ import { Summary } from './pages/Summary.tsx';
 import { Terms } from './pages/Terms.tsx';
 import { TransferForm } from './pages/TransferForm.tsx';
 import { match, useLocation } from './router.ts';
-import { ErrorView } from './ui.tsx';
+import { devTools } from './tg.tsx';
+import { ErrorView, Loading } from './ui.tsx';
 
 const groupTab = (v: string | null) => (v === 'balances' || v === 'history' ? v : 'expenses');
 
@@ -43,6 +44,19 @@ const routes: [pattern: string, render: (p: Params, query: Query) => ReactElemen
     (p, query) => <TransferForm key={p.eid} groupId={Number(p.id)} expenseId={Number(p.eid)} prefill={query} />,
   ],
 ];
+
+// Каталог компонентов: только вне Telegram и с ?dev=… (tg.tsx → devTools); настоящим пользователям маршрута нет,
+// а код каталога лежит в отдельном чанке и им не загружается.
+const Kit = lazy(() => import('./pages/Kit.tsx').then((m) => ({ default: m.Kit })));
+if (devTools)
+  routes.push([
+    '/kit',
+    () => (
+      <Suspense fallback={<Loading />}>
+        <Kit />
+      </Suspense>
+    ),
+  ]);
 
 export function App() {
   const { path, query } = useLocation();

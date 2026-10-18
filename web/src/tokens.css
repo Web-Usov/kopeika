@@ -1,0 +1,164 @@
+/* Токены дизайн-кода v1 (design/v1/README.md, разделы 2–3). Единственное место, где живут литеральные цвета и размеры.
+   Базовые цвета берутся из темы Telegram (`--tg-theme-*`); запасные значения нужны только вне Telegram.
+   Тёмная пара включается атрибутом data-scheme="dark" на <html>: его ставит tg.tsx по Telegram.WebApp.colorScheme
+   (событие themeChanged), а вне Telegram — по prefers-color-scheme. */
+
+:root {
+  /* типографика */
+  --fs-display: 44px;
+  --fs-amount: 26px;
+  --fs-title-l: 28px;
+  --fs-title-m: 22px;
+  --fs-headline: 17px;
+  --fs-body: 16px;
+  --fs-callout: 14px;
+  --fs-footnote: 13px;
+  --fs-caption: 12px;
+
+  /* отступы */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+
+  /* радиусы */
+  --r-xs: 8px;
+  --r-s: 10px;
+  --r-m: 12px;
+  --r-l: 16px;
+  --r-xl: 24px;
+  --r-pill: 999px;
+
+  /* размеры */
+  --h-row: 52px;
+  --h-btn: 44px;
+  --h-btn-sm: 36px;
+  --h-main: 52px;
+  --h-field: 48px;
+  --h-seg: 34px;
+  --tile: 40px;
+  --tile-s: 32px;
+  --av-l: 44px;
+  --av-m: 36px;
+  --av-s: 28px;
+  --av-xs: 22px;
+  --emb: 72px;
+  --emb-l: 88px;
+  --ctl: 24px;
+  --sw-w: 51px;
+  --sw-h: 31px;
+  --sw-knob: 27px;
+  --stp-btn: 40px;
+  --w-label: 104px;
+  --w-box: 120px;
+  --h-box: 40px;
+
+  /* тени */
+  --sh-raise: 0 1px 3px rgba(0, 0, 0, 0.14);
+  --sh-modal: 0 20px 50px rgba(0, 0, 0, 0.25);
+
+  /* цвет, светлая тема: база из Telegram */
+  --bg: var(--tg-theme-secondary-bg-color, #efeff4);
+  --sec: var(--tg-theme-section-bg-color, var(--tg-theme-bg-color, #ffffff));
+  --text: var(--tg-theme-text-color, #000000);
+  --hint: var(--tg-theme-hint-color, #8e8e93);
+  --sub: var(--tg-theme-section-header-text-color, #6d6d72);
+  --link: var(--tg-theme-link-color, #2481cc);
+  --btn: var(--tg-theme-button-color, #2481cc);
+  --btn-text: var(--tg-theme-button-text-color, #ffffff);
+  --sep: var(--tg-theme-section-separator-color, rgba(60, 60, 67, 0.2));
+  --neg: var(--tg-theme-destructive-text-color, #d70015);
+  --pos: #1b7f36;
+
+  /* производные */
+  --link-strong: color-mix(in srgb, var(--link) 80%, var(--text));
+  --sub-strong: color-mix(in srgb, var(--sub) 35%, var(--text));
+  --line: color-mix(in srgb, var(--hint) 27%, transparent);
+  --line2: color-mix(in srgb, var(--hint) 55%, transparent);
+  --fill: color-mix(in srgb, var(--hint) 15%, transparent);
+  --fill2: color-mix(in srgb, var(--hint) 24%, transparent);
+  --tint: color-mix(in srgb, var(--link) 12%, transparent);
+  --press: color-mix(in srgb, var(--hint) 16%, transparent);
+  --pos-tint: color-mix(in srgb, var(--pos) 14%, transparent);
+  --neg-tint: color-mix(in srgb, var(--neg) 10%, transparent);
+  --chev: #c4c4c7;
+  --seg-on: #ffffff;
+  --switch: #34c759;
+  --on-solid: #ffffff;
+  --scrim: rgba(0, 0, 0, 0.4);
+
+  /* медь: достижения, титулы, «пример» */
+  --brand: #b87333;
+  --brand-tint: rgba(184, 115, 51, 0.14);
+  --brand-text: #8a5220;
+
+  /* категории */
+  --c-food: #c8502a;
+  --c-groc: #1f8a3b;
+  --c-home: #2272b8;
+  --c-taxi: #9a7206;
+  --c-fun: #8a4fc0;
+  --c-shop: #c23a72;
+  --c-other: #6d6d72;
+
+  /* плитки на цвете (Tile solid-*) */
+  --solid-blue: #2481cc;
+  --solid-orange: #f08a24;
+  --solid-green: #34a853;
+  --solid-red: #e5484d;
+  --solid-gray: #8e8e93;
+  --solid-purple: #8a5cd6;
+
+  /* аватары: семь цветов по id участника */
+  --av-1: #62b84f;
+  --av-2: #4f9fd8;
+  --av-3: #9a85e0;
+  --av-4: #e86aa2;
+  --av-5: #e0656c;
+  --av-6: #3fb3b5;
+  --av-7: #f0924f;
+}
+
+/* Тёмная пара. Базовые токены Telegram по-прежнему главнее запасных значений. */
+:root[data-scheme="dark"] {
+  --bg: var(--tg-theme-secondary-bg-color, #000000);
+  --sec: var(--tg-theme-section-bg-color, var(--tg-theme-bg-color, #1c1c1e));
+  --text: var(--tg-theme-text-color, #ffffff);
+  --hint: var(--tg-theme-hint-color, #98989e);
+  --sub: var(--tg-theme-section-header-text-color, #8d8d93);
+  --link: var(--tg-theme-link-color, #3e88f7);
+  --btn: var(--tg-theme-button-color, #3e88f7);
+  --btn-text: var(--tg-theme-button-text-color, #ffffff);
+  --sep: var(--tg-theme-section-separator-color, rgba(84, 84, 88, 0.65));
+  --neg: var(--tg-theme-destructive-text-color, #ff453a);
+  --pos: #30d158;
+
+  --link-strong: color-mix(in srgb, var(--link) 60%, var(--text));
+  --line: color-mix(in srgb, var(--hint) 38%, transparent);
+  --line2: color-mix(in srgb, var(--hint) 60%, transparent);
+  --fill: color-mix(in srgb, var(--hint) 20%, transparent);
+  --fill2: color-mix(in srgb, var(--hint) 30%, transparent);
+  --tint: color-mix(in srgb, var(--link) 20%, transparent);
+  --press: color-mix(in srgb, var(--hint) 28%, transparent);
+  --pos-tint: color-mix(in srgb, var(--pos) 15%, transparent);
+  --neg-tint: color-mix(in srgb, var(--neg) 15%, transparent);
+  --chev: #5a5a5e;
+  --seg-on: #636366;
+  --switch: #30d158;
+  --scrim: rgba(0, 0, 0, 0.6);
+
+  --brand: #d08a4a;
+  --brand-tint: rgba(208, 138, 74, 0.2);
+  --brand-text: #eaa96b;
+
+  --c-food: #f0875e;
+  --c-groc: #4fc46a;
+  --c-home: #5aa4f0;
+  --c-taxi: #e0b23a;
+  --c-fun: #b98af0;
+  --c-shop: #f06fa5;
+  --c-other: #a0a0a8;
+}

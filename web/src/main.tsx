@@ -6,6 +6,7 @@ import { installErrorReporting } from './errorReport.ts';
 import './i18n.ts';
 import { joinSource } from './joinSource.ts';
 import { initTelegram, startParam } from './tg.tsx';
+import './tokens.css';
 import './styles.css';
 
 initTelegram();

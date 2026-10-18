@@ -2,21 +2,28 @@
 // Shared by the server (validation) and the Mini App (chips, stats). Names live in the i18n dictionaries.
 import type { Key, Lang } from './i18n/index.ts';
 
+/** Имена иконок категорий (web/src/icons.tsx) и тонов плитки (--c-* в web/src/tokens.css, класс .tone-<tone>). */
+export type CategoryIcon = 'food' | 'cart' | 'home' | 'taxi' | 'fun' | 'bag' | 'receipt';
+export type CategoryTone = 'food' | 'groc' | 'home' | 'taxi' | 'fun' | 'shop' | 'other';
+
 export const CATEGORIES = [
-  { id: 'food', emoji: '🍽' },
-  { id: 'groceries', emoji: '🛒' },
-  { id: 'housing', emoji: '🏠' },
-  { id: 'transport', emoji: '🚕' },
-  { id: 'fun', emoji: '🎉' },
-  { id: 'shopping', emoji: '🛍' },
-  { id: 'other', emoji: '🧾' },
-] as const;
+  { id: 'food', emoji: '🍽', icon: 'food', tone: 'food' },
+  { id: 'groceries', emoji: '🛒', icon: 'cart', tone: 'groc' },
+  { id: 'housing', emoji: '🏠', icon: 'home', tone: 'home' },
+  { id: 'transport', emoji: '🚕', icon: 'taxi', tone: 'taxi' },
+  { id: 'fun', emoji: '🎉', icon: 'fun', tone: 'fun' },
+  { id: 'shopping', emoji: '🛍', icon: 'bag', tone: 'shop' },
+  { id: 'other', emoji: '🧾', icon: 'receipt', tone: 'other' },
+] as const satisfies readonly { id: string; emoji: string; icon: CategoryIcon; tone: CategoryTone }[];
 
 export type CategoryId = (typeof CATEGORIES)[number]['id'];
 export const CATEGORY_IDS = CATEGORIES.map((c) => c.id) as [CategoryId, ...CategoryId[]];
 export const DEFAULT_CATEGORY: CategoryId = 'other';
 
 export const categoryEmoji = (id: string): string => CATEGORIES.find((c) => c.id === id)?.emoji ?? '🧾';
+/** Иконка и тон категории для интерфейса (эмодзи остаются для бота и CSV). Неизвестная категория — «другое». */
+export const categoryIcon = (id: string): CategoryIcon => CATEGORIES.find((c) => c.id === id)?.icon ?? 'receipt';
+export const categoryTone = (id: string): CategoryTone => CATEGORIES.find((c) => c.id === id)?.tone ?? 'other';
 export const categoryKey = (id: CategoryId): Key => `category.${id}`;
 
 // Words are matched by prefix ("такси" matches "такси в аэропорт"); a trailing "=" means the whole word.
