@@ -115,6 +115,47 @@ export function Steps({ title, items }: { title?: ReactNode; items: { title: Rea
   );
 }
 
+/**
+ * Содержимое `Section` для ссылки-приглашения: ссылка моноширинным, «Скопировать» (`tint`) и «Отправить» (`primary`)
+ * поровну; ниже, через разделитель, необязательная строка `rotate` («Новая ссылка-приглашение»).
+ */
+export function InviteCard({
+  link,
+  copyLabel,
+  shareLabel,
+  onCopy,
+  onShare,
+  rotateLabel,
+  onRotate,
+}: {
+  link: string;
+  copyLabel: string;
+  shareLabel: string;
+  onCopy: () => void;
+  onShare: () => void;
+  rotateLabel?: string;
+  onRotate?: () => void;
+}) {
+  return (
+    <>
+      <div className="invite">
+        <div className="invite-link">{link}</div>
+        <div className="btn-pair">
+          <Button variant="tint" wide icon="copy" onClick={onCopy}>
+            {copyLabel}
+          </Button>
+          <Button variant="primary" wide icon="share" onClick={onShare}>
+            {shareLabel}
+          </Button>
+        </div>
+      </div>
+      {rotateLabel && onRotate && (
+        <Row tone="link" left={<Icon name="repeat" size={22} stroke={1.9} />} title={rotateLabel} onClick={onRotate} />
+      )}
+    </>
+  );
+}
+
 /** Подвал главной: ссылки в одну строку (`.links`) и версия (`.ver`). */
 export function LegalLinks({ links, version }: { links: { label: string; onClick: () => void }[]; version: string }) {
   return (
@@ -226,6 +267,15 @@ export function Avatar({
           <Icon name={badge.icon} size={12} stroke={2.4} />
         </span>
       </span>
+    </span>
+  );
+}
+
+/** Круг-заглушка размера `m` с плюсом: «добавить участника». Лежит в строке на месте аватара. */
+export function AvatarAdd() {
+  return (
+    <span className="avatar m add" aria-hidden="true">
+      <Icon name="plus" size={20} stroke={2} />
     </span>
   );
 }
