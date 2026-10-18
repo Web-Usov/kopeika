@@ -861,7 +861,7 @@ select.field {
 
 .chips {
   display: flex;
-  gap: 6px;
+  gap: var(--sp-2);
   padding: 0 16px 10px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -1927,6 +1927,214 @@ select.field {
   color: var(--pos);
   font-size: var(--fs-callout);
   font-weight: 500;
+}
+
+/* --- Форма траты: карточка суммы, строки выбора, чипы категорий --- */
+.section-body.bare {
+  background: none;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.chip .chip-ic {
+  display: inline-flex;
+  background: none;
+}
+
+.row.pick {
+  cursor: pointer;
+}
+
+.pick-value {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.pick-value.muted {
+  color: var(--hint);
+}
+
+.pick-native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  border: 0;
+  font-size: var(--fs-body);
+  cursor: pointer;
+  appearance: none;
+}
+
+.row.pick:has(:focus-visible) {
+  outline: 2px solid var(--link);
+  outline-offset: -2px;
+}
+
+.row.pick:has(:disabled) {
+  opacity: 0.45;
+}
+
+.field-row.has-suffix input {
+  text-align: right;
+}
+
+.field-suffix {
+  flex: none;
+  color: var(--hint);
+  font-weight: 600;
+}
+
+.amt {
+  background: var(--sec);
+  border-radius: var(--r-l);
+  overflow: hidden;
+}
+
+.amt-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-5) var(--sp-4) var(--sp-4);
+}
+
+.amt-label {
+  color: var(--hint);
+  font-size: var(--fs-callout);
+}
+
+.amt-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  max-width: 100%;
+}
+
+.amt-input {
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: var(--fs-display);
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.amt-input::placeholder {
+  color: var(--hint);
+}
+
+.amt-input:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+.amt-cur {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-height: var(--h-btn-sm);
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-s);
+  background: var(--fill);
+  font-size: var(--fs-headline);
+  font-weight: 600;
+}
+
+.amt-cur svg {
+  color: var(--sub);
+}
+
+.amt-error {
+  color: var(--neg);
+  font-size: var(--fs-footnote);
+  text-align: center;
+}
+
+.amt-title,
+.amt .row,
+.amt-act,
+.amt-note,
+.amt .err {
+  position: relative;
+}
+
+.amt-title::before,
+.amt .row::before,
+.amt-act::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: var(--sp-4);
+  right: var(--sp-4);
+  border-top: 0.5px solid var(--sep);
+}
+
+.amt-title {
+  padding: 0 var(--sp-4);
+}
+
+.amt-name {
+  display: block;
+  width: 100%;
+  min-height: var(--h-row);
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  text-align: center;
+}
+
+.amt-name::placeholder {
+  color: var(--hint);
+}
+
+.amt-name:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: -2px;
+}
+
+.amt-act {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  width: 100%;
+  min-height: var(--h-row);
+  padding: var(--sp-2) var(--sp-4);
+  color: var(--link);
+}
+
+.amt-act small {
+  color: var(--hint);
+  font-size: var(--fs-callout);
+}
+
+.amt-act:disabled {
+  opacity: 0.45;
+}
+
+.amt-note {
+  padding: 0 var(--sp-4) var(--sp-3);
+  color: var(--hint);
+  font-size: var(--fs-footnote);
+  line-height: 1.4;
+}
+
+.amt .err {
+  padding: 0 var(--sp-4) var(--sp-3);
 }
 
 /* --- Состояния (README, раздел 6) --- */

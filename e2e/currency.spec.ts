@@ -37,7 +37,7 @@ test('трата в лари: курс недоступен, вводим вру
   // При редактировании валюта и курс восстанавливаются.
   await row.click();
   await expect(page.getByLabel('Валюта траты')).toHaveValue('GEL');
-  await expect(page.locator('input.rate')).toHaveValue('34,5');
+  await expect(page.getByLabel('Курс')).toHaveValue('34,5');
   await expect(page.getByPlaceholder('0').first()).toHaveValue('100');
-  expect(text(await page.locator('.rate-hint').first().textContent())).toContain('3 450');
+  expect(text(await page.locator('.amt-note').first().textContent())).toContain('3 450');
 });
