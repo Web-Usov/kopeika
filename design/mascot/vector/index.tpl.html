@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Копейка: единый риг</title>
+<style>
+:root { --bg: #faf7f2; --card: #ffffff; --text: #2a1a10; --muted: #8a7666; --line: #eadfd2; --accent: #e08a17; }
+body.dark { --bg: #17212b; --card: #1f2b38; --text: #f1ece6; --muted: #8c9aa8; --line: #2c3a48; --accent: #f5a524; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 1180px; margin: 0 auto; padding: 20px 16px 60px; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+h2 { font-size: 17px; margin: 32px 0 12px; }
+p.lead { color: var(--muted); margin: 0 0 16px; max-width: 780px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.top { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: 20px; align-items: start; }
+.stage { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 12px; position: sticky; top: 12px; }
+.stage-svg { display: block; width: 100%; height: auto; aspect-ratio: 1; }
+.now { text-align: center; margin: 4px 0 2px; font-weight: 600; font-size: 17px; }
+.use { text-align: center; color: var(--muted); font-size: 13px; min-height: 19px; }
+.fxl { text-align: center; color: var(--accent); font-size: 12.5px; min-height: 18px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 10px; }
+.controls button, .controls label { background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
+.controls button:hover { border-color: var(--accent); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; }
+.thumb { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 6px 6px 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.thumb:hover { border-color: var(--accent); }
+.thumb.on { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
+.thumb svg { width: 100%; height: auto; aspect-ratio: 1; }
+.thumb span { font-size: 12.5px; text-align: center; line-height: 1.2; }
+.scenes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.scene { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 10px; }
+.scene svg { display: block; width: 100%; height: auto; aspect-ratio: 1; }
+.scene figcaption { text-align: center; font-size: 14px; }
+.scene figcaption span { color: var(--muted); font-size: 12.5px; }
+.notes { color: var(--muted); font-size: 13.5px; max-width: 820px; }
+.notes code { font-size: 12.5px; }
+@media (max-width: 720px) { .top { grid-template-columns: 1fr; } .stage { position: static; } }
+</style>
+</head>
+<body>
+%HIDDEN%
+<main>
+<h1>Копейка: единый риг</h1>
+<p class="lead">Лицо из A, эффекты из B, блеск из C — в одном SVG. Нажмите эмоцию: Копейка плавно перейдёт в неё, тип глаза меняется через моргание, эффекты проступают и гаснут. На большой монете всё время идёт фоновый блеск покоя, дыхание и автоморгание.</p>
+
+<section class="top">
+  <div class="stage">
+    %STAGE%
+    <div class="now" id="now">Привет</div>
+    <div class="use" id="use">онбординг, приветствие бота</div>
+    <div class="fxl" id="fxl"></div>
+    <div class="controls">
+      <button id="blink">Моргнуть</button>
+      <label><input type="checkbox" id="autoblink" checked> автоморгание</label>
+      <label><input type="checkbox" id="live" checked> фоновый блеск</label>
+      <label><input type="checkbox" id="slow"> медленно ×4</label>
+      <button id="theme">Тёмный фон</button>
+    </div>
+  </div>
+  <div>
+    <div class="grid" id="thumbs">%THUMBS%</div>
+  </div>
+</section>
+
+<h2>Сцены (SMIL, по кругу; те же файлы лежат в svg/scenes/ и работают через &lt;img&gt;)</h2>
+<div class="scenes">%SCENES%</div>
+
+<h2>Как устроено</h2>
+<div class="notes">
+<p>Слои внутри монеты снизу вверх: монета без вшитых бликов → тонировки (покраснение снизу вверх, вуаль) → блеск (перелив, мягкий проход, полоса, белые дуги, искры обода) → сияние и ручейки слёз → лицо (глаза с веками, морфящийся рот) → румянец ///, щёчки, капля пота, венка, z z, звёздочки обода, искорки. Всё лежит внутри группы сжатия, поэтому эффекты прыгают и сплющиваются вместе с монетой, а румянец, слёзы и капля ещё и ездят вместе с лицом.</p>
+<p>Состояние — набор каналов «элемент.атрибут»: <code>d</code> контуров, <code>opacity</code> слоёв и эффектов, <code>translate/rotate/scale</code>. Переходы на этой странице — интерполяция тех же чисел через <code>setAttribute</code> (CSS-свойство <code>d</code> не используется). Сцены — SMIL.</p>
+</div>
+</main>
+
+<script>
+const DATA = %DATA%;
+const P = 'st';
+const TK = { translate: 1, rotate: 1, scale: 1 };
+const NUM = /-?\d*\.?\d+/g;
+const nodes = {};
+function node(k) {
+  if (!(k in nodes)) nodes[k] = document.getElementById(P + '-' + k.split('.')[0]);
+  return nodes[k];
+}
+function set(k, v) {
+  const nd = node(k); if (!nd) return;
+  const at = k.split('.')[1];
+  if (TK[at]) nd.setAttribute('transform', at + '(' + v + ')'); else nd.setAttribute(at, v);
+}
+function lerpStr(a, b, t) {
+  if (a === b || t >= 1) return b;
+  if (t <= 0) return a;
+  const na = a.match(NUM) || [], nb = b.match(NUM) || [];
+  if (na.length !== nb.length) return t < 0.5 ? a : b;
+  let i = 0;
+  return b.replace(NUM, () => { const x = +na[i], y = +nb[i]; i++; return (x + (y - x) * t).toFixed(2).replace(/\.?0+$/, '') || '0'; });
+}
+const ease = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const fast = u => ease(Math.min(1, u * 2.2));
+let cur = { ...DATA.emotions[0].ch };
+let curSig = { ...DATA.emotions[0].sig };
+for (const k in cur) set(k, cur[k]);
+let token = 0;
+const speed = () => document.getElementById('slow').checked ? 4 : 1;
+
+function anim(to, dur, mid) {
+  const my = ++token;
+  const from = { ...cur }, full = { ...cur, ...to };
+  let midFull = null;
+  if (mid) { midFull = {}; for (const k in full) midFull[k] = k in mid ? mid[k] : lerpStr(from[k], full[k], 0.5); }
+  dur *= speed();
+  return new Promise(res => {
+    const t0 = performance.now();
+    function frame(now) {
+      if (my !== token) return res(false);
+      const t = Math.min(1, (now - t0) / dur);
+      for (const k in full) {
+        // подмена слоёв лица — быстро; эффекты (fx_*) и формы — плавно
+        const q = k.endsWith('.opacity') && !k.startsWith('fx_') ? fast : ease;
+        let v;
+        if (midFull) v = t < 0.5 ? lerpStr(from[k], midFull[k], q(t * 2)) : lerpStr(midFull[k], full[k], q(t * 2 - 1));
+        else v = lerpStr(from[k], full[k], q(t));
+        if (v !== cur[k]) { cur[k] = v; set(k, v); }
+      }
+      if (t < 1) requestAnimationFrame(frame); else res(true);
+    }
+    requestAnimationFrame(frame);
+  });
+}
+function closedFor(sides) {
+  const m = {};
+  for (const k in DATA.closed) if (sides.includes(k.split('.')[0].slice(-1))) m[k] = DATA.closed[k];
+  return m;
+}
+let target = { ...cur };
+function go(ch, sig) {
+  const sw = [];
+  if (sig) for (const s of ['L', 'R']) if (sig[s] && sig[s] !== curSig[s]) sw.push(s);
+  if (sig) Object.assign(curSig, sig);
+  target = { ...target, ...ch };
+  return anim(ch, sw.length ? 520 : 440, sw.length ? closedFor(sw) : null);
+}
+async function blink() {
+  const sides = ['L', 'R'].filter(s => curSig[s].startsWith('ball'));
+  if (!sides.length) return;
+  const back = { ...target };
+  if (await anim(closedFor(sides), 80)) await anim(back, 150);
+}
+function markOn(el) { document.querySelectorAll('.thumb').forEach(b => b.classList.toggle('on', b === el)); }
+function show(e) {
+  document.getElementById('now').textContent = e.label;
+  document.getElementById('use').textContent = e.use;
+  document.getElementById('fxl').textContent = e.fx.join(' · ');
+}
+document.querySelectorAll('.thumb').forEach(b => b.addEventListener('click', () => {
+  const e = DATA.emotions[+b.dataset.emo];
+  go(e.ch, e.sig); markOn(b); show(e);
+}));
+document.querySelector('.thumb').classList.add('on');
+show(DATA.emotions[0]);
+document.getElementById('blink').onclick = blink;
+const stageSvg = document.querySelector('.stage-svg');
+document.getElementById('live').onchange = e => e.target.checked ? stageSvg.unpauseAnimations() : stageSvg.pauseAnimations();
+document.getElementById('theme').onclick = e => {
+  const d = document.body.classList.toggle('dark');
+  e.target.textContent = d ? 'Светлый фон' : 'Тёмный фон';
+};
+(function loop() {
+  setTimeout(() => { if (document.getElementById('autoblink').checked) blink(); loop(); }, 2600 + Math.random() * 2600);
+})();
+// SMIL ставится на паузу в скрытой вкладке — после возврата перезапускаем сцены с начала
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) document.querySelectorAll('.scene svg').forEach(s => s.setCurrentTime(0));
+});
+</script>
+</body>
+</html>

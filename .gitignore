@@ -12,3 +12,9 @@ playwright-report/
 test-results/
 
 __pycache__/
+
+# превью векторной Копейки: кадры, GIF и демо пересобираются (см. design/mascot/README.md)
+design/mascot/vector/preview/frames/
+design/mascot/vector/preview/gif/
+design/mascot/vector/preview/index.html
+design/mascot/vector/preview/data.json
