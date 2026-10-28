@@ -126,6 +126,41 @@ test('a paused template creates nothing; resuming starts from today', async () =
   assert.ok(resumed.body.nextDate >= localDate());
 });
 
+test('an archived group stays archived: due occurrences pass by without expenses', async () => {
+  const u = newUser();
+  const g = await createGroup(u, ['Маша']);
+  const tpl = (await call(u, 'POST', `/groups/${g.id}/recurring`, template(g))).body;
+  await call(u, 'POST', `/groups/${g.id}/archive`);
+  setNext(tpl.id, '2025-01-05');
+
+  assert.equal(runRecurring('2025-03-10'), 0);
+  assert.equal(runRecurring('2025-04-05'), 0);
+  assert.equal((await expensesOf(u, g)).length, 0);
+  assert.equal((await call(u, 'GET', `/groups/${g.id}`)).body.archived, true);
+  const after = (await call(u, 'GET', `/groups/${g.id}/recurring`)).body[0];
+  assert.equal(after.nextDate, '2025-05-05');
+  assert.equal(after.active, true);
+});
+
+test('unarchiving resumes from the nearest date; missed occurrences are not made up', async () => {
+  const u = newUser();
+  const g = await createGroup(u, ['Маша']);
+  const tpl = (await call(u, 'POST', `/groups/${g.id}/recurring`, template(g, { period: 'weekly', day: 1 }))).body;
+  await call(u, 'POST', `/groups/${g.id}/archive`);
+  // The scheduler has not passed yet, so next_date is still in the past at the moment of unarchiving.
+  setNext(tpl.id, '2025-01-06');
+  assert.equal((await call(u, 'POST', `/groups/${g.id}/unarchive`)).body.archived, false);
+
+  const next = (await call(u, 'GET', `/groups/${g.id}/recurring`)).body[0].nextDate;
+  assert.ok(next >= localDate());
+  runRecurring(localDate());
+  assert.ok((await expensesOf(u, g)).every((e) => e.spentOn >= localDate()));
+  runRecurring(next);
+  const list = await expensesOf(u, g);
+  assert.equal(list.length, 1);
+  assert.equal(list[0].spentOn, next);
+});
+
 test('a template whose member was deleted is switched off instead of crashing', async () => {
   const u = newUser();
   const g = await createGroup(u, ['Маша']);
