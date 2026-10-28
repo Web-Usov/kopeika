@@ -52,7 +52,7 @@ const receiptsEn: Record<ReceiptsProvider, { recipient: string; retention: strin
 
 const ru = (r: ReceiptsProvider): Policy => ({
   title: 'Политика конфиденциальности',
-  updated: 'Обновлено: 18 октября 2026',
+  updated: 'Обновлено: 28 октября 2026',
   intro:
     'Копейка — Telegram Mini App для учёта общих трат. Здесь коротко и без юридических формулировок: что мы храним, зачем, кто это видит и как всё удалить.',
   sections: [
@@ -110,7 +110,7 @@ const ru = (r: ReceiptsProvider): Policy => ({
         'в каждой группе, где есть другие участники с Telegram, вы станете участником без Telegram с тем же именем: траты и балансы остальных не меняются, а владельцем группы станет следующий участник;',
         'группы, где вы были единственным участником с Telegram, удаляются целиком, вместе с тратами и историей;',
         'удаляются ваши имя, username, фото, язык, платёжные реквизиты, настройки уведомлений и согласие на распознавание чеков; записи о сканах чеков (только число и стоимость) отвязываются от вас и остаются без имени как учёт расхода на месячный бюджет;',
-        'удаляются ваши напоминания и ссылки для привязки чатов; регулярные траты, которые вы создали, ставятся на паузу (группа может включить их снова);',
+        'удаляются ваши напоминания и ссылки и запросы для привязки чатов; регулярные траты, которые вы создали, ставятся на паузу (группа может включить их снова);',
         'в истории групп записи остаются, но вместо вашего имени там «удалённый пользователь». Названия трат и имя, под которым вы были в группе, остаются в старых записях у остальных участников — как после выхода из группы;',
         'сообщения бота, уже отправленные в Telegram-чаты, остаются в этих чатах.',
       ],
@@ -132,7 +132,7 @@ const ru = (r: ReceiptsProvider): Policy => ({
 
 const en = (r: ReceiptsProvider): Policy => ({
   title: 'Privacy Policy',
-  updated: 'Updated: October 18, 2026',
+  updated: 'Updated: October 28, 2026',
   intro:
     'Kopeika is a Telegram Mini App for splitting shared expenses. This is a short, plain-language description of what we store, why, who can see it and how to delete it all.',
   sections: [
@@ -188,7 +188,7 @@ const en = (r: ReceiptsProvider): Policy => ({
         'in every group that has other members with Telegram, you become a member without Telegram under the same name: other people’s expenses and balances do not change, and the next member becomes the group owner;',
         'groups where you were the only member with Telegram are deleted entirely, with their expenses and history;',
         'your name, username, photo, language, payment details, notification settings and receipt-scanning consent are deleted; receipt scan records (only count and cost) are detached from you and kept without a name as cost accounting for the monthly budget;',
-        'your reminders and chat-linking links are deleted; recurring expenses you created are paused (the group can turn them back on);',
+        'your reminders and chat-linking links and requests are deleted; recurring expenses you created are paused (the group can turn them back on);',
         'history entries stay in the groups, but your name is replaced with “deleted user”. Expense titles and the name you had in the group remain in older entries for the other members, as after leaving a group;',
         'bot messages already sent to Telegram chats stay in those chats.',
       ],
