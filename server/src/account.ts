@@ -41,7 +41,7 @@ export function leaveGroup(group: GroupRow, me: MemberRow, userId: number) {
  * Deletes everything that identifies the user, in one transaction:
  * - groups where nobody else has Telegram are deleted whole;
  * - in the other groups the user leaves (name-only member, ownership passed on), history stays for the others;
- * - their reminders, chat-link tokens and recurring templates are removed or stopped;
+ * - their reminders, chat-link tokens, pending chat requests and recurring templates are removed or stopped;
  * - expenses, history entries and templates they authored point at the "deleted user" placeholder;
  * - the users row (name, username, photo, language, payment details, notification flag, receipt consent and its
  *   provider) is deleted.
@@ -69,6 +69,7 @@ export function deleteAccount(userId: number) {
     run('UPDATE receipt_scans SET user_id = ? WHERE user_id = ?', DELETED_USER_ID, userId);
     run('UPDATE receipt_access_requests SET requested_by = ? WHERE requested_by = ?', DELETED_USER_ID, userId);
     run('DELETE FROM chat_links WHERE created_by_user = ?', userId);
+    run('DELETE FROM chat_requests WHERE user_id = ?', userId);
     // A template would keep creating expenses on behalf of a person who is gone: stop it, the group can resume it.
     run('UPDATE recurring SET active = 0, created_by = ? WHERE created_by = ?', DELETED_USER_ID, userId);
     run('UPDATE expenses SET created_by = ? WHERE created_by = ?', DELETED_USER_ID, userId);

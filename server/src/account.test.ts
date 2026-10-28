@@ -217,6 +217,16 @@ test('delete: reminders and chat-link tokens of the user are removed, recurring 
   assert.notEqual(theirs.created_by, 0);
 });
 
+test('delete: chat requests of the user are removed, others stay', async () => {
+  const { owner, guest, g } = await sharedSetup();
+  const mine = chatLink.createChatRequest(guest, g.id);
+  const theirs = chatLink.createChatRequest(owner, g.id);
+  await call(guest, 'DELETE', '/me');
+  assert.equal(count('SELECT COUNT(*) n FROM chat_requests WHERE user_id = ?', guest), 0);
+  assert.equal(count('SELECT COUNT(*) n FROM chat_requests WHERE id = ?', mine), 0);
+  assert.equal(count('SELECT COUNT(*) n FROM chat_requests WHERE id = ?', theirs), 1);
+});
+
 test('delete: history entries stay, the actor shows as a deleted user in both languages', async () => {
   const { owner, guest, g } = await sharedSetup();
   const names = async (lang: string) =>
