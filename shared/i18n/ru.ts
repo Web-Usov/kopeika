@@ -838,6 +838,7 @@ export const ru = {
     expenseNotFound: 'Трата не найдена',
     recurringNotFound: 'Регулярная трата не найдена',
     invalidData: 'Некорректные данные',
+    payloadTooLarge: 'Слишком большой запрос',
     internal: 'Внутренняя ошибка сервера',
     shareUnavailable: 'Бот сейчас недоступен — попробуйте чуть позже',
     exportBotUnavailable:

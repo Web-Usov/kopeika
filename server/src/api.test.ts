@@ -1180,3 +1180,56 @@ test('share: non-member 404, demo group 409, bad kind 400, bot unavailable 503, 
     botModule.setBotTestHooks({ chatMember: async () => 'administrator' });
   }
 });
+
+test('a body that is not valid JSON is a 400 in the request language and sends no server alert', async () => {
+  const alerts = await import('./alerts.ts');
+  const reported: unknown[] = [];
+  const original = alerts.alerter.report;
+  alerts.alerter.report = async (ev) => {
+    reported.push(ev);
+  };
+  try {
+    const u = newUser();
+    const put = async (lang?: string) => {
+      const headers: Record<string, string> = { Authorization: `dev ${u}`, 'Content-Type': 'application/json' };
+      if (lang) headers['X-Lang'] = lang;
+      const res = await api.request('/me', { method: 'PUT', headers, body: '{oops' });
+      return { status: res.status, body: (await res.json()) as Json };
+    };
+    const ru = await put();
+    assert.equal(ru.status, 400);
+    assert.equal(ru.body.error, 'Некорректные данные');
+    const en = await put('en');
+    assert.equal(en.status, 400);
+    assert.equal(en.body.error, 'Invalid data');
+    assert.deepEqual(reported, []);
+  } finally {
+    alerts.alerter.report = original;
+  }
+});
+
+test('a body over the size limit is a 413 with a translated message', async () => {
+  const u = newUser();
+  const big = JSON.stringify({ name: 'x'.repeat(256 * 1024 + 1) });
+  const post = async (headers: Record<string, string>) => {
+    const res = await api.request('/groups', {
+      method: 'POST',
+      headers: { Authorization: `dev ${u}`, 'Content-Type': 'application/json', ...headers },
+      body: big,
+    });
+    return { status: res.status, body: (await res.json()) as Json };
+  };
+  const ru = await post({});
+  assert.equal(ru.status, 413);
+  assert.equal(ru.body.error, 'Слишком большой запрос');
+  const en = await post({ 'X-Lang': 'en' });
+  assert.equal(en.status, 413);
+  assert.equal(en.body.error, 'The request is too large');
+  const small = await api.request('/client-errors', {
+    method: 'POST',
+    headers: { Authorization: `dev ${u}`, 'Content-Type': 'application/json', 'X-Lang': 'en' },
+    body: JSON.stringify({ message: 'x'.repeat(9 * 1024) }),
+  });
+  assert.equal(small.status, 413);
+  assert.equal(((await small.json()) as Json).error, 'The request is too large');
+});

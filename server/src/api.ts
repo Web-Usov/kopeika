@@ -1,5 +1,5 @@
 import { GrammyError, HttpError } from 'grammy';
-import { Hono } from 'hono';
+import { type Context, Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
 import { categoryTotals, DEFAULT_CATEGORY } from '../../shared/categories.ts';
@@ -102,11 +102,27 @@ api.onError((err, c) => {
   return c.json({ error: t('errors.internal') }, 500);
 });
 
+// Body limits run before auth, so there is no user language yet: X-Lang in dev, else Accept-Language (Russian if absent).
+const tooLargeText = (c: Context<Env>) =>
+  createT(pickLang(config.devAuth ? c.req.header('x-lang') : c.req.header('accept-language')))(
+    'errors.payloadTooLarge',
+  );
+
 // Request bodies are small JSON; refuse anything bigger before it is read into memory.
 // The receipt photo route has a bigger limit of its own (see below), so it skips this one.
-const smallBodyLimit = bodyLimit({ maxSize: 256 * 1024, onError: (c) => c.json({ error: 'Payload too large' }, 413) });
+const smallBodyLimit = bodyLimit({ maxSize: 256 * 1024, onError: (c) => c.json({ error: tooLargeText(c) }, 413) });
 const RECEIPT_PARSE_PATH = /\/groups\/[^/]+\/receipts\/parse$/;
 api.use('*', (c, next) => (RECEIPT_PARSE_PATH.test(c.req.path) ? next() : smallBodyLimit(c, next)));
+
+/** Reads the JSON body; a body that is not JSON is the client's fault (400), not a server error. */
+async function jsonBody(c: Context<Env>): Promise<unknown> {
+  try {
+    return await c.req.json();
+  } catch (err) {
+    if (err instanceof SyntaxError) throw fail(400, 'errors.invalidData');
+    throw err;
+  }
+}
 
 // --- Auth: every /api request carries "Authorization: tma <initData>" ---
 api.use('*', async (c, next) => {
@@ -167,10 +183,10 @@ const clientErrorBody = z
 
 api.post(
   '/client-errors',
-  bodyLimit({ maxSize: 8 * 1024, onError: (c) => c.json({ error: 'Payload too large' }, 413) }),
+  bodyLimit({ maxSize: 8 * 1024, onError: (c) => c.json({ error: tooLargeText(c) }, 413) }),
   async (c) => {
     if (!clientErrorsLimiter.allow(c.get('user').id)) throw fail(429, 'errors.tooMany');
-    const r = clientErrorBody.parse(await c.req.json());
+    const r = clientErrorBody.parse(await jsonBody(c));
     console.warn(`client error ${JSON.stringify(r)}`);
     void alerter.report({
       source: 'client',
@@ -225,7 +241,7 @@ api.get('/me', (c) => {
 });
 
 api.put('/me', async (c) => {
-  const body = z.object({ notify: z.boolean() }).parse(await c.req.json());
+  const body = z.object({ notify: z.boolean() }).parse(await jsonBody(c));
   run('UPDATE users SET notify = ? WHERE id = ?', body.notify ? 1 : 0, c.get('user').id);
   return c.json({ ok: true });
 });
@@ -263,7 +279,7 @@ api.get('/me/payment-info', (c) => {
 });
 
 api.put('/me/payment-info', async (c) => {
-  const info = parsePaymentInfo(paymentInfoBody.parse(await c.req.json()));
+  const info = parsePaymentInfo(paymentInfoBody.parse(await jsonBody(c)));
   run('UPDATE users SET payment_info = ? WHERE id = ?', serialize(info), c.get('user').id);
   return c.json(info);
 });
@@ -279,7 +295,7 @@ api.post('/groups', async (c) => {
       currency: z.enum(CURRENCIES as [string, ...string[]]),
       memberNames: z.array(name).max(50).default([]),
     })
-    .parse(await c.req.json());
+    .parse(await jsonBody(c));
   const groupId = tx(() => {
     assertCanJoinMoreGroups(user.id);
     assertRoomForMembers(0, 1 + body.memberNames.length);
@@ -316,7 +332,7 @@ api.get('/groups/:id', (c) => {
 
 api.patch('/groups/:id', async (c) => {
   const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
-  const body = z.object({ name }).parse(await c.req.json());
+  const body = z.object({ name }).parse(await jsonBody(c));
   tx(() => {
     run('UPDATE groups SET name = ? WHERE id = ?', body.name, group.id);
     if (body.name !== group.name)
@@ -404,7 +420,7 @@ api.post('/groups/:id/invite/rotate', (c) => {
 // --- Members ---
 api.post('/groups/:id/members', async (c) => {
   const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
-  const body = z.object({ name }).parse(await c.req.json());
+  const body = z.object({ name }).parse(await jsonBody(c));
   tx(() => {
     assertRoomForMembers(group.id);
     const res = run('INSERT INTO members (group_id, name) VALUES (?, ?)', group.id, body.name);
@@ -418,7 +434,7 @@ api.patch('/groups/:id/members/:memberId', async (c) => {
   const body = z
     .object({ name: name.optional(), paymentInfo: paymentInfoBody.optional() })
     .refine((b) => b.name !== undefined || b.paymentInfo !== undefined)
-    .parse(await c.req.json());
+    .parse(await jsonBody(c));
   const memberId = idParam(c.req.param('memberId'));
   const member = one<MemberRow>('SELECT * FROM members WHERE id = ? AND group_id = ?', memberId, group.id);
   if (!member) throw fail(404, 'errors.memberNotFound');
@@ -499,7 +515,7 @@ api.get('/chat-links/:token', (c) => {
 
 api.post('/chat-links/:token/attach', async (c) => {
   const user = c.get('user');
-  const body = z.object({ groupId: z.number().int().positive() }).parse(await c.req.json());
+  const body = z.object({ groupId: z.number().int().positive() }).parse(await jsonBody(c));
   const link = loadChatLink(c.req.param('token'));
   const { group, me } = loadGroupFor(String(body.groupId), user.id);
   if (group.is_demo) throw fail(409, 'errors.demoNotAllowed');
@@ -538,7 +554,7 @@ api.post('/groups/:id/chat/request', async (c) => {
 
 api.put('/groups/:id/chat/feed', async (c) => {
   const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
-  const { feed } = z.object({ feed: z.enum(CHAT_FEEDS as [ChatFeed, ...ChatFeed[]]) }).parse(await c.req.json());
+  const { feed } = z.object({ feed: z.enum(CHAT_FEEDS as [ChatFeed, ...ChatFeed[]]) }).parse(await jsonBody(c));
   if (group.is_demo) throw fail(409, 'errors.demoNotAllowed');
   if (group.chat_id === null) throw fail(409, 'errors.chatNotLinked');
   run('UPDATE groups SET chat_feed = ? WHERE id = ?', feed, group.id);
@@ -547,7 +563,7 @@ api.put('/groups/:id/chat/feed', async (c) => {
 
 api.put('/groups/:id/auto-remind', async (c) => {
   const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
-  const { enabled } = z.object({ enabled: z.boolean() }).parse(await c.req.json());
+  const { enabled } = z.object({ enabled: z.boolean() }).parse(await jsonBody(c));
   if (group.is_demo) throw fail(409, 'errors.demoNotAllowed');
   if (enabled !== (group.auto_remind === 1)) {
     tx(() => {
@@ -581,7 +597,7 @@ api.post('/invite/:code/join', async (c) => {
   const user = c.get('user');
   const body = z
     .object({ claimMemberId: z.number().int().positive().optional(), source: z.enum(['link', 'card']).optional() })
-    .parse(await c.req.json());
+    .parse(await jsonBody(c));
   const group = one<GroupRow>('SELECT * FROM groups WHERE invite_code = ? AND is_demo = 0', c.req.param('code'));
   if (!group) throw fail(404, 'errors.inviteInvalid');
   // Old clients send no source: that is a plain invite link.
@@ -676,7 +692,7 @@ api.post(
     let success = false;
     try {
       if (!canScan(group.id, new Date(), othersInFlight(group.id))) throw fail(429, 'errors.receipt.groupLimit');
-      const body = receiptBody.parse(await c.req.json());
+      const body = receiptBody.parse(await jsonBody(c));
       const mediaType = body.mediaType as (typeof MEDIA_TYPES)[number];
       const bytes = Buffer.from(body.image, 'base64');
       if (bytes.length === 0 || !matchesSignature(bytes, mediaType)) throw fail(400, 'errors.invalidData');
@@ -707,7 +723,7 @@ api.post('/groups/:id/receipts/access-request', (c) => {
 api.post('/groups/:id/expenses', async (c) => {
   const user = c.get('user');
   const { group, me } = loadGroupFor(c.req.param('id'), user.id);
-  const body = expenseBody.parse(await c.req.json());
+  const body = expenseBody.parse(await jsonBody(c));
   const expense = tx(() => createExpense(group, user.id, body, c.get('lang')));
   notifyExpense(group, expense, user.id, me.name);
   return c.json(detail({ ...group, archived_at: null }, me), 201);
@@ -744,7 +760,7 @@ api.post('/groups/:id/share', async (c) => {
   const lang = c.get('lang');
   const { group } = loadGroupFor(c.req.param('id'), user.id);
   if (group.is_demo) throw fail(409, 'errors.demoNotAllowed');
-  const { kind } = z.object({ kind: z.enum(['balance', 'summary']) }).parse(await c.req.json());
+  const { kind } = z.object({ kind: z.enum(['balance', 'summary']) }).parse(await jsonBody(c));
   if (!canPrepareShare()) throw fail(503, 'errors.shareUnavailable');
   let text: string;
   if (kind === 'balance') {
@@ -786,7 +802,7 @@ api.put('/groups/:id/expenses/:expenseId', async (c) => {
   const expenseId = idParam(c.req.param('expenseId'));
   const existing = one<ExpenseRow>('SELECT * FROM expenses WHERE id = ? AND group_id = ?', expenseId, group.id);
   if (!existing) throw fail(404, 'errors.expenseNotFound');
-  const body = expenseBody.parse(await c.req.json());
+  const body = expenseBody.parse(await jsonBody(c));
   body.kind = existing.kind;
   const { computed, rate } = validateExpense(group, body, c.get('lang'));
   const before = loadExpenseSnap(expenseId);
@@ -866,7 +882,7 @@ api.post('/groups/:id/recurring', async (c) => {
   const { group } = loadGroupFor(c.req.param('id'), user.id);
   if (group.is_demo) throw fail(409, 'errors.demoNotAllowed');
   assertRoomForRecurring(group.id);
-  const body = recurringCreate.parse(await c.req.json());
+  const body = recurringCreate.parse(await jsonBody(c));
   const today = localDate();
   // Never earlier than today: a template does not back-fill the past.
   const start = body.startDate && body.startDate > today ? body.startDate : today;
@@ -912,7 +928,7 @@ api.post('/groups/:id/recurring', async (c) => {
 api.patch('/groups/:id/recurring/:rid', async (c) => {
   const { group } = loadGroupFor(c.req.param('id'), c.get('user').id);
   const existing = loadRecurring(group, c.req.param('rid'));
-  const body = recurringPatch.parse(await c.req.json());
+  const body = recurringPatch.parse(await jsonBody(c));
   const next: RecurringRow = {
     ...existing,
     title: body.title ?? existing.title,
@@ -973,7 +989,7 @@ const REMIND_WINDOW_SQL = "datetime('now', '-1 day')";
 
 api.post('/groups/:id/remind', async (c) => {
   const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
-  const { memberId } = z.object({ memberId: z.number().int().positive() }).parse(await c.req.json());
+  const { memberId } = z.object({ memberId: z.number().int().positive() }).parse(await jsonBody(c));
   const d = detail(group, me);
   const debt = d.settlements.find((s) => s.from === memberId && s.to === me.id);
   if (!debt) throw fail(409, 'errors.remindNotAllowed');
