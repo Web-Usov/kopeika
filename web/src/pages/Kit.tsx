@@ -30,6 +30,7 @@ import {
   EmptyState,
   ErrorView,
   ExpenseRow,
+  Fact,
   FieldRow,
   GroupActions,
   GroupHeader,
@@ -38,6 +39,7 @@ import {
   InviteCard,
   LegalLinks,
   Loading,
+  Medal,
   Money,
   OkLine,
   PickRow,
@@ -50,6 +52,7 @@ import {
   ScreenTitle,
   Section,
   Segmented,
+  StackBar,
   Stepper,
   Steps,
   Switch,
@@ -758,6 +761,61 @@ export function Kit() {
             <Button>{t('quick.add')}</Button>
             <Button variant="fill">{t('quick.edit')}</Button>
           </QuickPreview>
+        </Variant>
+        <Variant label="StackBar">
+          <Card>
+            <StackBar
+              items={[
+                { tone: 'food', value: 42, label: t(categoryKey('food')) },
+                { tone: 'groc', value: 24, label: t(categoryKey('groceries')) },
+                { tone: 'taxi', value: 18, label: t(categoryKey('transport')) },
+                { tone: 'other', value: 6, label: t(categoryKey('other')) },
+              ]}
+            />
+          </Card>
+        </Variant>
+        <Variant label="Fact">
+          <div className="facts">
+            <Fact
+              icon="food"
+              tone="food"
+              label={t('summary.topCategory')}
+              value={t(categoryKey('food'))}
+              caption={<Money value={4200000} currency="RUB" />}
+            />
+            <Fact
+              icon="flame"
+              tone="neg"
+              label={t('summary.topDay')}
+              value="12.07"
+              caption={<Money value={1850000} currency="RUB" />}
+            />
+            <Fact
+              compact
+              icon="gem"
+              tone="fun"
+              label={t('summary.biggest')}
+              value={
+                <>
+                  <b>12 000 ₽</b> · {t('kit.sampleEmptyTitle')}
+                </>
+              }
+            />
+          </div>
+        </Variant>
+        <Variant label="Medal">
+          <div className="medals">
+            <Medal icon="sprout" title={t('achievements.items.first.title')} unlocked />
+            <Medal
+              icon="receipt"
+              title={t('achievements.items.ten.title')}
+              unlocked={false}
+              progress={{ current: 5, target: 10 }}
+              count={10}
+            />
+
+            <Medal icon="palette" title={t('achievements.items.allCategories.title')} unlocked={false} />
+          </div>
         </Variant>
         <Variant label="OkLine">
           <OkLine>{t('kit.sampleOk')}</OkLine>

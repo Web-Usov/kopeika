@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { ACHIEVEMENT_EMOJI, achievementTextKey, achievementTitleKey } from '../../../shared/achievements.ts';
-import { categoryEmoji, categoryKey } from '../../../shared/categories.ts';
+import { type AchievementId, achievementTextKey, achievementTitleKey } from '../../../shared/achievements.ts';
+import { type CategoryTotal, categoryIcon, categoryKey, categoryTone } from '../../../shared/categories.ts';
 import { formatMoney } from '../../../shared/money.ts';
-import { type GroupSummary, periodText, shortDay, summaryShareText } from '../../../shared/summary.ts';
+import { type GroupSummary, summaryShareText } from '../../../shared/summary.ts';
 import { api, useGroup } from '../api.ts';
-import { lang, t } from '../i18n.ts';
+import { dateLocale, lang, t } from '../i18n.ts';
+import type { IconName } from '../icons.tsx';
 import { navigate } from '../router.ts';
 import {
   alertDialog,
@@ -16,25 +17,66 @@ import {
   shareLink,
   shareMessage,
 } from '../tg.tsx';
-import { Avatar, ErrorView, Loading, Row, Section } from '../ui.tsx';
+import {
+  Avatar,
+  Badge,
+  Card,
+  Emblem,
+  EmptyState,
+  ErrorView,
+  Fact,
+  Loading,
+  Medal,
+  Row,
+  RowValue,
+  Screen,
+  ScreenTitle,
+  Section,
+  StackBar,
+} from '../ui.tsx';
+
+const ACHIEVEMENT_ICON: Record<AchievementId, IconName> = {
+  first: 'sprout',
+  crew: 'users',
+  ten: 'receipt',
+  hundred: 'flame',
+  travelers: 'globe',
+  allCategories: 'palette',
+  clean: 'check',
+  week: 'calendar',
+  month: 'clock',
+};
+
+const dateOf = (iso: string) => {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
+};
+const COUNTED: AchievementId[] = ['ten', 'hundred', 'week', 'month'];
+
+const cx = (...parts: (string | false)[]) => parts.filter(Boolean).join(' ');
 
 export function Summary({ id }: { id: number }) {
   const { data: g, error } = useGroup(id);
   // The group payload only carries the newest expenses, so the summary is computed by the server over all of them.
   const [s, setS] = useState<GroupSummary>();
   const [summaryError, setSummaryError] = useState<string>();
+  const [categories, setCategories] = useState<CategoryTotal[]>([]);
   const stamp = g ? `${g.expensesTotal}:${g.totalSpent}` : '';
   useEffect(() => {
     if (!stamp) return;
     api.summary(id).then(setS, (e: Error) => setSummaryError(e.message));
+    api.stats(id).then(
+      (r) => setCategories(r.group),
+      () => {},
+    );
   }, [id, stamp]);
   const back = <BackButton onClick={() => navigate(`/g/${id}`, { replace: true })} />;
   if (!g || !s)
     return (
-      <div className="page">
+      <Screen>
         {back}
         {error || summaryError ? <ErrorView message={(error ?? summaryError)!} /> : <Loading />}
-      </div>
+      </Screen>
     );
 
   const money = (n: number) => formatMoney(n, g.currency, lang);
@@ -42,14 +84,10 @@ export function Summary({ id }: { id: number }) {
 
   if (s.count === 0) {
     return (
-      <div className="page">
+      <Screen>
         {back}
-        <div className="empty">
-          <div className="empty-emoji">🏆</div>
-          <p>{t('summary.empty')}</p>
-          <p className="hint">{t('summary.emptyHint')}</p>
-        </div>
-      </div>
+        <EmptyState icon="trophy" tone="brand" title={t('summary.empty')} hint={t('summary.emptyHint')} />
+      </Screen>
     );
   }
 
@@ -74,93 +112,127 @@ export function Summary({ id }: { id: number }) {
   };
 
   const maxPaid = Math.max(1, ...s.members.map((m) => Math.max(m.paid, m.consumed)));
+  const unlocked = achievements.filter((a) => a.unlocked).length;
+  const biggest = s.biggest && g.expenses.find((e) => e.id === s.biggest?.id);
+  const totalText = money(s.total);
+  const dayFmt = new Intl.DateTimeFormat(dateLocale, { day: 'numeric', month: 'long', timeZone: 'UTC' });
+  const day = (iso: string) => dayFmt.format(dateOf(iso));
+  const period =
+    !s.firstDay || !s.lastDay
+      ? ''
+      : s.firstDay === s.lastDay
+        ? day(s.firstDay)
+        : dayFmt.formatRange(dateOf(s.firstDay), dateOf(s.lastDay));
+  const medals = [...achievements].sort((a, b) => Number(b.unlocked) - Number(a.unlocked));
 
   return (
-    <div className="page">
+    <Screen>
       {back}
-      <header className="group-header">
-        <div className="hero-emoji">🏆</div>
-        <h2>{g.name}</h2>
-        <div className="hint">{periodText(s, lang)}</div>
+      <header className="sum-head">
+        <Emblem icon="trophy" tone="brand" />
+        <ScreenTitle center lead={`${period} · ${t('common.members', { count: g.members.length })}`}>
+          {g.name}
+        </ScreenTitle>
       </header>
 
-      <div className="summary-card summary-hero">
-        <div className="summary-label">{t('summary.total')}</div>
-        <div className="summary-big">{money(s.total)}</div>
-        <div className="summary-label">{t('summary.expensesCount', { count: s.count })}</div>
-      </div>
-
-      <div className="summary-grid">
-        {s.topCategory && (
-          <div className="summary-card">
-            <div className="summary-emoji">{categoryEmoji(s.topCategory.category)}</div>
-            <div className="summary-label">{t('summary.topCategory')}</div>
-            <div className="summary-value">{t(categoryKey(s.topCategory.category))}</div>
-            <div className="summary-label">{money(s.topCategory.amount)}</div>
-          </div>
+      <Card className="sum-total">
+        <div className="sum-total-label">
+          {t('summary.total')} · {t('summary.expensesCount', { count: s.count })}
+        </div>
+        <div className={cx('sum-total-amount', totalText.length > 11 && 'long')}>{totalText}</div>
+        {categories.length > 0 && (
+          <StackBar
+            items={categories.map((c) => ({
+              tone: categoryTone(c.category),
+              value: c.amount,
+              label: t(categoryKey(c.category)),
+            }))}
+          />
         )}
-        {s.topDay && (
-          <div className="summary-card">
-            <div className="summary-emoji">🔥</div>
-            <div className="summary-label">{t('summary.topDay')}</div>
-            <div className="summary-value">{shortDay(s.topDay.day, lang)}</div>
-            <div className="summary-label">{money(s.topDay.amount)}</div>
-          </div>
-        )}
-      </div>
+      </Card>
 
-      {s.biggest && (
-        <div className="summary-card">
-          <div className="summary-emoji">💎</div>
-          <div className="summary-label">{t('summary.biggest')}</div>
-          <div className="summary-value">{money(s.biggest.amount)}</div>
-          <div className="summary-label">{t('summary.biggestBy', { name: name(s.biggest.payerId) })}</div>
+      {(s.topCategory || s.topDay || s.biggest) && (
+        <div className="facts">
+          {s.topCategory && (
+            <Fact
+              icon={categoryIcon(s.topCategory.category)}
+              tone={categoryTone(s.topCategory.category)}
+              label={t('summary.topCategory')}
+              value={t(categoryKey(s.topCategory.category))}
+              caption={money(s.topCategory.amount)}
+            />
+          )}
+          {s.topDay && (
+            <Fact
+              icon="flame"
+              tone="neg"
+              label={t('summary.topDay')}
+              value={day(s.topDay.day)}
+              caption={money(s.topDay.amount)}
+            />
+          )}
+          {s.biggest && (
+            <Fact
+              compact
+              icon="gem"
+              tone="fun"
+              label={t('summary.biggest')}
+              value={
+                <>
+                  <b>{money(s.biggest.amount)}</b>
+                  {biggest && ` · ${biggest.title}`}
+                </>
+              }
+            />
+          )}
         </div>
       )}
 
-      <Section title={t('summary.members')}>
+      <Section title={t('summary.members')} inset={64} footer={t('summary.titlesNote')}>
         {s.members.map((m) => (
           <Row
             key={m.id}
-            left={<Avatar member={g.members.find((x) => x.id === m.id)!} />}
-            title={m.name}
-            subtitle={
+            left={<Avatar member={g.members.find((x) => x.id === m.id)!} size="m" />}
+            title={
               <>
-                {m.title && (
-                  <span className="title-chip">
-                    {m.title.emoji} {m.title.label}
-                  </span>
-                )}
-                <span className="bar">
-                  <span className="accent" style={{ width: `${(m.paid / maxPaid) * 100}%` }} />
-                </span>
+                {m.name}
+                {m.title && <Badge tone="brand">{m.title.label}</Badge>}
               </>
             }
-            right={
-              <span className="stack-right">
-                <span>{t('summary.paid', { amount: money(m.paid) })}</span>
-                <span className="hint small">{t('summary.consumed', { amount: money(m.consumed) })}</span>
+            subtitle={
+              <span className="paid-bar" aria-hidden="true">
+                <span style={{ width: `${(m.paid / maxPaid) * 100}%` }} />
               </span>
+            }
+            right={
+              <RowValue amount={<b>{money(m.paid)}</b>} caption={t('summary.part', { amount: money(m.consumed) })} />
             }
           />
         ))}
       </Section>
 
-      <Section title={t('achievements.title')}>
-        {achievements.map((a) => (
-          <div key={a.id} className={`achievement ${a.unlocked ? 'unlocked' : 'locked'}`}>
-            <div className="achievement-emoji">{ACHIEVEMENT_EMOJI[a.id]}</div>
-            <div className="achievement-body">
-              <div className="achievement-title">{t(achievementTitleKey(a.id))}</div>
-              <div className="hint small">{t(achievementTextKey(a.id))}</div>
-            </div>
-            {a.progress && (
-              <div className="achievement-progress hint small">
-                {t('achievements.progress', { current: a.progress.current, target: a.progress.target })}
-              </div>
-            )}
-          </div>
-        ))}
+      <Section
+        title={t('achievements.title')}
+        aside={
+          <span className="sum-count">
+            {t('achievements.counterOf', { done: unlocked, total: achievements.length })}
+          </span>
+        }
+        bare
+      >
+        <div className="medals">
+          {medals.map((a) => (
+            <Medal
+              key={a.id}
+              icon={ACHIEVEMENT_ICON[a.id]}
+              title={t(achievementTitleKey(a.id))}
+              hint={t(achievementTextKey(a.id))}
+              unlocked={a.unlocked}
+              progress={a.progress}
+              count={COUNTED.includes(a.id) ? a.progress?.target : undefined}
+            />
+          ))}
+        </div>
       </Section>
 
       <MainButton
@@ -170,6 +242,6 @@ export function Summary({ id }: { id: number }) {
           share();
         }}
       />
-    </div>
+    </Screen>
   );
 }
