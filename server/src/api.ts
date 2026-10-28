@@ -580,7 +580,12 @@ api.put('/groups/:id/chat/feed', async (c) => {
   const { feed } = z.object({ feed: z.enum(CHAT_FEEDS as [ChatFeed, ...ChatFeed[]]) }).parse(await jsonBody(c));
   if (group.is_demo) throw fail(409, 'errors.demoNotAllowed');
   if (group.chat_id === null) throw fail(409, 'errors.chatNotLinked');
-  run('UPDATE groups SET chat_feed = ? WHERE id = ?', feed, group.id);
+  if (feed !== group.chat_feed) {
+    tx(() => {
+      run('UPDATE groups SET chat_feed = ? WHERE id = ?', feed, group.id);
+      logActivity(group.id, c.get('user').id, 'group.chat_feed', { to: feed });
+    });
+  }
   return c.json(detail({ ...group, chat_feed: feed }, me));
 });
 
@@ -927,24 +932,27 @@ api.post('/groups/:id/recurring', async (c) => {
     created_at: '',
   };
   validateTemplate(group, row, c.get('lang'));
-  const res = run(
-    `INSERT INTO recurring (group_id, created_by, title, category, amount, payer_id, split_mode, shares, period, day,
+  const created = tx(() => {
+    const res = run(
+      `INSERT INTO recurring (group_id, created_by, title, category, amount, payer_id, split_mode, shares, period, day,
                             start_date, next_date)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    row.group_id,
-    row.created_by,
-    row.title,
-    row.category,
-    row.amount,
-    row.payer_id,
-    row.split_mode,
-    row.shares,
-    row.period,
-    row.day,
-    row.start_date,
-    row.next_date,
-  );
-  const created = one<RecurringRow>('SELECT * FROM recurring WHERE id = ?', Number(res.lastInsertRowid))!;
+      row.group_id,
+      row.created_by,
+      row.title,
+      row.category,
+      row.amount,
+      row.payer_id,
+      row.split_mode,
+      row.shares,
+      row.period,
+      row.day,
+      row.start_date,
+      row.next_date,
+    );
+    logActivity(group.id, user.id, 'recurring.create', { name: row.title });
+    return one<RecurringRow>('SELECT * FROM recurring WHERE id = ?', Number(res.lastInsertRowid))!;
+  });
   return c.json(recurringDto(created), 201);
 });
 
@@ -970,28 +978,37 @@ api.patch('/groups/:id/recurring/:rid', async (c) => {
     next.period !== existing.period || next.day !== existing.day || (next.active === 1 && existing.active === 0);
   if (rescheduled) next.next_date = firstOccurrence(next.period, next.day, localDate());
   validateTemplate(group, next, c.get('lang'));
-  run(
-    `UPDATE recurring SET title = ?, category = ?, amount = ?, payer_id = ?, split_mode = ?, shares = ?, period = ?,
+  tx(() => {
+    run(
+      `UPDATE recurring SET title = ?, category = ?, amount = ?, payer_id = ?, split_mode = ?, shares = ?, period = ?,
        day = ?, active = ?, next_date = ? WHERE id = ?`,
-    next.title,
-    next.category,
-    next.amount,
-    next.payer_id,
-    next.split_mode,
-    next.shares,
-    next.period,
-    next.day,
-    next.active,
-    next.next_date,
-    existing.id,
-  );
+      next.title,
+      next.category,
+      next.amount,
+      next.payer_id,
+      next.split_mode,
+      next.shares,
+      next.period,
+      next.day,
+      next.active,
+      next.next_date,
+      existing.id,
+    );
+    logActivity(group.id, c.get('user').id, 'recurring.update', {
+      name: next.title,
+      ...(next.active !== existing.active && { enabled: next.active === 1 }),
+    });
+  });
   return c.json(recurringDto(next));
 });
 
 api.delete('/groups/:id/recurring/:rid', (c) => {
   const { group } = loadGroupFor(c.req.param('id'), c.get('user').id);
   const r = loadRecurring(group, c.req.param('rid'));
-  run('DELETE FROM recurring WHERE id = ?', r.id);
+  tx(() => {
+    run('DELETE FROM recurring WHERE id = ?', r.id);
+    logActivity(group.id, c.get('user').id, 'recurring.delete', { name: r.title });
+  });
   return c.json({ ok: true });
 });
 

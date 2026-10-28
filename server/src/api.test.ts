@@ -1071,6 +1071,17 @@ test('chat feed setting: members only, needs a linked chat, rejects garbage, res
   assert.equal(res.status, 200);
   assert.deepEqual(res.body.chat, { title: 'Друзья', feed: 'daily' });
   assert.equal((await call(u, 'GET', `/groups/${g.id}`)).body.chat.feed, 'daily');
+  const feedLog = async () =>
+    ((await call(u, 'GET', `/groups/${g.id}/activity`)).body.items as { action: string; payload: unknown }[]).filter(
+      (h) => h.action === 'group.chat_feed',
+    );
+  // one entry for the change; the same value again writes nothing
+  assert.deepEqual(
+    (await feedLog()).map((h) => h.payload),
+    [{ to: 'daily' }],
+  );
+  assert.equal((await call(u, 'PUT', `/groups/${g.id}/chat/feed`, { feed: 'daily' })).status, 200);
+  assert.equal((await feedLog()).length, 1);
   await call(u, 'POST', `/chat-links/${chatLink.createChatLink(newChat(), 'Другой', u)}/attach`, { groupId: g.id });
   assert.equal((await call(u, 'GET', `/groups/${g.id}`)).body.chat.feed, 'each');
 });
