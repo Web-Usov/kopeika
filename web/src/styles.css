@@ -2187,6 +2187,75 @@ select.field {
   padding: 0 var(--sp-4) var(--sp-3);
 }
 
+/* --- Перевод: «кто → кому» и чип «Весь долг» --- */
+.xfer-pair {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: start;
+  gap: var(--sp-2);
+}
+
+.xfer-who {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  text-align: center;
+}
+
+.xfer-caption {
+  margin-top: var(--sp-1);
+  color: var(--hint);
+  font-size: var(--fs-footnote);
+}
+
+.xfer-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  max-width: 100%;
+  font-size: var(--fs-headline);
+  font-weight: 600;
+}
+
+.xfer-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.xfer-name svg {
+  flex: none;
+  color: var(--hint);
+}
+
+.xfer-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--av-l);
+  height: var(--av-l);
+  color: var(--link);
+}
+
+.xfer-err {
+  padding: var(--sp-3) 0 0;
+  text-align: center;
+}
+
+.amt-chips {
+  display: flex;
+  justify-content: center;
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+}
+
+.amt .row.pick::before {
+  left: 0;
+  right: 0;
+}
+
 /* --- Состояния (README, раздел 6) --- */
 :is(.btn, .mbtn, .chip, .ibtn):active,
 :is(.btn, .chip, .ibtn).is-pressed {

@@ -1,11 +1,25 @@
 import { useState } from 'react';
-import { amountToInput, parseAmount } from '../../../shared/money.ts';
+import { amountToInput, formatMoney, parseAmount } from '../../../shared/money.ts';
 import { api, type Expense, type GroupDetail, useExpense, useGroup } from '../api.ts';
 import { applySavedGroup } from '../celebration.ts';
-import { t } from '../i18n.ts';
+import { lang, t } from '../i18n.ts';
+import { Icon } from '../icons.tsx';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, confirmDialog, haptic, MainButton } from '../tg.tsx';
-import { ErrorView, Loading, Section, todayIso } from '../ui.tsx';
+import {
+  AmountCard,
+  AmountChip,
+  ErrorView,
+  formatDay,
+  Loading,
+  PickRow,
+  Row,
+  Screen,
+  ScreenTitle,
+  Section,
+  TransferPair,
+  todayIso,
+} from '../ui.tsx';
 
 export function TransferForm({
   groupId,
@@ -43,10 +57,10 @@ export function TransferForm({
       </div>
     );
   return (
-    <div className="page">
+    <Screen>
       {back}
       <Editor g={g} transfer={transfer} prefill={prefill} />
-    </div>
+    </Screen>
   );
 }
 
@@ -109,57 +123,81 @@ function Editor({ g, transfer, prefill }: { g: GroupDetail; transfer?: Expense; 
     }
   };
 
-  const options = g.members.map((m) => (
-    <option key={m.id} value={m.id}>
-      {label(m.id)}
-    </option>
-  ));
-
+  const settlement = g.settlements.find((s) => s.from === from && s.to === to);
   return (
     <>
-      <h2 className="page-title">{transfer ? t('transfer.titleEdit') : t('transfer.titleNew')}</h2>
-      <p className="hint page-subtitle">{t('transfer.subtitle')}</p>
+      <ScreenTitle lead={t('transfer.subtitle')}>
+        {transfer ? t('transfer.titleEdit') : t('transfer.titleNew')}
+      </ScreenTitle>
 
-      <Section title={t('transfer.from')}>
-        <select className="field" value={from} onChange={(e) => setFrom(Number(e.target.value))}>
-          {options}
-        </select>
-      </Section>
+      <TransferPair
+        members={g.members.map((m) => ({ ...m, label: label(m.id) }))}
+        from={{
+          value: from,
+          label: t('transfer.from'),
+          display: from === g.meId ? t('common.you') : undefined,
+          onChange: setFrom,
+        }}
+        to={{
+          value: to,
+          label: t('transfer.to'),
+          display: to === g.meId ? t('transfer.toMe') : undefined,
+          onChange: setTo,
+        }}
+        error={from === to ? t('transfer.sameMember') : undefined}
+      />
 
-      <Section title={t('transfer.to')}>
-        <select className="field" value={to} onChange={(e) => setTo(Number(e.target.value))}>
-          {options}
-        </select>
-        {from === to && <div className="field-error">{t('transfer.sameMember')}</div>}
-      </Section>
-
-      <Section title={t('transfer.amount')}>
-        <div className="amount-field">
-          <input
-            className="field amount"
-            inputMode="decimal"
-            placeholder="0"
-            value={amountStr}
-            onChange={(e) => setAmountStr(e.target.value)}
-          />
-          <span className="currency">{g.currency}</span>
-        </div>
-      </Section>
-
-      <Section title={t('transfer.when')}>
-        <input
-          className="field"
-          type="date"
-          value={spentOn}
-          max={todayIso()}
-          onChange={(e) => setSpentOn(e.target.value || todayIso())}
+      <AmountCard
+        label={t('transfer.amount')}
+        value={amountStr}
+        onChange={setAmountStr}
+        currency={{ value: g.currency, label: t('expense.currencyLabel') }}
+      >
+        {settlement && (
+          <AmountChip
+            selected={amount === settlement.amount}
+            onClick={() => {
+              haptic.tap();
+              setAmountStr(amountToInput(settlement.amount));
+            }}
+          >
+            {t('transfer.wholeDebt', { amount: formatMoney(settlement.amount, g.currency, lang) })}
+          </AmountChip>
+        )}
+        <PickRow
+          icon="calendar"
+          title={t('transfer.when')}
+          value={formatDay(spentOn)}
+          native={
+            <input
+              className="pick-native"
+              type="date"
+              aria-label={t('transfer.when')}
+              value={spentOn}
+              max={todayIso()}
+              onChange={(e) => setSpentOn(e.target.value || todayIso())}
+              onClick={(e) => {
+                try {
+                  e.currentTarget.showPicker?.();
+                } catch {
+                  // the native picker opens on its own where showPicker is unavailable
+                }
+              }}
+            />
+          }
         />
-      </Section>
+      </AmountCard>
 
       {transfer && (
-        <button type="button" className="danger-btn" onClick={remove}>
-          {t('transfer.delete')}
-        </button>
+        <Section>
+          <Row
+            tone="danger"
+            className="center"
+            left={<Icon name="trash" size={20} />}
+            title={t('transfer.delete')}
+            onClick={remove}
+          />
+        </Section>
       )}
 
       <MainButton text={t('transfer.save')} onClick={save} disabled={!valid} loading={saving} />

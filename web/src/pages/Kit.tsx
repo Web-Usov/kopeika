@@ -10,6 +10,7 @@ import { applyScheme, BackButton, MainButton } from '../tg.tsx';
 import {
   AmountAction,
   AmountCard,
+  AmountChip,
   Avatar,
   AvatarAdd,
   AvatarStack,
@@ -53,6 +54,7 @@ import {
   Switch,
   Tile,
   type TileTone,
+  TransferPair,
 } from '../ui.tsx';
 
 const SURFACE = ['bg', 'sec', 'fill', 'fill2', 'press', 'line', 'line2', 'sep', 'chev', 'seg-on', 'scrim'];
@@ -629,6 +631,9 @@ export function Kit() {
             </AmountAction>
           </AmountCard>
           <AmountCard label={t('expense.amountLabel')} value="1,2,3" onChange={noop} error={t('expense.amountError')} />
+          <AmountCard label={t('transfer.amount')} value="1200" onChange={noop}>
+            <AmountChip selected>{t('transfer.wholeDebt', { amount: '1 200 ₽' })}</AmountChip>
+          </AmountCard>
         </Variant>
         <Variant label="Box">
           <Section>
@@ -645,6 +650,13 @@ export function Kit() {
       </Block>
 
       <Block id="patterns" title={t('kit.patterns')}>
+        <Variant label="TransferPair">
+          <TransferPair
+            members={members.map((m) => ({ ...m, label: m.name }))}
+            from={{ value: members[0].id, label: t('transfer.from'), onChange: noop }}
+            to={{ value: members[1].id, label: t('transfer.to'), onChange: noop }}
+          />
+        </Variant>
         <Variant label="Steps">
           <Steps
             title={t('home.welcomeTitle')}

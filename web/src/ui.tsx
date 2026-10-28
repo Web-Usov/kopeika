@@ -757,7 +757,8 @@ export function AmountCard({
   onChange: (v: string) => void;
   placeholder?: string;
   error?: string;
-  currency?: { value: string; options: string[]; onChange: (c: string) => void; label: string };
+  /** Без `options` и `onChange` плашка статичная — валюта не выбирается (перевод). */
+  currency?: { value: string; options?: string[]; onChange?: (c: string) => void; label: string };
   /** Название под чертой (поле по центру). */
   title?: InputProps;
   children?: ReactNode;
@@ -780,24 +781,27 @@ export function AmountCard({
             aria-invalid={error ? true : undefined}
             onChange={(e) => onChange(e.target.value)}
           />
-          {currency && (
-            <label className="amt-cur">
-              <span aria-hidden="true">{currencySign(currency.value)}</span>
-              <Icon name="down" size={16} stroke={2.2} />
-              <select
-                className="pick-native"
-                aria-label={currency.label}
-                value={currency.value}
-                onChange={(e) => currency.onChange(e.target.value)}
-              >
-                {currency.options.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
+          {currency &&
+            (currency.onChange ? (
+              <label className="amt-cur">
+                <span aria-hidden="true">{currencySign(currency.value)}</span>
+                <Icon name="down" size={16} stroke={2.2} />
+                <select
+                  className="pick-native"
+                  aria-label={currency.label}
+                  value={currency.value}
+                  onChange={(e) => currency.onChange?.(e.target.value)}
+                >
+                  {(currency.options ?? [currency.value]).map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <span className="amt-cur">{currencySign(currency.value)}</span>
+            ))}
         </div>
         {error && <div className="amt-error">{error}</div>}
       </div>
@@ -807,6 +811,79 @@ export function AmountCard({
         </div>
       )}
       {children}
+    </div>
+  );
+}
+
+/**
+ * «Кто → кому» (форма перевода): `Card` с двумя аватарами `l`, стрелкой и именами с выбором (нативный `select`).
+ * `from` и `to` — подпись над именем, выбранный участник, обработчик и `display` (вместо имени: «Вы» / «Вам»); `members[].label` — имя в списке.
+ */
+export function TransferPair({
+  members,
+  from,
+  to,
+  error,
+}: {
+  members: (AvatarMember & { label: string })[];
+  from: { value: number; label: string; display?: string; onChange: (id: number) => void };
+  to: { value: number; label: string; display?: string; onChange: (id: number) => void };
+  error?: string;
+}) {
+  const side = ({ value, label, display, onChange }: typeof from) => {
+    const member = members.find((m) => m.id === value) ?? members[0];
+    return (
+      <label className="xfer-who">
+        <Avatar member={member} size="l" />
+        <span className="xfer-caption">{label}</span>
+        <span className="xfer-name">
+          <span>{display ?? member.label}</span>
+          <Icon name="down" size={16} stroke={2.2} />
+        </span>
+        <select
+          className="pick-native"
+          aria-label={label}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+        >
+          {members.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+  };
+  return (
+    <Card>
+      <div className="xfer-pair">
+        {side(from)}
+        <span className="xfer-arrow" aria-hidden="true">
+          <Icon name="chev" size={20} stroke={2.2} />
+        </span>
+        {side(to)}
+      </div>
+      {error && <div className="err xfer-err">{error}</div>}
+    </Card>
+  );
+}
+
+/** Чип-подсказка внутри `AmountCard` («Весь долг · 1 200 ₽»): подставляет сумму. */
+export function AmountChip({
+  selected,
+  onClick,
+  children,
+}: {
+  selected?: boolean;
+  onClick?: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="amt-chips">
+      <Chip selected={selected} onClick={onClick}>
+        {children}
+      </Chip>
     </div>
   );
 }
