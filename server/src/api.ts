@@ -501,6 +501,17 @@ api.delete('/groups/:id/members/:memberId', (c) => {
     memberId,
   );
   if (used) throw fail(409, 'errors.memberHasExpenses');
+  // Templates (active or paused) keep the payer and shares without foreign keys; deleting would silently disable them.
+  const inRecurring = one(
+    `SELECT 1 FROM recurring WHERE group_id = ? AND (
+       payer_id = ?
+       OR EXISTS (SELECT 1 FROM json_each(recurring.shares) WHERE json_extract(value, '$.memberId') = ?)
+     ) LIMIT 1`,
+    group.id,
+    memberId,
+    memberId,
+  );
+  if (inRecurring) throw fail(409, 'errors.memberHasRecurring');
   tx(() => {
     run('DELETE FROM members WHERE id = ?', memberId);
     logActivity(group.id, c.get('user').id, 'member.delete', { memberId, name: member.name });

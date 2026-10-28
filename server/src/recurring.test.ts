@@ -166,7 +166,9 @@ test('a template whose member was deleted is switched off instead of crashing', 
   const g = await createGroup(u, ['Маша']);
   const masha = g.members.find((m: Json) => m.name === 'Маша');
   const tpl = (await call(u, 'POST', `/groups/${g.id}/recurring`, template(g))).body;
-  assert.equal((await call(u, 'DELETE', `/groups/${g.id}/members/${masha.id}`)).status, 200);
+  // The API refuses this now, so remove the member behind its back to exercise the scheduler's own guard.
+  assert.equal((await call(u, 'DELETE', `/groups/${g.id}/members/${masha.id}`)).status, 409);
+  db.run('DELETE FROM members WHERE id = ?', masha.id);
   setNext(tpl.id, '2025-01-05');
   assert.equal(runRecurring('2025-01-05'), 0);
   assert.equal((await call(u, 'GET', `/groups/${g.id}/recurring`)).body[0].active, false);
@@ -214,4 +216,42 @@ test('validation: day range depends on the period; deleting a template stops it'
   assert.equal(edited.body.period, 'weekly');
   assert.equal((await call(u, 'DELETE', `/groups/${g.id}/recurring/${tpl.id}`)).status, 200);
   assert.equal((await call(u, 'GET', `/groups/${g.id}/recurring`)).body.length, 0);
+});
+
+test('a member in recurring templates cannot be deleted until they are removed from them', async () => {
+  const u = newUser();
+  const g = await createGroup(u, ['Маша', 'Коля', 'Петя']);
+  const id = (name: string) => g.members.find((m: Json) => m.name === name).id as number;
+  const del = (memberId: number) => call(u, 'DELETE', `/groups/${g.id}/members/${memberId}`);
+
+  // Payer of an active template.
+  const asPayer = (await call(u, 'POST', `/groups/${g.id}/recurring`, template(g, { payerId: id('Маша') }))).body;
+  const res = await del(id('Маша'));
+  assert.equal(res.status, 409);
+  assert.match(res.body.error, /регулярных/);
+
+  // In the shares of an active template (not the payer).
+  const onlyKolya = template(g, { shares: [{ memberId: id('Коля'), value: 1 }] });
+  const asShare = (await call(u, 'POST', `/groups/${g.id}/recurring`, onlyKolya)).body;
+  assert.equal((await del(id('Коля'))).status, 409);
+
+  // In the shares of a paused template.
+  const paused = (
+    await call(u, 'POST', `/groups/${g.id}/recurring`, template(g, { shares: [{ memberId: id('Петя'), value: 1 }] }))
+  ).body;
+  assert.equal((await call(u, 'PATCH', `/groups/${g.id}/recurring/${paused.id}`, { active: false })).status, 200);
+  assert.equal((await del(id('Петя'))).status, 409);
+
+  // Once the templates are gone, the members can be deleted.
+  for (const tpl of [asPayer, asShare, paused])
+    assert.equal((await call(u, 'DELETE', `/groups/${g.id}/recurring/${tpl.id}`)).status, 200);
+  for (const name of ['Маша', 'Коля', 'Петя']) assert.equal((await del(id(name))).status, 200);
+});
+
+test('a member without expenses and templates is deleted as before', async () => {
+  const u = newUser();
+  const g = await createGroup(u, ['Маша']);
+  await call(u, 'POST', `/groups/${g.id}/recurring`, template(g, { shares: [{ memberId: g.meId, value: 1 }] }));
+  const masha = g.members.find((m: Json) => m.name === 'Маша');
+  assert.equal((await call(u, 'DELETE', `/groups/${g.id}/members/${masha.id}`)).status, 200);
 });
