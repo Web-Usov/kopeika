@@ -1124,10 +1124,21 @@ export function formatDay(iso: string): string {
 
 /* ---------- Траты ---------- */
 
-/** День в списке трат: заголовок секции с суммой трат за день справа (переводы в сумму не входят). */
-export function DayHeader({ day, total, children }: { day: string; total?: ReactNode; children: ReactNode }) {
+/** День в списке трат или истории: заголовок секции с суммой трат за день справа (переводы в сумму не входят; в истории суммы нет). */
+export function DayHeader({
+  day,
+  total,
+  inset = 68,
+  children,
+}: {
+  day: string;
+  total?: ReactNode;
+  /** Отступ разделителей: 68 под плиткой 40, 64 под аватаром `m` (история). */
+  inset?: InsetPx;
+  children: ReactNode;
+}) {
   return (
-    <Section title={day} aside={total} inset={68}>
+    <Section title={day} aside={total} inset={inset}>
       {children}
     </Section>
   );

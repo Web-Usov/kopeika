@@ -757,6 +757,28 @@ export function Kit() {
             />
           </DayHeader>
         </Variant>
+        <Variant label="DayHeader inset 64 · Row wrap · Avatar badge (история)">
+          <DayHeader day={t('common.today')} inset={64}>
+            {(['plus', 'transfer', 'pencil', 'trash', 'users'] as const).map((icon, i) => (
+              <Row
+                key={icon}
+                wrap
+                left={
+                  <Avatar
+                    member={members[i % members.length]}
+                    badge={{ icon, tone: (['pos', 'link', 'gray', 'neg', 'brand'] as const)[i] }}
+                  />
+                }
+                title={
+                  <>
+                    {t('kit.sampleLong')} <b>3 200 ₽</b>
+                  </>
+                }
+                subtitle="14:32"
+              />
+            ))}
+          </DayHeader>
+        </Variant>
         <Variant label="QuickPreview">
           <QuickPreview
             category="taxi"
