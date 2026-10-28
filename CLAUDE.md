@@ -56,7 +56,7 @@ npm run dev:web      # Vite :5173, проксирует /api
 - Задачи — GitHub Issues с этапами (milestones). Формат задачи: Зачем / Что сделать / Где в коде / Вне рамок / Готово, когда. Метка `agent-ready` — задачу можно брать без уточнений; `needs-info` — сначала нужен человек.
 - План и решения владельца — [docs/roadmap.md](docs/roadmap.md); читать перед новой задачей.
 - Одна задача — одна ветка (`feat/…`, `fix/…`, `chore/…`) и один PR с `Closes #N`. В `main` напрямую не пушить: он защищён, слияние — squash после зелёного CI.
-- CI (`.github/workflows/docker.yml`): `npm run check` (Biome + typecheck + тесты), затем сборка образа. Пуш в `main` публикует `ghcr.io/web-usov/kopeika:latest` — это продакшен.
+- CI (`.github/workflows/docker.yml`): `npm run check` (Biome + typecheck + тесты), затем сборка образа. Пуш в `main` публикует `ghcr.io/web-usov/kopeika:main` и `:sha-…`; `:latest` — это продакшен, он публикуется только с git-тега `v*`.
 - Перед PR: `npm run check`; если менялся UI — проверить в браузере по инструкции выше.
 
 ## Версии и релизы
@@ -65,4 +65,5 @@ npm run dev:web      # Vite :5173, проксирует /api
 - Этап (milestone) = минорная версия: v0.1 «Фундамент», v0.2 «Повседневное» и т.д. Задачи привязываются к этапу-версии через milestone.
 - Когда этап закрыт — GitHub Release с тегом `vX.Y.0` и автоматическими заметками (Generate release notes).
 - Срочные исправления — патч-релиз `vX.Y.Z`.
+- Прод (docker-compose на `:latest`) обновляется только релизом: `main` даёт `:main`/`:sha-…`, `:latest` ставится на тег `v*`. Незаконченный этап, влитый в `main`, до прода не доходит; пре-релизы `v1.2.3-rc.1` в `:latest` не попадают.
 - Версия видна в подвале главного экрана, в логе старта сервера, в `GET /version` (`{ version, sha }`) и в метке образа `org.opencontainers.image.version`. CI передаёт её в сборку как build-arg `APP_VERSION` / `GIT_SHA`.
