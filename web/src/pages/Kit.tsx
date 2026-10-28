@@ -23,6 +23,7 @@ import {
   Card,
   CategoryStat,
   CategoryTile,
+  CelebrationModal,
   Check,
   Chip,
   Chips,
@@ -35,6 +36,7 @@ import {
   ExpenseRow,
   Fact,
   FieldRow,
+  FinishBanner,
   GroupActions,
   GroupHeader,
   IconButton,
@@ -698,6 +700,24 @@ export function Kit() {
               onRotate={noop}
             />
           </Section>
+        </Variant>
+        <Variant label="FinishBanner">
+          <FinishBanner onFinish={noop} onLater={noop} />
+        </Variant>
+        <Variant label="CelebrationModal (в рамке, без затемнения экрана)">
+          <div className="kit-modal">
+            <div className="modal">
+              <Emblem icon="check" tone="pos" size={88} />
+              <h2 className="modal-title">{t('celebrate.groupTitle')}</h2>
+              <p className="modal-text">{t('celebrate.groupText')}</p>
+              <div className="modal-actions">
+                <Button wide>{t('celebrate.close')}</Button>
+                <Button variant="ghost" wide>
+                  {t('celebrate.finishTrip')}
+                </Button>
+              </div>
+            </div>
+          </div>
         </Variant>
         <Variant label="DemoNote">
           <DemoNote text={t('group.demoBanner')} actionLabel={t('group.demoDelete')} onAction={noop} />

@@ -199,8 +199,8 @@ API — для `web/src/ui.tsx`. Класс в скобках — как в `v1.
 - `AmountCard label value onChange currency title error` — карточка: «Сумма», число `display` по центру (`size` по длине), валюта плашкой `--fill` со знаком и `down` (нативный выбор, `pick-native`); название под чертой; ниже `children` строками через черту: курс (`FieldRow suffix`), `AmountAction` («Разобрать чек» + подпись «· осталось 3 из 5», ссылка по центру), чип «Весь долг». `error` — красный текст под числом. Без `currency` плашки нет. Используют форма траты и форма перевода.
 - `Intro` (`.intro`) — шапка приглашения и привязки чата: `Emblem`, название `title-l`, подпись `--hint`, под ней необязательный ряд (`AvatarStack` на фоне экрана).
 - `EmptyState` — `Emblem`, заголовок `headline`, подсказка `hint`.
-- `CelebrationModal` (`.modal` на `.scrim`) — эмблема 88, заголовок `title-m`, текст, `Button primary wide`, `Button ghost wide`.
-- `FinishBanner` — `Card` с обводкой `--brand`: плитка-галочка, заголовок, текст, две кнопки поровну.
+- `CelebrationModal` (`.modal` на `.scrim`) — карточка `--r-xl`, отступы `--sp-6`; эмблема 88 (`pos` с галочкой или `brand` с иконкой достижения), заголовок `title-m`, текст `hint`, `Button primary wide`, `Button ghost wide` «Завершить поездку» (только если плашку можно показать). Медное конфетти — между затемнением и карточкой, без движения при `prefers-reduced-motion`.
+- `FinishBanner` — `Card` с обводкой 2 px `--brand`: `Tile pos` с галочкой, заголовок `headline`, текст `hint`, две кнопки поровну (`primary` «Завершить», `fill` «Не сейчас»). Самая первая карточка экрана группы.
 - `OkLine` (`.ok`) — зелёная галочка с текстом «сходится».
 - `PhotoTile icon label capture onFile` + `PhotoTiles` (`.photo`, `.photos`) — две плитки фото в ряд: иконка в плитке `--tint`, подпись; под ними скрытый выбор файла. `Tips items` (`.tips`) — советы с зелёными галочками. Старт разбора чека.
 

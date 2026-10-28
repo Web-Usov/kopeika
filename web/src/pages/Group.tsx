@@ -47,6 +47,7 @@ import {
   EmptyState,
   ErrorView,
   ExpenseRow,
+  FinishBanner,
   formatDay,
   GroupActions,
   GroupHeader,
@@ -82,7 +83,7 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
     <div className="page">
       {back}
       {g.isDemo && <DemoBanner g={g} />}
-      {!g.isDemo && !g.archived && isAllSettled(g) && <FinishBanner g={g} />}
+      {!g.isDemo && !g.archived && isAllSettled(g) && <FinishOffer g={g} />}
       <GroupHeader
         title={g.name}
         subtitle={rich('group.headerSub', {
@@ -125,7 +126,7 @@ export function Group({ id, tab }: { id: number; tab: Tab }) {
       {tab === 'expenses' ? <ExpensesTab g={g} /> : tab === 'balances' ? <BalancesTab g={g} /> : <HistoryTab g={g} />}
 
       <MainButton text={t('group.addExpense')} onClick={() => navigate(`/g/${g.id}/expense/new`)} />
-      <Celebration groupId={g.id} />
+      <Celebration g={g} />
     </div>
   );
 }
@@ -157,28 +158,17 @@ function GroupBalance({ g, balance }: { g: GroupDetail; balance: number }) {
 }
 
 /** «Everyone is settled up. Finish the trip?»; «Not now» hides it until the next entry in the group. */
-function FinishBanner({ g }: { g: GroupDetail }) {
+function FinishOffer({ g }: { g: GroupDetail }) {
   const [, rerender] = useState(0);
   if (finishOfferDismissed(g)) return null;
   return (
-    <div className="banner finish-banner">
-      <div>{t('group.allSettledBanner')}</div>
-      <div className="banner-actions">
-        <button type="button" className="chip finish-yes" onClick={() => void finishTrip(g)}>
-          {t('group.finish')}
-        </button>
-        <button
-          type="button"
-          className="chip"
-          onClick={() => {
-            dismissFinishOffer(g);
-            rerender((n) => n + 1);
-          }}
-        >
-          {t('group.finishLater')}
-        </button>
-      </div>
-    </div>
+    <FinishBanner
+      onFinish={() => void finishTrip(g)}
+      onLater={() => {
+        dismissFinishOffer(g);
+        rerender((n) => n + 1);
+      }}
+    />
   );
 }
 

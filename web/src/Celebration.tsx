@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { ACHIEVEMENT_EMOJI, achievementTitleKey } from '../../shared/achievements.ts';
+import { achievementTextKey, achievementTitleKey } from '../../shared/achievements.ts';
+import type { GroupDetail } from './api.ts';
 import { type Pending, takeCelebration } from './celebration.ts';
+import { canFinish, finishTrip } from './finish.ts';
 import { t } from './i18n.ts';
 import { haptic } from './tg.tsx';
+import { ACHIEVEMENT_ICON, CelebrationModal, Emblem } from './ui.tsx';
 
 const COLORS = ['#b87333', '#d4a017', '#e8b04a', '#c9622d', '#f2d27a'];
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
@@ -53,14 +56,14 @@ function confetti(canvas: HTMLCanvasElement) {
 }
 
 /** Оверлей «всё в расчёте»: показывается один раз после сохранения, закрывается тапом или через ~4 с. */
-export function Celebration({ groupId }: { groupId: number }) {
+export function Celebration({ g }: { g: GroupDetail }) {
   const [kind, setKind] = useState<Pending | null>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    const k = takeCelebration(groupId);
+    const k = takeCelebration(g.id);
     if (k) setKind(k);
-  }, [groupId]);
+  }, [g.id]);
 
   useEffect(() => {
     if (!kind) return;
@@ -75,30 +78,30 @@ export function Celebration({ groupId }: { groupId: number }) {
 
   if (!kind) return null;
   // Закрытие всех долгов важнее; иначе — новое достижение.
+  const [first] = kind.achievements;
   const view = kind.kind
     ? {
-        emoji: '🪙',
+        emblem: <Emblem icon="check" tone="pos" size={88} />,
         title: t(kind.kind === 'group' ? 'celebrate.groupTitle' : 'celebrate.meTitle'),
         text: t(kind.kind === 'group' ? 'celebrate.groupText' : 'celebrate.meText'),
       }
     : {
-        emoji: ACHIEVEMENT_EMOJI[kind.achievements[0]],
-        title: t('achievements.newTitle'),
-        text: kind.achievements.map((id) => t(achievementTitleKey(id))).join(', '),
+        emblem: <Emblem icon={ACHIEVEMENT_ICON[first]} tone="brand" size={88} />,
+        title: kind.achievements.map((id) => t(achievementTitleKey(id))).join(', '),
+        text: t(kind.achievements.length === 1 ? achievementTextKey(first) : 'achievements.newTitle'),
       };
+  const close = () => setKind(null);
   return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: закрывается и кнопкой внутри
-    <div className="celebration" role="dialog" aria-modal="true" onClick={() => setKind(null)}>
-      <canvas ref={canvas} className="celebration-canvas" />
-      <div className="celebration-card">
-        {/* Временно эмодзи; позже заменим на маскота (#20). */}
-        <div className="celebration-emoji">{view.emoji}</div>
-        <h2>{view.title}</h2>
-        <p>{view.text}</p>
-        <button type="button" className="small-btn">
-          {t('celebrate.close')}
-        </button>
-      </div>
-    </div>
+    <CelebrationModal
+      backdrop={<canvas ref={canvas} className="celebration-canvas" />}
+      emblem={view.emblem}
+      title={view.title}
+      text={view.text}
+      actionLabel={t('celebrate.close')}
+      onAction={close}
+      ghostLabel={canFinish(g) ? t('celebrate.finishTrip') : undefined}
+      onGhost={() => void finishTrip(g)}
+      onDismiss={close}
+    />
   );
 }

@@ -5,7 +5,6 @@ import { formatMoney } from '../../../shared/money.ts';
 import { type GroupSummary, summaryShareText } from '../../../shared/summary.ts';
 import { api, useGroup } from '../api.ts';
 import { dateLocale, lang, t } from '../i18n.ts';
-import type { IconName } from '../icons.tsx';
 import { navigate } from '../router.ts';
 import {
   alertDialog,
@@ -18,6 +17,7 @@ import {
   shareMessage,
 } from '../tg.tsx';
 import {
+  ACHIEVEMENT_ICON,
   Avatar,
   Badge,
   Card,
@@ -34,18 +34,6 @@ import {
   Section,
   StackBar,
 } from '../ui.tsx';
-
-const ACHIEVEMENT_ICON: Record<AchievementId, IconName> = {
-  first: 'sprout',
-  crew: 'users',
-  ten: 'receipt',
-  hundred: 'flame',
-  travelers: 'globe',
-  allCategories: 'palette',
-  clean: 'check',
-  week: 'calendar',
-  month: 'clock',
-};
 
 const dateOf = (iso: string) => {
   const [y, m, d] = iso.split('-').map(Number);
