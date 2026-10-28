@@ -517,11 +517,13 @@ export const en: Dict = {
     needTwo: 'The group needs at least one more member',
     from: 'From',
     to: 'To',
+    toMe: 'You',
     sameMember: 'Pick two different members',
     amount: 'Amount',
     when: 'When',
     delete: 'Delete transfer',
     confirmDelete: 'Delete this transfer?',
+    wholeDebt: 'Whole debt · {amount}',
     save: 'Save transfer',
   },
   bot: {
