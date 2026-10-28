@@ -617,6 +617,8 @@ api.get('/invite/:code', (c) => {
   return c.json({
     group: { id: group.id, name: group.name, currency: group.currency, membersCount: members.length },
     isMember: Boolean(me),
+    // For the avatar stack on the invite screen: the first few, names only (no photos for someone outside the group).
+    members: members.slice(0, 5).map((m) => ({ id: m.id, name: m.name })),
     unclaimed: members.filter((m) => m.user_id === null).map((m) => ({ id: m.id, name: m.name })),
   });
 });

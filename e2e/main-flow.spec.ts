@@ -13,7 +13,7 @@ test('создать группу, добавить трату, присоеди
   await page.getByRole('button', { name: 'Создать группу' }).click();
   await page.getByPlaceholder('Поездка в Грузию').fill('Поездка');
   for (const name of ['Маша', 'Петя']) {
-    await page.getByRole('button', { name: '+ Добавить участника' }).click();
+    await page.getByRole('button', { name: 'Добавить участника' }).click();
     await page.getByPlaceholder('Имя участника').last().fill(name);
   }
   await page.getByRole('button', { name: 'Создать группу' }).click();

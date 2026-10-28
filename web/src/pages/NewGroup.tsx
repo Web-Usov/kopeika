@@ -1,11 +1,20 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { Key } from '../../../shared/i18n/index.ts';
 import { CURRENCIES } from '../../../shared/money.ts';
 import { api, setGroup } from '../api.ts';
 import { t } from '../i18n.ts';
 import { askNotifyOnce } from '../notify.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, haptic, MainButton } from '../tg.tsx';
-import { Section } from '../ui.tsx';
+import { Avatar, AvatarAdd, BigField, IconButton, Row, Screen, ScreenTitle, Section } from '../ui.tsx';
+
+const currencySymbol = (c: string) =>
+  new Intl.NumberFormat('en', { style: 'currency', currency: c, currencyDisplay: 'narrowSymbol' })
+    .formatToParts(0)
+    .find((p) => p.type === 'currency')?.value ?? c;
+
+/** «₽ Рубль»: символ и название из словаря. */
+const currencyLabel = (c: string) => `${currencySymbol(c)} ${t(`currencies.${c}` as Key)}`;
 
 /** `linkToken`: opened from the chat link screen; the new group gets that chat attached right away. */
 export function NewGroup({ linkToken }: { linkToken?: string | null }) {
@@ -13,6 +22,14 @@ export function NewGroup({ linkToken }: { linkToken?: string | null }) {
   const [currency, setCurrency] = useState('RUB');
   const [others, setOthers] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [myName, setMyName] = useState<string>();
+
+  useEffect(() => {
+    api.me().then(
+      (me) => setMyName(me.name),
+      () => {},
+    );
+  }, []);
 
   const create = async () => {
     setSaving(true);
@@ -42,63 +59,80 @@ export function NewGroup({ linkToken }: { linkToken?: string | null }) {
   };
 
   return (
-    <div className="page">
+    <Screen>
       <BackButton onClick={() => navigate(linkToken ? `/link/${linkToken}` : '/', { replace: true })} />
-      <h2 className="page-title">{t('newGroup.title')}</h2>
+      <ScreenTitle>{t('newGroup.title')}</ScreenTitle>
 
-      <Section title={t('newGroup.nameSection')}>
-        <input
-          className="field"
+      <Section>
+        <BigField
+          label={t('newGroup.nameSection')}
           placeholder={t('newGroup.namePlaceholder')}
           value={name}
           maxLength={64}
           onChange={(e) => setName(e.target.value)}
         />
-      </Section>
-
-      <Section title={t('newGroup.currencySection')}>
-        <select className="field" value={currency} onChange={(e) => setCurrency(e.target.value)}>
-          {CURRENCIES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-      </Section>
-
-      <Section title={t('newGroup.membersSection')} footer={t('newGroup.membersFooter')}>
-        <div className="row">
-          <span className="row-main">
-            <span className="row-title">{t('common.you')}</span>
-          </span>
-        </div>
-        {others.map((n, i) => (
-          <div className="row" key={i}>
-            <input
-              className="field inline"
-              placeholder={t('newGroup.memberPlaceholder')}
-              value={n}
-              maxLength={64}
-              // biome-ignore lint/a11y/noAutofocus: фокус на только что добавленном поле участника — так задумано
-              autoFocus={i === others.length - 1}
-              onChange={(e) => setOthers(others.map((x, j) => (j === i ? e.target.value : x)))}
-            />
-            <button
-              type="button"
-              className="icon-btn"
-              onClick={() => setOthers(others.filter((_, j) => j !== i))}
-              aria-label={t('common.remove')}
+        <Row
+          title={t('newGroup.currencySection')}
+          right={<span className="pick-value muted">{currencyLabel(currency)}</span>}
+          chevron
+          native={
+            <select
+              className="pick-native"
+              aria-label={t('newGroup.currencySection')}
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
             >
-              ✕
-            </button>
-          </div>
+              {CURRENCIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          }
+        />
+      </Section>
+
+      <Section title={t('newGroup.membersSection')} footer={t('newGroup.membersFooter')} inset={64}>
+        <Row
+          left={<Avatar member={{ id: 0, name: myName ?? t('common.you'), photoUrl: null }} />}
+          title={t('common.you')}
+          subtitle={t('settings.telegram')}
+        />
+        {others.map((n, i) => (
+          <Row
+            key={i}
+            left={n.trim() ? <Avatar member={{ id: i + 1, name: n.trim(), photoUrl: null }} /> : <AvatarAdd />}
+            title={
+              <input
+                className="row-input"
+                aria-label={t('newGroup.memberPlaceholder')}
+                placeholder={t('newGroup.memberPlaceholder')}
+                value={n}
+                maxLength={64}
+                // biome-ignore lint/a11y/noAutofocus: фокус на только что добавленном поле участника — так задумано
+                autoFocus={i === others.length - 1}
+                onChange={(e) => setOthers(others.map((x, j) => (j === i ? e.target.value : x)))}
+              />
+            }
+            right={
+              <IconButton
+                icon="x"
+                variant="mute"
+                label={t('common.remove')}
+                onClick={() => setOthers(others.filter((_, j) => j !== i))}
+              />
+            }
+          />
         ))}
-        <button type="button" className="row clickable link" onClick={() => setOthers([...others, ''])}>
-          {t('newGroup.addMember')}
-        </button>
+        <Row
+          tone="link"
+          left={<AvatarAdd tint />}
+          title={t('newGroup.addMember')}
+          onClick={() => setOthers([...others, ''])}
+        />
       </Section>
 
       <MainButton text={t('newGroup.create')} onClick={create} disabled={!name.trim()} loading={saving} />
-    </div>
+    </Screen>
   );
 }

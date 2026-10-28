@@ -82,6 +82,11 @@ test('invite preview and joining as a new member', async () => {
   assert.equal(preview.body.group.membersCount, 2);
   assert.equal(preview.body.isMember, false);
   assert.equal(preview.body.unclaimed.length, 1);
+  assert.deepEqual(
+    preview.body.members.map((m: Json) => m.name),
+    [g.members[0].name, 'Маша'],
+  );
+  assert.ok(preview.body.members.every((m: Json) => Object.keys(m).sort().join() === 'id,name'));
 
   const join = await call(guest, 'POST', `/invite/${g.inviteCode}/join`, {});
   assert.equal(join.status, 200);

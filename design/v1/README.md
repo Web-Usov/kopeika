@@ -196,6 +196,7 @@ API — для `web/src/ui.tsx`. Класс в скобках — как в `v1.
 - `Fact` (`.fact`) — плитка факта: малая плитка, подпись, значение `title-m`, сумма.
 - `Medal` (`.medal`) — достижение: получено — медь с обводкой; не получено — серое с прогрессом.
 - `AmountCard label value onChange currency title error` — карточка: «Сумма», число `display` по центру (`size` по длине), валюта плашкой `--fill` со знаком и `down` (нативный выбор, `pick-native`); название под чертой; ниже `children` строками через черту: курс (`FieldRow suffix`), `AmountAction` («Разобрать чек» + подпись «· осталось 3 из 5», ссылка по центру), чип «Весь долг». `error` — красный текст под числом. Без `currency` плашки нет. Используют форма траты и форма перевода.
+- `Intro` (`.intro`) — шапка приглашения и привязки чата: `Emblem`, название `title-l`, подпись `--hint`, под ней необязательный ряд (`AvatarStack` на фоне экрана).
 - `EmptyState` — `Emblem`, заголовок `headline`, подсказка `hint`.
 - `CelebrationModal` (`.modal` на `.scrim`) — эмблема 88, заголовок `title-m`, текст, `Button primary wide`, `Button ghost wide`.
 - `FinishBanner` — `Card` с обводкой `--brand`: плитка-галочка, заголовок, текст, две кнопки поровну.
@@ -251,7 +252,7 @@ API — для `web/src/ui.tsx`. Класс в скобках — как в `v1.
 | `home`, `home-dark` | `Section` групп: `Tile` с буквой, `Badge brand`, `RowValue`; архив строкой; «Настройки»; `Row danger` |
 | `payment` | `FieldRow` ×5, `Button fill` + `Button primary` |
 | `new-group` | `BigField`, `Row` «Валюта», участники `Avatar` + `IconButton mute`, `Row link` |
-| `join` | `Emblem`, `AvatarStack`, строки с `Radio` |
+| `join` | `Intro` (`Emblem`, `AvatarStack`), строки с `Avatar` и `Radio` |
 | `group-empty` | `GroupHeader`, `Segmented`, `QuickInput`, `EmptyState` |
 | `expenses`, `expenses-dark` | `DemoNote`, `GroupHeader`, `Segmented`, `QuickInput`, `DayHeader`, `ExpenseRow` |
 | `quick` | `QuickInput` в фокусе, `QuickPreview` |
