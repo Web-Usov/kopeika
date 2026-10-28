@@ -6,6 +6,10 @@ import { ReceiptProviderError } from './provider.ts';
 // Reasoning tokens count toward max_tokens, so leave room beyond the ~100 lines of JSON.
 const MAX_TOKENS = 8192;
 
+// Upper bound when usage is missing: a token per 32 base64 chars (24 bytes) of the photo and per 2 chars of text.
+const estimateInputTokens = (image: ReceiptImage, instruction: string) =>
+  Math.ceil(image.base64.length / 32) + Math.ceil((SYSTEM_PROMPT.length + instruction.length) / 2);
+
 interface ChatCompletion {
   model?: string;
   choices?: { finish_reason?: string | null; message?: { content?: string | null; refusal?: string | null } }[];
@@ -21,6 +25,7 @@ async function parseReceipt(
   opts: ReceiptParseOptions,
 ): Promise<{ draft: RawReceipt; usage: ReceiptUsage }> {
   const reasoning = opts.reasoning ?? 'none';
+  const instruction = receiptInstruction(opts.hintCurrency);
   const body = {
     model: opts.model,
     max_tokens: MAX_TOKENS,
@@ -31,7 +36,7 @@ async function parseReceipt(
         content: [
           // The image goes before the instruction (recommended by the vision docs).
           { type: 'image_url', image_url: { url: `data:${image.mediaType};base64,${image.base64}` } },
-          { type: 'text', text: receiptInstruction(opts.hintCurrency) },
+          { type: 'text', text: instruction },
         ],
       },
     ],
@@ -78,12 +83,18 @@ async function parseReceipt(
   if (choice.finish_reason === 'content_filter' || choice.message?.refusal) throw new ReceiptProviderError('refusal');
   const text = choice.message?.content;
   if (typeof text !== 'string' || text === '') throw new ReceiptProviderError('malformed');
+  const draft = parseAnswer(text);
+  const model = data.model ?? opts.model;
+  // A call without usage still costs money: count it from above so the monthly budget cannot be bypassed.
+  const prompt = data.usage?.prompt_tokens;
+  const completion = data.usage?.completion_tokens;
+  if (!prompt || !completion) console.warn(`Receipts: ${model} answered without usage, counting an upper estimate`);
   return {
-    draft: parseAnswer(text),
+    draft,
     usage: {
-      model: data.model ?? opts.model,
-      inputTokens: data.usage?.prompt_tokens ?? 0,
-      outputTokens: data.usage?.completion_tokens ?? 0,
+      model,
+      inputTokens: prompt || estimateInputTokens(image, instruction),
+      outputTokens: completion || MAX_TOKENS,
     },
   };
 }
