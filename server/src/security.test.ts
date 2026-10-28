@@ -134,7 +134,9 @@ test('invite and chat-link previews leak no Telegram ids, chat ids or payment de
   const g = await group(owner, ['Маша']);
   await call(owner, 'PUT', '/me/payment-info', { card: '4111111111111111' });
   const preview = await call(stranger, 'GET', `/invite/${g.inviteCode}`);
-  const text = JSON.stringify(preview.body);
+  // Members come as { id, name } only; dev names look like "Тестер 50000", so names stay out of the id check.
+  for (const m of preview.body.members) assert.deepEqual(Object.keys(m).sort(), ['id', 'name']);
+  const text = JSON.stringify({ ...preview.body, members: preview.body.members.map((m: { id: number }) => m.id) });
   assert.equal(text.includes('4111'), false);
   assert.equal(text.includes(String(owner)), false);
   assert.deepEqual(Object.keys(preview.body.group).sort(), ['currency', 'id', 'membersCount', 'name']);
