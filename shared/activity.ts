@@ -23,7 +23,11 @@ export type ActivityAction =
   | 'debt.remind'
   | 'group.auto_remind'
   | 'group.chat_link'
-  | 'group.chat_unlink';
+  | 'group.chat_unlink'
+  | 'group.chat_feed'
+  | 'recurring.create'
+  | 'recurring.update'
+  | 'recurring.delete';
 
 export interface PersonRef {
   id: number;
@@ -49,7 +53,7 @@ export interface ActivityPayload {
   before?: ExpenseSnapshot;
   after?: ExpenseSnapshot;
   expense?: ExpenseSnapshot;
-  /** group.auto_remind: the new state of the setting. */
+  /** group.auto_remind: the new state of the setting. recurring.update: the new state, set only when pause/resume changed it. */
   enabled?: boolean;
   /** The expense was created by a recurring template. */
   recurring?: boolean;
@@ -77,6 +81,26 @@ export function activityText(lang: Lang, entry: ActivityEntry, currency: string)
       return t(lang, 'activity.chatLink', { actor, name: p.name ?? '' });
     case 'group.chat_unlink':
       return t(lang, 'activity.chatUnlink', { actor, name: p.name ?? '' });
+    case 'group.chat_feed':
+      return t(
+        lang,
+        p.to === 'off' ? 'activity.chatFeedOff' : p.to === 'daily' ? 'activity.chatFeedDaily' : 'activity.chatFeedEach',
+        { actor },
+      );
+    case 'recurring.create':
+      return t(lang, 'activity.recurringCreate', { actor, name: p.name ?? '' });
+    case 'recurring.update':
+      return t(
+        lang,
+        p.enabled === undefined
+          ? 'activity.recurringUpdate'
+          : p.enabled
+            ? 'activity.recurringResume'
+            : 'activity.recurringPause',
+        { actor, name: p.name ?? '' },
+      );
+    case 'recurring.delete':
+      return t(lang, 'activity.recurringDelete', { actor, name: p.name ?? '' });
     case 'member.add':
       return t(lang, 'activity.memberAdd', { actor, name: p.name ?? '' });
     case 'member.rename':

@@ -255,3 +255,53 @@ test('a member without expenses and templates is deleted as before', async () =>
   const masha = g.members.find((m: Json) => m.name === 'Маша');
   assert.equal((await call(u, 'DELETE', `/groups/${g.id}/members/${masha.id}`)).status, 200);
 });
+
+test('history: each recurring action writes exactly one entry with a minimal payload', async () => {
+  const u = newUser();
+  const g = await createGroup(u, ['Маша']);
+  const log = async () => ((await call(u, 'GET', `/groups/${g.id}/activity`)).body.items as Json[]).reverse();
+  const base = (await log()).length;
+  const last = async (n: number) => {
+    const h = await log();
+    assert.equal(h.length, base + n);
+    return h[h.length - 1];
+  };
+
+  const tpl = (await call(u, 'POST', `/groups/${g.id}/recurring`, template(g))).body;
+  let e = await last(1);
+  assert.equal(e.action, 'recurring.create');
+  assert.deepEqual(e.payload, { name: 'Аренда' });
+
+  await call(u, 'PATCH', `/groups/${g.id}/recurring/${tpl.id}`, { title: 'Квартплата' });
+  e = await last(2);
+  assert.equal(e.action, 'recurring.update');
+  assert.deepEqual(e.payload, { name: 'Квартплата' });
+
+  await call(u, 'PATCH', `/groups/${g.id}/recurring/${tpl.id}`, { active: false });
+  e = await last(3);
+  assert.deepEqual(e.payload, { name: 'Квартплата', enabled: false });
+
+  await call(u, 'PATCH', `/groups/${g.id}/recurring/${tpl.id}`, { active: true });
+  e = await last(4);
+  assert.deepEqual(e.payload, { name: 'Квартплата', enabled: true });
+
+  await call(u, 'DELETE', `/groups/${g.id}/recurring/${tpl.id}`);
+  e = await last(5);
+  assert.equal(e.action, 'recurring.delete');
+  assert.deepEqual(e.payload, { name: 'Квартплата' });
+
+  // a rejected request writes nothing
+  assert.equal((await call(u, 'DELETE', `/groups/${g.id}/recurring/${tpl.id}`)).status, 404);
+  await last(5);
+});
+
+test('history: the demo group writes no recurring entries', async () => {
+  const u = newUser();
+  const demo = (await call(u, 'POST', '/demo')).body;
+  const count = () => db.one<{ n: number }>('SELECT COUNT(*) AS n FROM activity WHERE group_id = ?', demo.id)!.n;
+  const before = count();
+  assert.equal((await call(u, 'POST', `/groups/${demo.id}/recurring`, template(demo))).status, 409);
+  assert.equal((await call(u, 'PATCH', `/groups/${demo.id}/recurring/1`, { active: false })).status, 404);
+  assert.equal((await call(u, 'DELETE', `/groups/${demo.id}/recurring/1`)).status, 404);
+  assert.equal(count(), before);
+});

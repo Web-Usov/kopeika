@@ -84,3 +84,38 @@ test('chat link / unlink entries', () => {
   assert.equal(text('ru', unlink), 'Маша отвязал(а) чат «Друзья»');
   assert.equal(text('en', unlink), 'Маша unlinked the chat “Друзья”');
 });
+
+test('chat feed entries', () => {
+  assert.equal(text('ru', entry('group.chat_feed', { to: 'off' })), 'Маша выключил(а) ленту в чате');
+  assert.equal(text('en', entry('group.chat_feed', { to: 'off' })), 'Маша turned off the chat feed');
+  assert.equal(text('ru', entry('group.chat_feed', { to: 'each' })), 'Маша включил(а) в чате ленту «каждая трата»');
+  assert.equal(text('en', entry('group.chat_feed', { to: 'each' })), 'Маша set the chat feed to every expense');
+  assert.equal(text('ru', entry('group.chat_feed', { to: 'daily' })), 'Маша включил(а) в чате ленту «раз в день»');
+  assert.equal(text('en', entry('group.chat_feed', { to: 'daily' })), 'Маша set the chat feed to a daily digest');
+});
+
+test('recurring entries: pause and resume differ from a plain change', () => {
+  const name = 'Аренда';
+  assert.equal(text('ru', entry('recurring.create', { name })), 'Маша создал(а) регулярную трату «Аренда»');
+  assert.equal(text('en', entry('recurring.create', { name })), 'Маша created the recurring expense “Аренда”');
+  assert.equal(text('ru', entry('recurring.update', { name })), 'Маша изменил(а) регулярную трату «Аренда»');
+  assert.equal(text('en', entry('recurring.update', { name })), 'Маша changed the recurring expense “Аренда”');
+  assert.equal(
+    text('ru', entry('recurring.update', { name, enabled: false })),
+    'Маша поставил(а) на паузу регулярную трату «Аренда»',
+  );
+  assert.equal(
+    text('en', entry('recurring.update', { name, enabled: false })),
+    'Маша paused the recurring expense “Аренда”',
+  );
+  assert.equal(
+    text('ru', entry('recurring.update', { name, enabled: true })),
+    'Маша возобновил(а) регулярную трату «Аренда»',
+  );
+  assert.equal(
+    text('en', entry('recurring.update', { name, enabled: true })),
+    'Маша resumed the recurring expense “Аренда”',
+  );
+  assert.equal(text('ru', entry('recurring.delete', { name })), 'Маша удалил(а) регулярную трату «Аренда»');
+  assert.equal(text('en', entry('recurring.delete', { name })), 'Маша deleted the recurring expense “Аренда”');
+});
