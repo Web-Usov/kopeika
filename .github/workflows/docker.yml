@@ -51,7 +51,7 @@ jobs:
           retention-days: 7
 
   image:
-    needs: test
+    needs: [test, e2e]
     runs-on: ubuntu-latest
     permissions:
       contents: read
