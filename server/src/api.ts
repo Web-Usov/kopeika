@@ -373,7 +373,19 @@ api.post('/groups/:id/archive', (c) => {
 api.post('/groups/:id/unarchive', (c) => {
   const { group, me } = loadGroupFor(c.req.param('id'), c.get('user').id);
   tx(() => {
-    if (group.archived_at !== null) logActivity(group.id, c.get('user').id, 'group.unarchive', {});
+    if (group.archived_at !== null) {
+      logActivity(group.id, c.get('user').id, 'group.unarchive', {});
+      // Like a resume: occurrences the scheduler has not yet skipped while archived are not made up.
+      const today = localDate();
+      const stale = all<RecurringRow>(
+        'SELECT * FROM recurring WHERE group_id = ? AND active = 1 AND next_date < ?',
+        group.id,
+        today,
+      );
+      for (const r of stale) {
+        run('UPDATE recurring SET next_date = ? WHERE id = ?', firstOccurrence(r.period, r.day, today), r.id);
+      }
+    }
     run('UPDATE groups SET archived_at = NULL WHERE id = ?', group.id);
   });
   return c.json(detail({ ...group, archived_at: null }, me));

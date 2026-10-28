@@ -96,6 +96,11 @@ function processTemplate(r: RecurringRow, today: string): ExpenseRow[] {
   const group = one<GroupRow>('SELECT * FROM groups WHERE id = ?', r.group_id);
   if (!group) return [];
   const { due, skipped, next } = dueDates({ period: r.period, day: r.day, nextDate: r.next_date }, today);
+  // An archived group sleeps: its occurrences pass by without expenses, so they neither pile up nor bring it back.
+  if (group.archived_at !== null) {
+    run('UPDATE recurring SET next_date = ? WHERE id = ? AND active = 1 AND next_date = ?', next, r.id, r.next_date);
+    return [];
+  }
   const created = tx(() => {
     const claimed = run(
       'UPDATE recurring SET next_date = ? WHERE id = ? AND active = 1 AND next_date = ?',
