@@ -197,3 +197,46 @@ test('parseReasoning: valid values, default and warning for junk', async () => {
   }
   assert.match(seen[0] ?? '', /RECEIPTS_REASONING/);
 });
+
+test('usage: missing or zero fields are estimated from above, present ones kept', async () => {
+  const { SYSTEM_PROMPT, receiptInstruction } = await import('./receipts/common.ts');
+  const reply = (usage?: object) => {
+    globalThis.fetch = (async () =>
+      json({
+        model: 'google/gemma-4-26b-a4b-it',
+        choices: [{ finish_reason: 'stop', message: { role: 'assistant', content: JSON.stringify(answer) } }],
+        ...(usage ? { usage } : {}),
+      })) as typeof fetch;
+    return openrouter.openrouterProvider.parseReceipt(image, opts);
+  };
+  const estimate =
+    Math.ceil(image.base64.length / 32) + Math.ceil((SYSTEM_PROMPT.length + receiptInstruction('RUB').length) / 2);
+  const warn = console.warn;
+  const seen: string[] = [];
+  console.warn = (m: string) => seen.push(m);
+  try {
+    assert.deepEqual((await reply()).usage, {
+      model: 'google/gemma-4-26b-a4b-it',
+      inputTokens: estimate,
+      outputTokens: 8192,
+    });
+    assert.equal(seen.length, 1);
+    assert.match(seen[0] ?? '', /gemma-4-26b-a4b-it.*without usage/);
+    assert.doesNotMatch(seen[0] ?? '', /AAAA|sk-or-test|Кафе/);
+
+    assert.deepEqual((await reply({ prompt_tokens: 0, completion_tokens: 0 })).usage.inputTokens, estimate);
+    assert.equal(seen.length, 2);
+
+    const partial = (await reply({ prompt_tokens: 777 })).usage;
+    assert.equal(partial.inputTokens, 777);
+    assert.equal(partial.outputTokens, 8192);
+    assert.equal(seen.length, 3);
+
+    const full = (await reply({ prompt_tokens: 1234, completion_tokens: 56 })).usage;
+    assert.equal(full.inputTokens, 1234);
+    assert.equal(full.outputTokens, 56);
+    assert.equal(seen.length, 3); // no warning when usage is complete
+  } finally {
+    console.warn = warn;
+  }
+});
