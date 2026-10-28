@@ -39,11 +39,12 @@ npm run typecheck
 
 ## Деплой
 
-Образ собирается GitHub Actions при каждом пуше в `main` и публикуется в GitHub Container Registry (amd64 и arm64):
+Образ собирается GitHub Actions при каждом пуше в `main` и git-теге `v*` и публикуется в GitHub Container Registry (amd64 и arm64):
 
-- `ghcr.io/web-usov/kopeika:latest` — последняя версия из `main`;
+- `ghcr.io/web-usov/kopeika:latest` — последний релиз (git-тег `v*`); именно его запускает `docker-compose.yml`; пре-релизы `v1.2.3-rc.1` в `:latest` не попадают;
+- `ghcr.io/web-usov/kopeika:main` — последняя сборка из `main`, ещё не релиз;
 - `ghcr.io/web-usov/kopeika:sha-<коммит>` — конкретная сборка, для отката;
-- `ghcr.io/web-usov/kopeika:1.2.3` — если поставить git-тег `v1.2.3`.
+- `ghcr.io/web-usov/kopeika:1.2.3` — релиз с git-тегом `v1.2.3`.
 
 ```bash
 cp .env.example .env   # BOT_TOKEN, APP_URL, APP_SHORT_NAME

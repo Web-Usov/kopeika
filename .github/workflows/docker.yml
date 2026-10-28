@@ -1,9 +1,11 @@
 name: Docker image
 
 # Builds the image and publishes it to GitHub Container Registry:
-#   ghcr.io/web-usov/kopeika:latest      — every push to main
+#   ghcr.io/web-usov/kopeika:main        — every push to main (not production)
 #   ghcr.io/web-usov/kopeika:sha-abc1234 — every build, for rollbacks
-#   ghcr.io/web-usov/kopeika:1.2.3       — git tags like v1.2.3
+#   ghcr.io/web-usov/kopeika:1.2.3       — git tags like v1.2.3 (also 1.2, unless pre-release)
+#   ghcr.io/web-usov/kopeika:latest      — git tags v* only, i.e. releases (production);
+#                                          pre-releases like v1.2.3-rc.1 do not get it
 on:
   push:
     branches: [main]
@@ -79,8 +81,12 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository }}
+          # latest is set explicitly below, never implicitly by the semver tags.
+          flavor: |
+            latest=false
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=main,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') }}
             type=sha
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
