@@ -5,7 +5,19 @@ import { joinSource } from '../joinSource.ts';
 import { askNotifyOnce } from '../notify.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, haptic, MainButton } from '../tg.tsx';
-import { ErrorView, Loading, Row, Section } from '../ui.tsx';
+import {
+  Avatar,
+  AvatarAdd,
+  AvatarStack,
+  Emblem,
+  ErrorView,
+  Intro,
+  Loading,
+  Radio,
+  Row,
+  Screen,
+  Section,
+} from '../ui.tsx';
 
 /** `to`: where a member lands (the bot's «Open the summary» button points at the summary). */
 export function Join({ code, to }: { code: string; to?: 'summary' }) {
@@ -42,48 +54,60 @@ export function Join({ code, to }: { code: string; to?: 'summary' }) {
   const back = <BackButton onClick={() => navigate('/', { replace: true })} />;
   if (error)
     return (
-      <div className="page">
+      <Screen>
         {back}
-        <ErrorView message={error} />
-      </div>
+        <ErrorView message={error} hint={t('join.invalidHint')} />
+      </Screen>
     );
   if (!invite)
     return (
-      <div className="page">
+      <Screen>
         {back}
         <Loading />
-      </div>
+      </Screen>
     );
 
-  const { group, unclaimed } = invite;
+  const { group, unclaimed, members } = invite;
+  const [a, b] = members;
+  const whoText =
+    group.membersCount > 2 && a && b
+      ? t('join.withMore', { a: a.name, b: b.name, count: group.membersCount - 2 })
+      : a && b
+        ? t('join.withTwo', { a: a.name, b: b.name })
+        : (a?.name ?? '');
   return (
-    <div className="page">
+    <Screen>
       {back}
-      <header className="hero">
-        <div className="hero-emoji">👋</div>
-        <h1>{group.name}</h1>
-        <p className="hint">{t('join.invited', { members: t('common.members', { count: group.membersCount }) })}</p>
-      </header>
+      <Intro emblem={<Emblem icon="userplus" />} title={group.name} lead={t('join.invited')}>
+        <div className="intro-who">
+          <AvatarStack members={members.slice(0, 4).map((m) => ({ ...m, photoUrl: null }))} size="s" />
+          <span>{whoText}</span>
+        </div>
+      </Intro>
 
       {unclaimed.length > 0 && (
-        <Section title={t('join.whoAreYou')} footer={t('join.whoFooter')}>
+        <Section title={t('join.whoAreYou')} footer={t('join.whoFooter')} inset={64}>
           {unclaimed.map((m) => (
             <Row
               key={m.id}
               onClick={() => setClaim(m.id)}
-              left={<span className={`radio ${claim === m.id ? 'on' : ''}`} />}
+              left={<Avatar member={{ id: m.id, name: m.name, photoUrl: null }} />}
               title={m.name}
+              subtitle={t('settings.noTelegram')}
+              right={<Radio on={claim === m.id} />}
             />
           ))}
           <Row
             onClick={() => setClaim(null)}
-            left={<span className={`radio ${claim === null ? 'on' : ''}`} />}
+            left={<AvatarAdd />}
             title={t('join.notInList')}
+            subtitle={t('join.notInListHint')}
+            right={<Radio on={claim === null} />}
           />
         </Section>
       )}
 
       <MainButton text={t('join.join')} onClick={join} loading={saving} />
-    </div>
+    </Screen>
   );
 }

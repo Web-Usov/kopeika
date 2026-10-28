@@ -527,6 +527,11 @@ button:disabled {
   color: var(--hint);
 }
 
+.avatar.add.tint {
+  background: var(--tint);
+  color: var(--link);
+}
+
 .row-input {
   flex: 1;
   min-width: 0;
@@ -2511,4 +2516,48 @@ select.field {
   color: var(--sub);
   font-size: var(--fs-callout);
   padding: 0 var(--sp-1);
+}
+
+/* --- Intro (шапка приглашения и привязки чата) --- */
+.intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4) 0;
+  text-align: center;
+}
+
+.intro-title {
+  margin: var(--sp-1) 0 0;
+  font-size: var(--fs-title-l);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.intro-lead {
+  margin: 0;
+  color: var(--hint);
+  font-size: var(--fs-body);
+  line-height: 1.35;
+}
+
+.intro .stack .avatar {
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+.intro-who {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+  color: var(--hint);
+  font-size: var(--fs-callout);
+}
+
+.intro-who .stack {
+  margin-top: 0;
 }

@@ -3,7 +3,7 @@ import { api, type ChatLinkPreview, setGroup, useGroups } from '../api.ts';
 import { t } from '../i18n.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, haptic, MainButton } from '../tg.tsx';
-import { ErrorView, Loading, Row, Section } from '../ui.tsx';
+import { Avatar, AvatarAdd, Emblem, ErrorView, Intro, Loading, Radio, Row, Screen, Section } from '../ui.tsx';
 
 /** Opened from the button the bot posts in a group chat: pick the Kopeika group to attach that chat to. */
 export function Link({ token }: { token: string }) {
@@ -21,17 +21,17 @@ export function Link({ token }: { token: string }) {
   const failure = error ?? groupsError;
   if (failure)
     return (
-      <div className="page">
+      <Screen>
         {back}
         <ErrorView message={failure} />
-      </div>
+      </Screen>
     );
   if (!preview || !groups)
     return (
-      <div className="page">
+      <Screen>
         {back}
         <Loading />
-      </div>
+      </Screen>
     );
 
   const active = groups.filter((g) => !g.archived);
@@ -51,32 +51,39 @@ export function Link({ token }: { token: string }) {
   };
 
   return (
-    <div className="page">
+    <Screen>
       {back}
-      <header className="hero">
-        <div className="hero-emoji">💬</div>
-        <h1>{t('link.title', { chat: preview.chatTitle })}</h1>
-        <p className="hint">{t('link.hint')}</p>
-      </header>
+      <Intro
+        emblem={<Emblem icon="chat" />}
+        title={t('link.title', { chat: preview.chatTitle })}
+        lead={t('link.hint')}
+      />
 
       <Section
         title={t('link.pickGroup')}
         footer={preview.replaces ? t('link.willReplace', { name: preview.replaces.name }) : undefined}
+        inset={64}
       >
-        {active.length === 0 && <div className="row hint">{t('link.noGroups')}</div>}
+        {active.length === 0 && <Row title={<span className="hint">{t('link.noGroups')}</span>} />}
         {active.map((g) => (
           <Row
             key={g.id}
             onClick={() => setPicked(g.id)}
-            left={<span className={`radio ${picked === g.id ? 'on' : ''}`} />}
+            left={<Avatar member={{ id: g.id - 1, name: g.name, photoUrl: null }} />}
             title={g.name}
             subtitle={t('common.members', { count: g.membersCount })}
+            right={<Radio on={picked === g.id} />}
           />
         ))}
-        <Row title={t('link.createNew')} onClick={() => navigate(`/new?link=${encodeURIComponent(token)}`)} />
+        <Row
+          tone="link"
+          left={<AvatarAdd tint />}
+          title={t('link.createNew')}
+          onClick={() => navigate(`/new?link=${encodeURIComponent(token)}`)}
+        />
       </Section>
 
       <MainButton text={t('link.attach')} onClick={attach} loading={saving} disabled={picked === null} />
-    </div>
+    </Screen>
   );
 }

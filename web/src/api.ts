@@ -122,6 +122,7 @@ export interface GroupSummary {
 export interface InvitePreview {
   group: { id: number; name: string; currency: string; membersCount: number };
   isMember: boolean;
+  members: { id: number; name: string }[];
   unclaimed: { id: number; name: string }[];
 }
 

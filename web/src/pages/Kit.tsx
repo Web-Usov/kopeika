@@ -34,6 +34,7 @@ import {
   GroupActions,
   GroupHeader,
   IconButton,
+  Intro,
   InviteCard,
   LegalLinks,
   Loading,
@@ -767,6 +768,11 @@ export function Kit() {
               <Button variant="tint">{t('kit.sampleAdd')}</Button>
             </EmptyState>
           </Card>
+        </Variant>
+        <Variant label="Intro">
+          <Intro emblem={<Emblem icon="users" />} title={t('kit.sampleNameValue')} lead={t('join.invited')}>
+            <AvatarStack members={members} />
+          </Intro>
         </Variant>
         <Variant label="ErrorView">
           <Card>

@@ -277,10 +277,10 @@ export function Avatar({
   );
 }
 
-/** Круг-заглушка размера `m` с плюсом: «добавить участника». Лежит в строке на месте аватара. */
-export function AvatarAdd() {
+/** Круг-заглушка размера `m` с плюсом: «добавить участника». Лежит в строке на месте аватара; `tint` — акцентная (строка-ссылка «Добавить…»). */
+export function AvatarAdd({ tint = false }: { tint?: boolean }) {
   return (
-    <span className="avatar m add" aria-hidden="true">
+    <span className={cx('avatar', 'm', 'add', tint && 'tint')} aria-hidden="true">
       <Icon name="plus" size={20} stroke={2} />
     </span>
   );
@@ -937,6 +937,28 @@ export function EmptyState({
   );
 }
 
+/** Шапка приглашения и привязки чата: эмблема, название `title-l`, подпись и необязательный ряд (`AvatarStack`). */
+export function Intro({
+  emblem,
+  title,
+  lead,
+  children,
+}: {
+  emblem: ReactNode;
+  title: ReactNode;
+  lead?: ReactNode;
+  children?: ReactNode;
+}) {
+  return (
+    <header className="intro">
+      {emblem}
+      <h1 className="intro-title">{title}</h1>
+      {lead && <p className="intro-lead">{lead}</p>}
+      {children}
+    </header>
+  );
+}
+
 /** Зелёная галочка с текстом, например «сходится». */
 export function OkLine({ children }: { children: ReactNode }) {
   return (
@@ -955,10 +977,10 @@ export function Loading() {
   );
 }
 
-export function ErrorView({ message }: { message: string }) {
+export function ErrorView({ message, hint }: { message: string; hint?: string }) {
   return (
     <div className="center">
-      <EmptyState icon="info" tone="neg" title={message} />
+      <EmptyState icon="info" tone="neg" title={message} hint={hint} />
     </div>
   );
 }

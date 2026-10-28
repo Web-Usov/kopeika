@@ -4,7 +4,7 @@ test('все в расчёте: плашка, «Не сейчас» до сле�
   await page.goto('/?dev=31');
   await page.getByRole('button', { name: 'Создать группу' }).click();
   await page.getByPlaceholder('Поездка в Грузию').fill('Финиш');
-  await page.getByRole('button', { name: '+ Добавить участника' }).click();
+  await page.getByRole('button', { name: 'Добавить участника' }).click();
   await page.getByPlaceholder('Имя участника').last().fill('Маша');
   await page.getByRole('button', { name: 'Создать группу' }).click();
   await expect(page.getByRole('heading', { name: 'Финиш' })).toBeVisible();
@@ -100,7 +100,7 @@ test('настройки: «Завершить поездку» предупре
   await page.goto('/?dev=33');
   await page.getByRole('button', { name: 'Создать группу' }).click();
   await page.getByPlaceholder('Поездка в Грузию').fill('Долги');
-  await page.getByRole('button', { name: '+ Добавить участника' }).click();
+  await page.getByRole('button', { name: 'Добавить участника' }).click();
   await page.getByPlaceholder('Имя участника').last().fill('Петя');
   await page.getByRole('button', { name: 'Создать группу' }).click();
   await page.getByRole('button', { name: 'Добавить трату' }).click();

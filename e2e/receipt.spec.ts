@@ -192,7 +192,7 @@ async function assignFlow(page: Page, currency: string) {
   await page.getByRole('button', { name: 'Создать группу' }).click();
   await page.getByPlaceholder('Поездка в Грузию').fill('Ужин');
   for (const name of ['Маша', 'Петя']) {
-    await page.getByRole('button', { name: '+ Добавить участника' }).click();
+    await page.getByRole('button', { name: 'Добавить участника' }).click();
     await page.getByPlaceholder('Имя участника').last().fill(name);
   }
   await page.getByRole('button', { name: 'Создать группу' }).click();
