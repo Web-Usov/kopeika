@@ -84,26 +84,29 @@ export function groupOfChat(chatId: number): GroupRow | undefined {
  * The caller has already checked that the user belongs to the group.
  */
 export function attachChat(link: ChatLinkRow, group: GroupRow, userId: number) {
-  tx(() => {
-    const prev = groupOfChat(link.chat_id);
-    if (prev && prev.id !== group.id) {
-      run('UPDATE groups SET chat_id = NULL, chat_title = NULL WHERE id = ?', prev.id);
-      logActivity(prev.id, userId, 'group.chat_unlink', { name: link.chat_title });
-    }
-    if (group.chat_id !== null && group.chat_id !== link.chat_id) {
-      logActivity(group.id, userId, 'group.chat_unlink', { name: group.chat_title ?? '' });
-    }
-    run(
-      "UPDATE groups SET chat_id = ?, chat_title = ?, chat_feed = 'each' WHERE id = ?",
-      link.chat_id,
-      link.chat_title,
-      group.id,
-    );
-    // Spare tokens of the same chat (several /balance calls) die with it: nobody can relink the chat later with them.
-    run("UPDATE chat_links SET used_at = datetime('now') WHERE chat_id = ? AND used_at IS NULL", link.chat_id);
-    logActivity(group.id, userId, 'group.chat_link', { name: link.chat_title });
-    countEvent('chat.link');
-  });
+  tx(() => attachChatInTx(link, group, userId));
+}
+
+/** The body of `attachChat` for a caller that already holds a transaction. */
+function attachChatInTx(link: ChatLinkRow, group: GroupRow, userId: number) {
+  const prev = groupOfChat(link.chat_id);
+  if (prev && prev.id !== group.id) {
+    run('UPDATE groups SET chat_id = NULL, chat_title = NULL WHERE id = ?', prev.id);
+    logActivity(prev.id, userId, 'group.chat_unlink', { name: link.chat_title });
+  }
+  if (group.chat_id !== null && group.chat_id !== link.chat_id) {
+    logActivity(group.id, userId, 'group.chat_unlink', { name: group.chat_title ?? '' });
+  }
+  run(
+    "UPDATE groups SET chat_id = ?, chat_title = ?, chat_feed = 'each' WHERE id = ?",
+    link.chat_id,
+    link.chat_title,
+    group.id,
+  );
+  // Spare tokens of the same chat (several /balance calls) die with it: nobody can relink the chat later with them.
+  run("UPDATE chat_links SET used_at = datetime('now') WHERE chat_id = ? AND used_at IS NULL", link.chat_id);
+  logActivity(group.id, userId, 'group.chat_link', { name: link.chat_title });
+  countEvent('chat.link');
 }
 
 /** Unlinks the group from its chat. Returns the old chat id, or null if there was none. */
@@ -204,20 +207,30 @@ export async function handleChatShared(
   if (userStatus === null) return { ok: false, problem: 'unavailable' };
   if (userStatus !== 'creator' && userStatus !== 'administrator') return { ok: false, problem: 'notAdmin' };
   if (botStatus !== 'member' && botStatus !== 'administrator') return { ok: false, problem: 'botMissing' };
-  run("UPDATE chat_requests SET used_at = datetime('now') WHERE id = ?", input.requestId);
-  attachChat(
-    {
-      token: '',
-      chat_id: input.chatId,
-      chat_title: input.title?.trim() || String(input.chatId),
-      created_by_user: input.userId,
-      expires_at: req.expires_at,
-      used_at: null,
-    },
-    group,
-    input.userId,
-  );
-  return { ok: true, group: one<GroupRow>('SELECT * FROM groups WHERE id = ?', group.id)! };
+  // The lookups above awaited Telegram, so the request is claimed and the chat linked in one transaction: of two
+  // concurrent updates for the same request only one gets a changed row. The group is re-read as it may have changed.
+  return tx((): ChatSharedResult => {
+    const claimed = run(
+      "UPDATE chat_requests SET used_at = datetime('now') WHERE id = ? AND used_at IS NULL",
+      input.requestId,
+    );
+    if (claimed.changes === 0) return { ok: false, problem: 'used' };
+    const fresh = one<GroupRow>('SELECT * FROM groups WHERE id = ?', group.id);
+    if (!fresh) return { ok: false, problem: 'invalid' };
+    attachChatInTx(
+      {
+        token: '',
+        chat_id: input.chatId,
+        chat_title: input.title?.trim() || String(input.chatId),
+        created_by_user: input.userId,
+        expires_at: req.expires_at,
+        used_at: null,
+      },
+      fresh,
+      input.userId,
+    );
+    return { ok: true, group: one<GroupRow>('SELECT * FROM groups WHERE id = ?', group.id)! };
+  });
 }
 
 /** Confirmation in the chat after linking, with a "join" button when the invite link exists. */

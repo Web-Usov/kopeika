@@ -152,6 +152,36 @@ test('chat_shared: valid request links the chat; other user, reuse, expiry, non-
   });
 });
 
+test('chat_shared: two concurrent updates for one request link the chat once', async () => {
+  const u = newUser();
+  const g = await createGroup(u);
+  const chatId = newChat();
+  const req = chatLink.createChatRequest(u, g.id);
+  // The lookup is held until both calls have passed their checks, so both reach the claim step.
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const lookup = async (_chat: number, id: number) => {
+    await gate;
+    return id === BOT ? 'administrator' : 'creator';
+  };
+  const input = { userId: u, botId: BOT, requestId: req, chatId, title: 'Друзья' };
+  const first = chatLink.handleChatShared(input, lookup);
+  const second = chatLink.handleChatShared(input, lookup);
+  release();
+  const results = await Promise.all([first, second]);
+  assert.deepEqual(results.map((r) => r.ok).sort(), [false, true]);
+  assert.deepEqual(
+    results.find((r) => !r.ok),
+    { ok: false, problem: 'used' },
+  );
+  assert.equal(
+    db.one<{ n: number }>("SELECT COUNT(*) n FROM activity WHERE group_id = ? AND action = 'group.chat_link'", g.id)?.n,
+    1,
+  );
+});
+
 test('chat_shared replies exist in both languages for every outcome', () => {
   const ok = { ok: true as const, group: { name: 'Дача' } as never };
   assert.equal(
