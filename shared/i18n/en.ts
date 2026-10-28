@@ -817,6 +817,7 @@ export const en: Dict = {
       note: 'Note is too long',
     },
     memberHasExpenses: 'This member has expenses: delete or change them first',
+    memberHasRecurring: 'This person is in recurring expenses. Remove them there first, or delete the template.',
     inviteInvalid: 'This invite is no longer valid',
     demoNotAllowed: 'That’s not available in the example — create your own group',
     chatLinkInvalid: 'This chat link is not valid',
