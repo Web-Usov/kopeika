@@ -2,7 +2,7 @@
 // Служебный экран: маршрут #/kit регистрируется только при devTools (см. App.tsx), ссылок на него нет.
 // Тексты — через словари kit.* (ru/en). Правила и имена — design/v1/README.md.
 import { type ReactNode, useEffect, useState } from 'react';
-import { CATEGORIES, categoryKey, categoryTone } from '../../../shared/categories.ts';
+import { CATEGORIES, type CategoryId, categoryKey, categoryTone } from '../../../shared/categories.ts';
 import { lang, t } from '../i18n.ts';
 import { ICON_NAMES, Icon } from '../icons.tsx';
 import { navigate } from '../router.ts';
@@ -16,15 +16,18 @@ import {
   AvatarStack,
   Badge,
   BalanceBlock,
+  BalanceRow,
   BigField,
   Box,
   Button,
   Card,
+  CategoryStat,
   CategoryTile,
   Check,
   Chip,
   Chips,
   DayHeader,
+  DebtCard,
   DemoNote,
   Emblem,
   EmptyState,
@@ -819,6 +822,77 @@ export function Kit() {
         </Variant>
         <Variant label="OkLine">
           <OkLine>{t('kit.sampleOk')}</OkLine>
+        </Variant>
+        <Variant label="DebtCard">
+          <div className="debts">
+            <DebtCard
+              member={members[1]}
+              caption={t('group.owesYou')}
+              amount={<Money value={333333} currency="RUB" />}
+              reason={t('group.remindNoNotify', { name: members[1].name })}
+            >
+              <Button variant="tint" onClick={noop}>
+                {t('group.markTransfer')}
+              </Button>
+              <Button variant="fill" disabled onClick={noop}>
+                {t('group.remind')}
+              </Button>
+            </DebtCard>
+            <DebtCard
+              member={members[0]}
+              caption={t('group.youOweCaption')}
+              amount={<Money value={333333} currency="RUB" />}
+              lines={[
+                { text: '+7 900 123-45-67 · Т-Банк', copyLabel: t('payment.copyPhone'), onCopy: noop },
+                { text: '2200 7001 2345 6789', copyLabel: t('payment.copyCard'), onCopy: noop, copied: true },
+              ]}
+            >
+              <Button variant="tint" onClick={noop}>
+                {t('group.markTransfer')}
+              </Button>
+            </DebtCard>
+            <DebtCard
+              member={members[2]}
+              caption={t('group.youOweCaption')}
+              amount={<Money value={120000} currency="RUB" />}
+              hint={t('payment.none', { name: members[2].name })}
+            >
+              <Button variant="tint" onClick={noop}>
+                {t('group.markTransfer')}
+              </Button>
+            </DebtCard>
+          </div>
+        </Variant>
+        <Variant label="BalanceRow · BalanceTrack">
+          <Section inset={60}>
+            {[1520000, -820000, 0].map((v, i) => (
+              <BalanceRow
+                key={v}
+                member={members[i]}
+                name={i === 0 ? t('common.you') : members[i].name}
+                value={v}
+                ratio={Math.abs(v) / 1520000}
+                amount={v === 0 ? '0' : <Money value={v} currency="RUB" signed />}
+              />
+            ))}
+          </Section>
+        </Variant>
+        <Variant label="CategoryStat">
+          <Section inset={60}>
+            {[
+              ['food', 1, 980000],
+              ['transport', 0.62, 610000],
+              ['fun', 0.25, 250000],
+            ].map(([c, r, a]) => (
+              <CategoryStat
+                key={c}
+                category={c as string}
+                title={t(categoryKey(c as CategoryId))}
+                amount={<Money value={a as number} currency="RUB" />}
+                ratio={r as number}
+              />
+            ))}
+          </Section>
         </Variant>
         <Variant label="EmptyState">
           <Card>

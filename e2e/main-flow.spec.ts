@@ -55,11 +55,11 @@ test('создать группу, добавить трату, присоеди
   await page2.getByRole('button', { name: 'Присоединиться' }).click();
   await expect.poll(async () => text(await page2.locator('.bal-main').innerText())).toBe('Вы должны 333,33 ₽');
 
-  // 4. Вкладка «Балансы»: «Вернул» у своего долга.
+  // 4. Вкладка «Балансы»: «Отметить перевод» у своего долга.
   await page2.getByRole('button', { name: 'Балансы' }).click();
   await expect(page2.getByText('+79001234567 · Т-Банк')).toBeVisible();
   await expect(page2.getByRole('button', { name: 'Скопировать номер' })).toBeVisible();
-  await page2.locator('.row', { hasText: /^Вы →/ }).getByRole('button', { name: 'Вернул' }).click();
+  await page2.getByRole('button', { name: 'Отметить перевод' }).click();
   await page2.getByRole('button', { name: 'Сохранить перевод' }).click();
   await expect.poll(async () => text(await page2.locator('.bal-main').innerText())).toBe('Баланс Вы в расчёте');
   // Долги закрылись — праздничный оверлей; закрывается тапом и не возвращается.
