@@ -668,13 +668,13 @@ api.get('/rates', async (c) => {
     .object({
       base: z.enum(CURRENCIES as [string, ...string[]]),
       currency: z.enum(CURRENCIES as [string, ...string[]]),
-      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      date: isoDate,
     })
     .parse(c.req.query());
   if (q.base === q.currency) throw fail(400, 'errors.rate.sameCurrency');
   const parsed = Date.parse(`${q.date}T00:00:00Z`);
   // Not further than a couple of days ahead: every distinct future date would be a new upstream call and cache entry.
-  if (Number.isNaN(parsed) || parsed > Date.now() + 2 * 86_400_000) throw fail(400, 'errors.invalidData');
+  if (parsed > Date.now() + 2 * 86_400_000) throw fail(400, 'errors.invalidData');
   return c.json(await getRate(q.base, q.currency, q.date));
 });
 

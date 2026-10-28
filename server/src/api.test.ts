@@ -10,6 +10,7 @@ let api: typeof import('./api.ts').api;
 let rateLimiter: typeof import('./api.ts').rateLimiter;
 let chatLink: typeof import('./chatLink.ts');
 let db: typeof import('./db.ts');
+let localDate: typeof import('./recurring.ts').localDate;
 let botModule: typeof import('./bot.ts');
 before(async () => {
   ({ api, rateLimiter } = await import('./api.ts'));
@@ -18,6 +19,7 @@ before(async () => {
   // Most tests act as a chat admin; the admin check itself is covered separately.
   botModule.setBotTestHooks({ chatMember: async () => 'administrator' });
   chatLink = await import('./chatLink.ts');
+  ({ localDate } = await import('./recurring.ts'));
 });
 
 // Every test uses its own users so tests do not depend on order.
@@ -1232,4 +1234,39 @@ test('a body over the size limit is a 413 with a translated message', async () =
   });
   assert.equal(small.status, 413);
   assert.equal(((await small.json()) as Json).error, 'The request is too large');
+});
+
+const shiftDays = (n: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return localDate(d);
+};
+
+test('expense date: only real dates from 2000-01-01 up to tomorrow', async () => {
+  const u = newUser();
+  const g = await createGroup(u, ['Маша']);
+  const post = (spentOn: string) => call(u, 'POST', `/groups/${g.id}/expenses`, expense(g, { spentOn }));
+  for (const bad of ['2026-02-29', '2026-13-01', '2026-04-31', '1999-12-31', shiftDays(2)]) {
+    assert.equal((await post(bad)).status, 400, bad);
+  }
+  for (const ok of ['2024-02-29', localDate(), shiftDays(1)]) {
+    assert.equal((await post(ok)).status, 201, ok);
+  }
+});
+
+test('template start date and /rates date must be real dates', async () => {
+  const u = newUser();
+  const g = await createGroup(u);
+  const tpl = {
+    title: 'Аренда',
+    amount: 30000,
+    payerId: g.meId,
+    splitMode: 'equal',
+    shares: g.members.map((m: Json) => ({ memberId: m.id, value: 1 })),
+    period: 'monthly',
+    day: 5,
+    startDate: '2026-02-30',
+  };
+  assert.equal((await call(u, 'POST', `/groups/${g.id}/recurring`, tpl)).status, 400);
+  assert.equal((await call(u, 'GET', '/rates?base=RUB&currency=USD&date=2026-02-30')).status, 400);
 });

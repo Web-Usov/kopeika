@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { CATEGORY_IDS } from '../../shared/categories.ts';
 import { SplitError } from '../../shared/money.ts';
-import { dueDates, isValidDay, type Period } from '../../shared/recurring.ts';
+import { dueDates, isRealDate, isValidDay, type Period } from '../../shared/recurring.ts';
 import { notifyExpense } from './bot.ts';
 import { config } from './config.ts';
 import { all, one, run, tx } from './db.ts';
@@ -46,7 +46,7 @@ export const recurringShape = {
   day: z.number().int().min(1).max(31),
 };
 
-export const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+export const isoDate = z.string().refine(isRealDate);
 
 export const scheduleOk = (b: { period: Period; day: number }) => isValidDay(b.period, b.day);
 
