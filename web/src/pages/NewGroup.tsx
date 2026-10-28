@@ -1,20 +1,11 @@
 import { useEffect, useState } from 'react';
-import type { Key } from '../../../shared/i18n/index.ts';
 import { CURRENCIES } from '../../../shared/money.ts';
 import { api, setGroup } from '../api.ts';
 import { t } from '../i18n.ts';
 import { askNotifyOnce } from '../notify.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, BackButton, haptic, MainButton } from '../tg.tsx';
-import { Avatar, AvatarAdd, BigField, IconButton, Row, Screen, ScreenTitle, Section } from '../ui.tsx';
-
-const currencySymbol = (c: string) =>
-  new Intl.NumberFormat('en', { style: 'currency', currency: c, currencyDisplay: 'narrowSymbol' })
-    .formatToParts(0)
-    .find((p) => p.type === 'currency')?.value ?? c;
-
-/** «₽ Рубль»: символ и название из словаря. */
-const currencyLabel = (c: string) => `${currencySymbol(c)} ${t(`currencies.${c}` as Key)}`;
+import { Avatar, AvatarAdd, BigField, currencyLabel, IconButton, Row, Screen, ScreenTitle, Section } from '../ui.tsx';
 
 /** `linkToken`: opened from the chat link screen; the new group gets that chat attached right away. */
 export function NewGroup({ linkToken }: { linkToken?: string | null }) {

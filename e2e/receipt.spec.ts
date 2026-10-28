@@ -76,7 +76,7 @@ test('чек: фото → черновик → правка → расхожд�
   ).toBe('ffd8ff');
 
   // Draft from the answer: header, items, the extra, hints.
-  await expect(page.getByPlaceholder('Заведение')).toHaveValue('Хинкальная');
+  await expect(page.getByLabel('Заведение')).toHaveValue('Хинкальная');
   await expect(page.getByLabel('Валюта чека')).toHaveValue('GEL');
   await expect(page.getByLabel('Название').nth(1)).toHaveValue('Лимонад');
   await expect(page.getByText('количество на цену')).toBeVisible();
@@ -100,7 +100,7 @@ test('чек: фото → черновик → правка → расхожд�
   await expect.poll(async () => text(await page.locator('.receipt-sum').textContent())).toBe('36 GEL');
 
   // An empty name blocks, a new row works, deleting restores.
-  await page.getByRole('button', { name: '+ Добавить позицию' }).click();
+  await page.getByRole('button', { name: 'Добавить позицию' }).click();
   await expect(next).toBeDisabled();
   await page.getByRole('button', { name: 'Удалить позицию' }).last().click();
   await expect(next).toBeEnabled();
@@ -109,7 +109,7 @@ test('чек: фото → черновик → правка → расхожд�
   await expect(page.getByRole('heading', { name: 'Кто что ел' })).toBeVisible();
   // Back to the editor keeps the edits.
   await page.getByRole('button', { name: 'Вернуться к позициям' }).click();
-  await expect(page.getByLabel('Сумма').nth(1)).toHaveValue('6');
+  await expect(page.getByLabel('Сумма').nth(1)).toHaveValue(/^6\b/);
 });
 
 test('чек: ручной ввод без фото, английский', async ({ page }) => {
@@ -152,7 +152,7 @@ test('чек: нужно согласие, потом повтор', async ({ pa
   await expect(page.getByRole('heading', { name: 'Отправить фото на распознавание?' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Политика конфиденциальности' })).toBeVisible();
   await page.getByRole('button', { name: 'Согласен, отправить' }).click();
-  await expect(page.getByPlaceholder('Заведение')).toHaveValue('Хинкальная');
+  await expect(page.getByLabel('Заведение')).toHaveValue('Хинкальная');
   expect(calls).toBe(1);
 });
 
@@ -168,7 +168,7 @@ test('чек: сервер просит согласие уже при отпр�
   await openReceipt(page);
   await page.locator('input[type="file"]:not([capture])').setInputFiles(photo);
   await page.getByRole('button', { name: 'Согласен, отправить' }).click();
-  await expect(page.getByPlaceholder('Заведение')).toHaveValue('Хинкальная');
+  await expect(page.getByLabel('Заведение')).toHaveValue('Хинкальная');
   expect(calls).toBe(2);
 });
 

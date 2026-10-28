@@ -1,9 +1,11 @@
 // "Who ate what": pick members for every receipt line, see live totals, create an `exact` expense.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   CATEGORIES,
   type CategoryId,
+  categoryIcon,
   categoryKey,
+  categoryTone,
   DEFAULT_CATEGORY,
   suggestCategory,
 } from '../../../shared/categories.ts';
@@ -30,7 +32,23 @@ import { errorText, lang, t } from '../i18n.ts';
 import { setReceiptDraft } from '../receiptDraft.ts';
 import { navigate } from '../router.ts';
 import { alertDialog, haptic, MainButton } from '../tg.tsx';
-import { Avatar, Money, Row, Section, Segmented, todayIso } from '../ui.tsx';
+import {
+  Avatar,
+  BigField,
+  Button,
+  Chip,
+  Chips,
+  FieldRow,
+  formatDay,
+  Money,
+  OkLine,
+  PickRow,
+  Row,
+  ScreenTitle,
+  Section,
+  Segmented,
+  todayIso,
+} from '../ui.tsx';
 import { rateDay, showRate } from './ExpenseForm.tsx';
 
 type RateInfo = { status: 'idle' | 'loading' | 'ok' | 'error'; date?: string; error?: string };
@@ -174,35 +192,32 @@ export function ReceiptAssign({ g, draft, onBack }: { g: GroupDetail; draft: Rec
     }
   };
 
-  const chipsRef = useRef<HTMLDivElement>(null);
   const nameOf = (id: number) => {
     const m = g.members.find((x) => x.id === id);
     return m ? (m.id === g.meId ? t('common.youParen', { name: m.name }) : m.name) : '';
   };
   const money = (v: number, cur = currency) => formatMoney(v, cur, lang);
   const hasMulti = draft.adjustments.some((a) => a.amount !== 0);
+  const payer = g.members.find((m) => m.id === payerId) ?? g.members[0];
 
   return (
     <>
-      <h2 className="page-title">{t('receipt.assignTitle')}</h2>
-      <p className="hint page-subtitle">{t('receipt.assignHint')}</p>
+      <ScreenTitle lead={t('receipt.assignHint')}>{t('receipt.assignTitle')}</ScreenTitle>
 
       <Section
-        title={
-          <span className="section-title-row">
-            {t('receipt.itemsTitle')}
-            <button type="button" className="text-btn small" onClick={() => splitAllEqual(false)}>
-              {t('receipt.splitAllEqual')}
-            </button>
-          </span>
+        title={t('receipt.itemsTitle')}
+        aside={
+          <Button variant="ghost" size="s" onClick={() => splitAllEqual(false)}>
+            {t('receipt.splitAllEqual')}
+          </Button>
         }
         footer={
           unassigned.length > 0 ? (
             <span className="neg" role="status">
               {t('receipt.unassigned', { names: unassigned.map((i) => i.name).join(', ') })}{' '}
-              <button type="button" className="text-btn small" onClick={() => splitAllEqual(true)}>
+              <Button variant="ghost" size="s" onClick={() => splitAllEqual(true)}>
                 {t('receipt.unassignedFix')}
-              </button>
+              </Button>
             </span>
           ) : undefined
         }
@@ -213,43 +228,40 @@ export function ReceiptAssign({ g, draft, onBack }: { g: GroupDetail; draft: Rec
           return (
             <div className={`row assign-item ${it.memberIds.length === 0 ? 'unassigned' : ''}`} key={it.id}>
               <div className="assign-head">
-                <span className="row-title">{it.name}</span>
+                <span className="row-title">
+                  {it.name}
+                  {quantities.get(it.id) ? ` ×${quantities.get(it.id)}` : ''}
+                </span>
                 <span className="assign-amount">
                   <Money value={it.amount} currency={currency} />
                 </span>
               </div>
-              <div className="chips wrap">
-                <button
-                  type="button"
-                  className={`chip ${everyone ? 'active' : ''}`}
-                  aria-pressed={everyone}
+              <Chips>
+                <Chip
+                  selected={everyone}
                   onClick={() => {
                     haptic.tap();
                     setAll(it.id, !everyone);
                   }}
                 >
                   {t('receipt.everyone')}
-                </button>
-                {g.members.map((m) => {
-                  const on = it.memberIds.includes(m.id);
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      className={`chip ${on ? 'active' : ''}`}
-                      aria-pressed={on}
-                      onClick={() => toggle(it.id, m.id)}
-                    >
-                      {m.name}
-                    </button>
-                  );
-                })}
+                </Chip>
+                {g.members.map((m) => (
+                  <Chip
+                    key={m.id}
+                    avatar={m}
+                    selected={it.memberIds.includes(m.id)}
+                    onClick={() => toggle(it.id, m.id)}
+                  >
+                    {m.id === g.meId ? t('common.you') : m.name}
+                  </Chip>
+                ))}
                 {units !== null && (
-                  <button type="button" className="chip dashed" onClick={() => splitUnits(it.id, units)}>
+                  <Chip dashed onClick={() => splitUnits(it.id, units)}>
                     {t('receipt.splitUnits', { count: units })}
-                  </button>
+                  </Chip>
                 )}
-              </div>
+              </Chips>
             </div>
           );
         })}
@@ -288,10 +300,13 @@ export function ReceiptAssign({ g, draft, onBack }: { g: GroupDetail; draft: Rec
       )}
 
       <Section
+        inset={64}
         title={t('receipt.peopleTitle')}
         footer={
           shareError ? (
             <span className="neg">{shareError}</span>
+          ) : shares ? (
+            <OkLine>{t('receipt.peopleOk', { amount: money(total) })}</OkLine>
           ) : foreign && !rate ? undefined : (
             t('receipt.peopleSum', { amount: money(total) })
           )
@@ -303,8 +318,8 @@ export function ReceiptAssign({ g, draft, onBack }: { g: GroupDetail; draft: Rec
           return (
             <Row
               key={m.id}
-              left={<Avatar member={m} size={32} />}
-              title={nameOf(m.id)}
+              left={<Avatar member={m} size="m" />}
+              title={m.id === g.meId ? t('common.you') : m.name}
               subtitle={foreign && gv ? t('receipt.approx', { amount: formatMoney(gv, g.currency, lang) }) : undefined}
               right={v ? <Money value={v} currency={currency} /> : <span className="hint">—</span>}
             />
@@ -312,11 +327,10 @@ export function ReceiptAssign({ g, draft, onBack }: { g: GroupDetail; draft: Rec
         })}
       </Section>
 
-      <Section>
-        <input
-          className="field"
+      <Section inset={16}>
+        <BigField
+          label={t('receipt.titleLabel')}
           placeholder={t('expense.titlePlaceholder')}
-          aria-label={t('expense.titlePlaceholder')}
           value={title}
           maxLength={100}
           onChange={(e) => {
@@ -326,27 +340,20 @@ export function ReceiptAssign({ g, draft, onBack }: { g: GroupDetail; draft: Rec
         />
         {foreign && (
           <>
-            <div className="amount-field rate-field">
-              <span className="rate-label">{t('expense.rateLabel')}</span>
-              <input
-                className="field rate"
-                inputMode="decimal"
-                aria-label={t('expense.rateLabel')}
-                placeholder={rateInfo.status === 'error' ? t('expense.rateEnter') : t('expense.ratePlaceholder')}
-                value={rateStr}
-                onChange={(e) => {
-                  setRateStr(e.target.value);
-                  setRateManual(true);
-                }}
-              />
-              <span className="currency">
-                {g.currency}/{currency}
-              </span>
-            </div>
-            {rateStr.trim() && !rate ? (
-              <div className="field-error">{t('expense.rateError')}</div>
-            ) : (
-              <div className="rate-hint hint">
+            <FieldRow
+              label={t('expense.rateLabel')}
+              inputMode="decimal"
+              placeholder={rateInfo.status === 'error' ? t('expense.rateEnter') : t('expense.ratePlaceholder')}
+              value={rateStr}
+              error={rateStr.trim() && !rate ? t('expense.rateError') : undefined}
+              suffix={`${g.currency}/${currency}`}
+              onChange={(e) => {
+                setRateStr(e.target.value);
+                setRateManual(true);
+              }}
+            />
+            {!(rateStr.trim() && !rate) && (
+              <div className="amt-note">
                 {rateInfo.status === 'loading' && t('expense.rateLoading')}
                 {rateInfo.status === 'error' && !rate && rateInfo.error}
                 {rate &&
@@ -355,64 +362,94 @@ export function ReceiptAssign({ g, draft, onBack }: { g: GroupDetail; draft: Rec
                     amount: formatMoney(converted, g.currency, lang),
                     rate: showRate(rate),
                     date: rateDay(rateInfo.date ?? spentOn),
-                  })}
+                  })}{' '}
+                {t('expense.exactForeignHint', { currency })}
               </div>
             )}
-            <div className="rate-hint hint">{t('expense.exactForeignHint', { currency })}</div>
           </>
         )}
-        <div className="chips-caption">{t('expense.categorySection')}</div>
-        <div className="chips" ref={chipsRef}>
+      </Section>
+
+      <Section bare title={t('expense.categorySection')}>
+        <Chips>
           {CATEGORIES.map((c) => (
-            <button
+            <Chip
               key={c.id}
-              type="button"
-              className={`chip ${category === c.id ? 'active' : ''}`}
-              aria-pressed={category === c.id}
+              selected={category === c.id}
+              icon={categoryIcon(c.id)}
+              tone={categoryTone(c.id)}
               onClick={() => {
                 haptic.tap();
                 setCategory(c.id);
                 setCategoryPicked(true);
               }}
             >
-              <span aria-hidden="true">{c.emoji}</span>
               {t(categoryKey(c.id))}
-            </button>
+            </Chip>
           ))}
-        </div>
+        </Chips>
       </Section>
 
-      <Section title={t('expense.whoPaid')}>
-        <select
-          className="field"
-          aria-label={t('expense.whoPaid')}
-          value={payerId}
-          onChange={(e) => setPayerId(Number(e.target.value))}
-        >
-          {g.members.map((m) => (
-            <option key={m.id} value={m.id}>
-              {nameOf(m.id)}
-            </option>
-          ))}
-        </select>
-      </Section>
-
-      <Section title={t('expense.when')}>
-        <input
-          className="field"
-          type="date"
-          aria-label={t('expense.when')}
-          value={spentOn}
-          max={today}
-          onChange={(e) => setSpentOn(e.target.value || today)}
+      <Section inset={60}>
+        <PickRow
+          icon="users"
+          title={t('expense.whoPaid')}
+          value={
+            <>
+              <Avatar member={payer} size="xs" />
+              {payer.id === g.meId ? t('common.you') : payer.name}
+            </>
+          }
+          native={
+            <select
+              className="pick-native"
+              aria-label={t('expense.whoPaid')}
+              value={payerId}
+              onChange={(e) => setPayerId(Number(e.target.value))}
+            >
+              {g.members.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {nameOf(m.id)}
+                </option>
+              ))}
+            </select>
+          }
+        />
+        <PickRow
+          icon="calendar"
+          title={t('expense.when')}
+          value={formatDay(spentOn)}
+          native={
+            <input
+              className="pick-native"
+              type="date"
+              aria-label={t('expense.when')}
+              value={spentOn}
+              max={today}
+              onChange={(e) => setSpentOn(e.target.value || today)}
+              onClick={(e) => {
+                try {
+                  e.currentTarget.showPicker?.();
+                } catch {
+                  // the native picker opens on its own where showPicker is unavailable
+                }
+              }}
+            />
+          }
         />
       </Section>
 
-      <button type="button" className="text-btn" onClick={onBack}>
-        {t('receipt.nextBack')}
-      </button>
-
-      <MainButton text={t('receipt.create')} onClick={() => void create()} disabled={!valid} loading={saving} />
+      <MainButton
+        text={t('receipt.create')}
+        onClick={() => void create()}
+        disabled={!valid}
+        loading={saving}
+        above={
+          <Button variant="ghost" wide onClick={onBack}>
+            {t('receipt.nextBack')}
+          </Button>
+        }
+      />
     </>
   );
 }

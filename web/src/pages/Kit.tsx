@@ -45,6 +45,8 @@ import {
   Medal,
   Money,
   OkLine,
+  PhotoTile,
+  PhotoTiles,
   PickRow,
   QuickInput,
   QuickPreview,
@@ -61,6 +63,7 @@ import {
   Switch,
   Tile,
   type TileTone,
+  Tips,
   TransferPair,
 } from '../ui.tsx';
 
@@ -893,6 +896,15 @@ export function Kit() {
               />
             ))}
           </Section>
+        </Variant>
+        <Variant label="PhotoTile · Tips">
+          <div className="kit-stack">
+            <PhotoTiles>
+              <PhotoTile capture icon="camera" label={t('receipt.camera')} onFile={noop} />
+              <PhotoTile icon="image" label={t('receipt.gallery')} onFile={noop} />
+            </PhotoTiles>
+            <Tips items={[t('receipt.tipWhole'), t('receipt.tipFlat'), t('receipt.tipGlare')]} />
+          </div>
         </Variant>
         <Variant label="EmptyState">
           <Card>

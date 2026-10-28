@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { type ChangeEvent, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { CURRENCIES, formatMoney } from '../../../shared/money.ts';
 import type { ReceiptsProvider } from '../../../shared/privacy.ts';
 import {
@@ -13,11 +14,34 @@ import {
 } from '../../../shared/receiptDraft.ts';
 import { ApiError, api, type GroupDetail, type ParsedReceipt, useGroup } from '../api.ts';
 import { lang, t } from '../i18n.ts';
+import { Icon } from '../icons.tsx';
 import { getReceiptDraft, setReceiptDraft } from '../receiptDraft.ts';
 import { PhotoError, type PreparedPhoto, prepareReceiptPhoto } from '../receiptPhoto.ts';
 import { navigate } from '../router.ts';
 import { BackButton, haptic, MainButton, openLink } from '../tg.tsx';
-import { ErrorView, Loading, Money, Section, todayIso } from '../ui.tsx';
+import {
+  BigField,
+  Box,
+  Button,
+  Card,
+  currencyLabel,
+  EmptyState,
+  ErrorView,
+  formatDay,
+  IconButton,
+  Loading,
+  Money,
+  OkLine,
+  PhotoTile,
+  PhotoTiles,
+  PickRow,
+  Row,
+  Screen,
+  ScreenTitle,
+  Section,
+  Tips,
+  todayIso,
+} from '../ui.tsx';
 import { ReceiptAssign } from './ReceiptAssign.tsx';
 
 type Stage =
@@ -33,16 +57,16 @@ export function Receipt({ groupId }: { groupId: number }) {
   const back = <BackButton onClick={() => navigate(`/g/${groupId}/expense/new`, { replace: true })} />;
   if (!g)
     return (
-      <div className="page">
+      <Screen>
         {back}
         {error ? <ErrorView message={error} /> : <Loading />}
-      </div>
+      </Screen>
     );
   return (
-    <div className="page">
+    <Screen>
       {back}
       <Flow g={g} />
-    </div>
+    </Screen>
   );
 }
 
@@ -65,8 +89,9 @@ function AccessGate({ g }: { g: GroupDetail }) {
   };
   return (
     <>
-      <h2 className="page-title">{t('receipt.access.title')}</h2>
-      <p className="hint page-subtitle">{t(`receipt.access.${access === 'approved' ? 'none' : access}`)}</p>
+      <ScreenTitle lead={t(`receipt.access.${access === 'approved' ? 'none' : access}`)}>
+        {t('receipt.access.title')}
+      </ScreenTitle>
       {error && <ErrorView message={error} />}
       {access !== 'pending' && (
         <MainButton text={t('receipt.access.request')} loading={busy} onClick={() => void ask()} />
@@ -180,22 +205,25 @@ function ScanFlow({ g }: { g: GroupDetail }) {
 
   if (stage.kind === 'reading')
     return (
-      <div className="center receipt-reading" role="status">
-        <div className="spinner" aria-hidden="true" />
-        <div>{stage.phase === 'prepare' ? t('receipt.preparing') : t('receipt.reading')}</div>
-        {stage.phase === 'upload' && <div className="hint small">{t('receipt.readingHint')}</div>}
-        <button type="button" className="text-btn" onClick={cancel}>
-          {t('receipt.cancel')}
-        </button>
+      <div role="status">
+        <EmptyState
+          icon="receipt"
+          title={stage.phase === 'prepare' ? t('receipt.preparing') : t('receipt.reading')}
+          hint={stage.phase === 'upload' ? t('receipt.readingHint') : undefined}
+        >
+          <Button variant="ghost" onClick={cancel}>
+            {t('receipt.cancel')}
+          </Button>
+        </EmptyState>
       </div>
     );
 
   if (stage.kind === 'consent')
     return (
       <>
-        <h2 className="page-title">{t('receipt.consentTitle')}</h2>
+        <ScreenTitle>{t('receipt.consentTitle')}</ScreenTitle>
         <Section>
-          <p className="row receipt-consent">
+          <p className="receipt-consent">
             {t(
               provider === 'openrouter'
                 ? 'receipt.consentTextOpenrouter'
@@ -204,18 +232,22 @@ function ScanFlow({ g }: { g: GroupDetail }) {
                   : 'receipt.consentText',
             )}
           </p>
-          <button
-            type="button"
-            className="row clickable link"
+          <Row
+            tone="link"
+            left={<Icon name="shield" size={20} />}
+            title={t('receipt.consentPolicy')}
             onClick={() => openLink(`${window.location.origin}/privacy?lang=${lang}`)}
-          >
-            {t('receipt.consentPolicy')}
-          </button>
+          />
         </Section>
-        <button type="button" className="text-btn" onClick={cancel}>
-          {t('receipt.cancel')}
-        </button>
-        <MainButton text={t('receipt.consentSend')} onClick={() => void consent()} />
+        <MainButton
+          text={t('receipt.consentSend')}
+          onClick={() => void consent()}
+          above={
+            <Button variant="ghost" wide onClick={cancel}>
+              {t('receipt.cancel')}
+            </Button>
+          }
+        />
       </>
     );
 
@@ -225,58 +257,41 @@ function ScanFlow({ g }: { g: GroupDetail }) {
         <ErrorView message={stage.message} />
         <div className="receipt-actions">
           {stage.retry && photo.current && (
-            <button type="button" className="small-btn primary" onClick={() => void send()}>
+            <Button wide onClick={() => void send()}>
               {t('receipt.retry')}
-            </button>
+            </Button>
           )}
-          <button type="button" className="small-btn" onClick={cancel}>
+          <Button variant="fill" wide onClick={cancel}>
             {t('receipt.otherPhoto')}
-          </button>
-          <button type="button" className="small-btn" onClick={manual}>
+          </Button>
+          <Button variant="ghost" wide onClick={manual}>
             {t('receipt.manual')}
-          </button>
+          </Button>
         </div>
       </>
     );
 
+  const q = g.receipts;
+  const left = q && !q.unlimited && q.limit > 0 ? Math.max(0, q.limit - q.used) : null;
   return (
     <>
-      <h2 className="page-title">{t('receipt.title')}</h2>
-      <p className="hint page-subtitle">{t('receipt.pickHint')}</p>
-      <Section>
-        <PhotoPicker capture label={t('receipt.camera')} onFile={onFile} />
-        <PhotoPicker label={t('receipt.gallery')} onFile={onFile} />
-      </Section>
-      <button type="button" className="text-btn" onClick={manual}>
-        {t('receipt.manual')}
-      </button>
+      <ScreenTitle lead={t('receipt.pickHint')}>{t('receipt.title')}</ScreenTitle>
+      <PhotoTiles>
+        <PhotoTile capture icon="camera" label={t('receipt.camera')} onFile={onFile} />
+        <PhotoTile icon="image" label={t('receipt.gallery')} onFile={onFile} />
+      </PhotoTiles>
+      <Tips items={[t('receipt.tipWhole'), t('receipt.tipFlat'), t('receipt.tipGlare')]} />
+      <div className="receipt-start-foot">
+        <Button variant="ghost" onClick={manual}>
+          {t('receipt.manual')}
+        </Button>
+        {left !== null && (
+          <div className="receipt-left">
+            {t('receipt.limitLeft', { left, limit: q?.limit ?? 0, count: q?.limit ?? 0 })}
+          </div>
+        )}
+      </div>
     </>
-  );
-}
-
-function PhotoPicker({
-  label,
-  capture,
-  onFile,
-}: {
-  label: string;
-  capture?: boolean;
-  onFile: (f: File | undefined) => void;
-}) {
-  return (
-    <label className="row clickable receipt-pick">
-      {label}
-      <input
-        type="file"
-        accept="image/*"
-        {...(capture ? { capture: 'environment' as const } : {})}
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          e.target.value = ''; // the same photo can be chosen again
-          onFile(file);
-        }}
-      />
-    </label>
   );
 }
 
@@ -293,6 +308,48 @@ interface ExtraRow {
   kind: DraftAdjustmentKind;
   label: string;
   amount: string;
+}
+
+/**
+ * Поле суммы в строке чека: пока не в фокусе — «2 400 ₽» (знак минуса настоящий), при фокусе — число для правки.
+ * Пустое и нечитаемое остаются как введены.
+ */
+function MoneyBox({
+  value,
+  currency,
+  onChange,
+  invalid,
+  placeholder,
+  'aria-label': label,
+}: {
+  value: string;
+  currency: string;
+  onChange: (e: ChangeEvent<HTMLInputElement>) => void;
+  invalid: boolean;
+  placeholder: string;
+  'aria-label': string;
+}) {
+  const [focused, setFocused] = useState(false);
+  const minor = parseSignedAmount(value);
+  const shown =
+    !focused && minor !== null && value.trim() !== '' ? formatMoney(minor, currency, lang).replace(/^-/, '−') : value;
+  return (
+    <Box
+      narrow
+      inputMode={focused ? 'decimal' : undefined}
+      placeholder={placeholder}
+      aria-label={label}
+      invalid={invalid}
+      value={shown}
+      onFocus={(e) => {
+        const input = e.target;
+        flushSync(() => setFocused(true)); // swap «2 400 ₽» for the number before the caret is placed
+        input.select();
+      }}
+      onBlur={() => setFocused(false)}
+      onChange={onChange}
+    />
+  );
 }
 
 let rowCounter = 0;
@@ -398,51 +455,81 @@ function DraftEditor({ g, initial, onNext }: { g: GroupDetail; initial: ParsedRe
 
   return (
     <>
-      <h2 className="page-title">{t('receipt.title')}</h2>
+      <ScreenTitle>{t('receipt.title')}</ScreenTitle>
 
       {hints.length > 0 && (
-        <div className="banner receipt-warn" role="status">
-          {hints.map((h) => (
-            <div key={h}>{h}</div>
-          ))}
-        </div>
+        <Card className="receipt-warn">
+          <span className="receipt-warn-ic" aria-hidden="true">
+            <Icon name="info" size={20} stroke={2} />
+          </span>
+          <div role="status">
+            {hints.map((h) => (
+              <div key={h}>{h}</div>
+            ))}
+          </div>
+        </Card>
       )}
 
-      <Section>
-        <input
-          className="field"
+      <Section
+        inset={60}
+        footer={currency === '' ? <span className="neg">{t('receipt.currencyMissing')}</span> : undefined}
+      >
+        <BigField
+          label={t('receipt.merchantLabel')}
           placeholder={t('receipt.merchantPlaceholder')}
-          aria-label={t('receipt.merchantPlaceholder')}
           value={merchant}
           maxLength={100}
           onChange={(e) => setMerchant(e.target.value)}
         />
-        <input
-          className="field"
-          type="date"
-          aria-label={t('receipt.dateLabel')}
-          value={date}
-          max={todayIso()}
-          onChange={(e) => setDate(e.target.value)}
+        <PickRow
+          icon="calendar"
+          title={t('receipt.dateLabel')}
+          value={date ? formatDay(date) : t('receipt.dateNone')}
+          muted={!date}
+          native={
+            <input
+              className="pick-native"
+              type="date"
+              aria-label={t('receipt.dateLabel')}
+              value={date}
+              max={todayIso()}
+              onChange={(e) => setDate(e.target.value)}
+              onClick={(e) => {
+                try {
+                  e.currentTarget.showPicker?.();
+                } catch {
+                  // the native picker opens on its own where showPicker is unavailable
+                }
+              }}
+            />
+          }
         />
-        <select
-          className={`field ${currency === '' ? 'invalid' : ''}`}
-          aria-label={t('receipt.currencyLabel')}
-          value={currency}
-          onChange={(e) => setCurrency(e.target.value)}
-        >
-          {currency === '' && <option value="">{t('receipt.currencyPick')}</option>}
-          {CURRENCIES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-        {currency === '' && <div className="field-error">{t('receipt.currencyMissing')}</div>}
+        <PickRow
+          icon="globe"
+          title={t('receipt.currencyLabel')}
+          value={currency ? currencyLabel(currency) : t('receipt.currencyPick')}
+          muted={currency === ''}
+          native={
+            <select
+              className="pick-native"
+              aria-label={t('receipt.currencyLabel')}
+              aria-invalid={currency === '' || undefined}
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+            >
+              {currency === '' && <option value="">{t('receipt.currencyPick')}</option>}
+              {CURRENCIES.map((c) => (
+                <option key={c} value={c}>
+                  {currencyLabel(c)}
+                </option>
+              ))}
+            </select>
+          }
+        />
       </Section>
 
       <Section
-        title={t('receipt.itemsTitle')}
+        title={`${t('receipt.itemsTitle')} · ${items.length}`}
         footer={
           !linesOk ? (
             <span className={items.length > 0 ? 'neg' : undefined}>
@@ -454,153 +541,174 @@ function DraftEditor({ g, initial, onNext }: { g: GroupDetail; initial: ParsedRe
         {items.map((r) => {
           const bad = !isLineValid(r.name, r.amount);
           return (
-            <div className="row receipt-line" key={r.key}>
-              <div className="receipt-main">
+            <Row
+              key={r.key}
+              className="receipt-line"
+              title={
                 <input
-                  className="field receipt-name"
+                  className="receipt-name"
                   placeholder={t('receipt.itemName')}
                   aria-label={t('receipt.itemName')}
                   value={r.name}
                   maxLength={100}
                   onChange={(e) => patchItem(r.key, { name: e.target.value })}
                 />
-                {r.quantity && <span className="hint small">×{r.quantity}</span>}
-              </div>
-              <input
-                className={`field exact ${bad && r.amount.trim() !== '' ? 'invalid' : ''}`}
-                inputMode="decimal"
-                placeholder="0"
-                aria-label={t('receipt.itemAmount')}
-                value={r.amount}
-                onChange={(e) => patchItem(r.key, { amount: e.target.value })}
-              />
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label={t('receipt.itemDelete')}
-                onClick={() => setItems((rows) => rows.filter((x) => x.key !== r.key))}
-              >
-                ✕
-              </button>
-            </div>
+              }
+              subtitle={r.quantity ? `×${r.quantity}` : undefined}
+              right={
+                <>
+                  <MoneyBox
+                    currency={cur}
+                    placeholder="0"
+                    aria-label={t('receipt.itemAmount')}
+                    invalid={bad && r.amount.trim() !== ''}
+                    value={r.amount}
+                    onChange={(e) => patchItem(r.key, { amount: e.target.value })}
+                  />
+                  <IconButton
+                    icon="x"
+                    variant="mute"
+                    label={t('receipt.itemDelete')}
+                    onClick={() => setItems((rows) => rows.filter((x) => x.key !== r.key))}
+                  />
+                </>
+              }
+            />
           );
         })}
-        <button
-          type="button"
-          className="row clickable link"
+        <Row
+          tone="link"
+          left={<Icon name="plus" size={20} stroke={2.2} />}
+          title={t('receipt.addItem')}
           onClick={() => setItems((rows) => [...rows, { key: nextKey(), name: '', amount: '' }])}
-        >
-          {t('receipt.addItem')}
-        </button>
+        />
       </Section>
 
       <Section title={t('receipt.extrasTitle')} footer={t('receipt.extrasFooter')}>
         {extras.map((r) => (
-          <div className="row receipt-line" key={r.key}>
-            <div className="receipt-main">
-              <select
-                className="field receipt-name"
-                aria-label={t('receipt.extrasTitle')}
-                value={r.kind}
-                onChange={(e) => {
-                  const kind = e.target.value as DraftAdjustmentKind;
-                  const v = parseSignedAmount(r.amount);
-                  patchExtra(r.key, { kind, ...(v !== null ? { amount: signedToInput(adjustForKind(kind, v)) } : {}) });
-                }}
-              >
-                {DRAFT_ADJUSTMENT_KINDS.map((k) => (
-                  <option key={k} value={k}>
-                    {t(`receipt.kind.${k}`)}
-                  </option>
-                ))}
-              </select>
-              {r.label && <span className="hint small receipt-label">{r.label}</span>}
-            </div>
-            <input
-              className={`field exact ${r.amount.trim() !== '' && !parseSignedAmount(r.amount) ? 'invalid' : ''}`}
-              inputMode="decimal"
-              placeholder="0"
-              aria-label={t('receipt.extraAmount')}
-              value={r.amount}
-              onChange={(e) => {
-                const v = parseSignedAmount(e.target.value);
-                patchExtra(r.key, {
-                  amount:
-                    v !== null && v !== 0 && r.kind === 'discount' && v > 0 ? `-${e.target.value}` : e.target.value,
-                });
-              }}
-            />
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label={t('receipt.extraDelete')}
-              onClick={() => setExtras((rows) => rows.filter((x) => x.key !== r.key))}
-            >
-              ✕
-            </button>
-          </div>
+          <Row
+            key={r.key}
+            className="receipt-line"
+            title={
+              <span className="receipt-kind">
+                <select
+                  aria-label={t('receipt.extrasTitle')}
+                  value={r.kind}
+                  onChange={(e) => {
+                    const kind = e.target.value as DraftAdjustmentKind;
+                    const v = parseSignedAmount(r.amount);
+                    patchExtra(r.key, {
+                      kind,
+                      ...(v !== null ? { amount: signedToInput(adjustForKind(kind, v)) } : {}),
+                    });
+                  }}
+                >
+                  {DRAFT_ADJUSTMENT_KINDS.map((k) => (
+                    <option key={k} value={k}>
+                      {t(`receipt.kind.${k}`)}
+                    </option>
+                  ))}
+                </select>
+                <Icon name="down" size={16} stroke={2.2} />
+              </span>
+            }
+            subtitle={r.label || undefined}
+            right={
+              <>
+                <MoneyBox
+                  currency={cur}
+                  placeholder="0"
+                  aria-label={t('receipt.extraAmount')}
+                  invalid={r.amount.trim() !== '' && !parseSignedAmount(r.amount)}
+                  value={r.amount}
+                  onChange={(e) => {
+                    const v = parseSignedAmount(e.target.value);
+                    patchExtra(r.key, {
+                      amount:
+                        v !== null && v !== 0 && r.kind === 'discount' && v > 0 ? `-${e.target.value}` : e.target.value,
+                    });
+                  }}
+                />
+                <IconButton
+                  icon="x"
+                  variant="mute"
+                  label={t('receipt.extraDelete')}
+                  onClick={() => setExtras((rows) => rows.filter((x) => x.key !== r.key))}
+                />
+              </>
+            }
+          />
         ))}
-        <button
-          type="button"
-          className="row clickable link"
+        <Row
+          tone="link"
+          left={<Icon name="plus" size={20} stroke={2.2} />}
+          title={t('receipt.addExtra')}
           onClick={() => setExtras((rows) => [...rows, { key: nextKey(), kind: 'service', label: '', amount: '' }])}
-        >
-          {t('receipt.addExtra')}
-        </button>
+        />
       </Section>
 
-      <Section title={t('receipt.totalTitle')}>
-        <div className="row">
-          <span className="row-main">{t('receipt.sumLabel')}</span>
-          <span className="row-right receipt-sum">
-            <Money value={totals.sum} currency={cur} />
-          </span>
-        </div>
-        <div className="row">
-          <span className="row-main">{t('receipt.printedLabel')}</span>
-          <input
-            className={`field exact ${printedBad ? 'invalid' : ''}`}
-            inputMode="decimal"
-            placeholder={t('receipt.printedPlaceholder')}
-            aria-label={t('receipt.printedLabel')}
-            value={printed}
-            onChange={(e) => setPrinted(e.target.value)}
-          />
-        </div>
-        {printedValue !== null && (
-          <div className={`row receipt-check ${mismatch ? 'neg' : 'pos'}`} role="status">
-            {mismatch
-              ? t('receipt.mismatch', {
-                  printed: money(printedValue),
-                  sum: money(totals.sum),
-                  diff: money(totals.diff ?? 0),
-                })
-              : t('receipt.matches')}
+      <Section title={t('receipt.totalTitle')} footer={t('receipt.printedHint')}>
+        <Row
+          title={t('receipt.sumLabel')}
+          right={
+            <span className="receipt-sum">
+              <Money value={totals.sum} currency={cur} />
+            </span>
+          }
+        />
+        <Row
+          title={t('receipt.printedLabel')}
+          right={
+            <MoneyBox
+              currency={cur}
+              placeholder={t('receipt.printedPlaceholder')}
+              aria-label={t('receipt.printedLabel')}
+              invalid={printedBad}
+              value={printed}
+              onChange={(e) => setPrinted(e.target.value)}
+            />
+          }
+        />
+        {printedValue !== null && !mismatch && (
+          <div className="row receipt-check" role="status">
+            <OkLine>{t('receipt.matches')}</OkLine>
           </div>
         )}
         {mismatch && printedValue !== null && (
-          <div className="row buttons receipt-fix">
-            <button type="button" className="small-btn" onClick={() => setPrinted('')}>
-              {t('receipt.acceptSum')}
-            </button>
-            <button
-              type="button"
-              className="small-btn"
-              onClick={() =>
-                setExtras((rows) => [
-                  ...rows,
-                  {
-                    key: nextKey(),
-                    kind: 'other',
-                    label: t('receipt.otherLabel'),
-                    amount: signedToInput(printedValue - totals.sum),
-                  },
-                ])
-              }
-            >
-              {t('receipt.addOther')}
-            </button>
-          </div>
+          <>
+            <Row
+              className="receipt-check neg"
+              left={<Icon name="info" size={20} />}
+              title={t('receipt.mismatch', {
+                printed: money(printedValue),
+                sum: money(totals.sum),
+                diff: money(totals.diff ?? 0),
+              })}
+              wrap
+            />
+            <div className="receipt-fix">
+              <Button variant="tint" wide onClick={() => setPrinted('')}>
+                {t('receipt.acceptSum')}
+              </Button>
+              <Button
+                variant="fill"
+                wide
+                onClick={() =>
+                  setExtras((rows) => [
+                    ...rows,
+                    {
+                      key: nextKey(),
+                      kind: 'other',
+                      label: t('receipt.otherLabel'),
+                      amount: signedToInput(printedValue - totals.sum),
+                    },
+                  ])
+                }
+              >
+                {t('receipt.addOther')}
+              </Button>
+            </div>
+          </>
         )}
       </Section>
 
