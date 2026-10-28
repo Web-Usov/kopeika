@@ -1,5 +1,6 @@
 import { type ButtonHTMLAttributes, type CSSProperties, type InputHTMLAttributes, type ReactNode, useId } from 'react';
 import { type CategoryId, type CategoryTone, categoryIcon, categoryTone } from '../../shared/categories.ts';
+import type { Key } from '../../shared/i18n/index.ts';
 import { formatMoney } from '../../shared/money.ts';
 import type { Member } from './api.ts';
 import { dateLocale, lang, t } from './i18n.ts';
@@ -705,9 +706,13 @@ export function BigField({ label, error, ...input }: InputProps & { label: strin
 }
 
 /** Поле суммы в строке позиции: 40 px, фон `--fill`. */
-export function Box({ invalid = false, ...input }: InputProps & { invalid?: boolean }) {
+export function Box({
+  invalid = false,
+  narrow = false,
+  ...input
+}: InputProps & { invalid?: boolean /** 96 px вместо 120: слева нужно место под название. */; narrow?: boolean }) {
   return (
-    <span className={cx('box', invalid && 'input-err')}>
+    <span className={cx('box', narrow && 'narrow', invalid && 'input-err')}>
       <input {...input} aria-invalid={invalid || undefined} />
     </span>
   );
@@ -724,7 +729,7 @@ export function QuickInput({ forceFocus = false, ...input }: InputProps & { forc
 }
 
 /** Знак валюты для плашки: «₽», «$», «₾»; если знака нет — код. */
-function currencySign(code: string): string {
+export function currencySign(code: string): string {
   try {
     const parts = new Intl.NumberFormat(dateLocale, {
       style: 'currency',
@@ -735,6 +740,11 @@ function currencySign(code: string): string {
   } catch {
     return code;
   }
+}
+
+/** Валюта в выборе: знак и название из словаря, «₽ Рубль». Общая для формы группы и чека. */
+export function currencyLabel(code: string): string {
+  return `${currencySign(code)} ${t(`currencies.${code}` as Key)}`;
 }
 
 /**
@@ -1398,5 +1408,61 @@ export function CategoryStat({
         </span>
       </div>
     </div>
+  );
+}
+
+/**
+ * Плитка фото (`.photo`): иконка в плитке `--tint`, подпись; под ней скрытый выбор файла.
+ * `capture` — сразу камера. Две плитки кладут в `<PhotoTiles>`.
+ */
+export function PhotoTile({
+  icon,
+  label,
+  capture = false,
+  onFile,
+}: {
+  icon: IconName;
+  label: string;
+  capture?: boolean;
+  onFile: (file: File | undefined) => void;
+}) {
+  return (
+    <label className="photo">
+      <span className="pi" aria-hidden="true">
+        <Icon name={icon} size={26} stroke={2} />
+      </span>
+      {label}
+      <input
+        type="file"
+        accept="image/*"
+        {...(capture ? { capture: 'environment' as const } : {})}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = ''; // тот же файл можно выбрать снова
+          onFile(file);
+        }}
+      />
+    </label>
+  );
+}
+
+/** Две плитки фото в ряд, поровну. */
+export function PhotoTiles({ children }: { children: ReactNode }) {
+  return <div className="photos">{children}</div>;
+}
+
+/** Советы с зелёными галочками (`.tips`): старт разбора чека. */
+export function Tips({ items }: { items: ReactNode[] }) {
+  return (
+    <ul className="tips">
+      {items.map((item, i) => (
+        <li className="tip" key={i}>
+          <span aria-hidden="true">
+            <Icon name="check" size={20} stroke={2.4} />
+          </span>
+          {item}
+        </li>
+      ))}
+    </ul>
   );
 }
