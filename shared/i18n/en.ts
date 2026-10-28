@@ -833,6 +833,7 @@ export const en: Dict = {
     expenseNotFound: 'Expense not found',
     recurringNotFound: 'Recurring expense not found',
     invalidData: 'Invalid data',
+    payloadTooLarge: 'The request is too large',
     internal: 'Something went wrong on our side. Please try again.',
     shareUnavailable: 'The bot is unavailable right now — try again a bit later',
     exportBotUnavailable:
