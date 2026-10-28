@@ -5,7 +5,15 @@ services:
     image: ghcr.io/web-usov/kopeika:latest
     container_name: kopeika
     restart: unless-stopped
-    # Values come from .env next to this file (docker compose) or the stack's Environment variables (Portainer).
+    # Every variable of the env file goes into the container (ADMIN_USER_IDS, RECEIPTS_*, limits, ...):
+    # .env next to this file (docker compose) or stack.env (Portainer's Environment variables of the stack).
+    # Either file may be missing; if both exist, stack.env wins.
+    env_file:
+      - path: .env
+        required: false
+      - path: stack.env
+        required: false
+    # The same values are also used for ${...} below. Entries here override env_file.
     environment:
       BOT_TOKEN: ${BOT_TOKEN:?BOT_TOKEN is required}
       APP_URL: ${APP_URL:-https://kopeika.usov-home.ru}

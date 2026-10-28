@@ -47,11 +47,13 @@ npm run typecheck
 - `ghcr.io/web-usov/kopeika:1.2.3` — релиз с git-тегом `v1.2.3`.
 
 ```bash
-cp .env.example .env   # BOT_TOKEN, APP_URL, APP_SHORT_NAME
+cp .env.example .env   # BOT_TOKEN, APP_URL, APP_SHORT_NAME и остальное по желанию
 docker compose pull && docker compose up -d
 ```
 
-В Portainer можно вставить [docker-compose.yml](docker-compose.yml) как stack, а переменные из `.env.example` задать в Environment variables. Обновление: pull + redeploy стека.
+Все переменные из env-файла попадают в контейнер через `env_file` в [docker-compose.yml](docker-compose.yml): `.env` рядом с compose-файлом (docker compose) и `stack.env` (файл переменных стека в Portainer). Любого из файлов может не быть; если есть оба, `stack.env` приоритетнее. `BOT_TOKEN` обязателен.
+
+В Portainer можно вставить [docker-compose.yml](docker-compose.yml) как stack, а переменные из `.env.example` задать в Environment variables. После добавления или изменения переменных нужен redeploy стека. Обновление: pull + redeploy стека.
 
 Собрать образ локально: `docker build -t kopeika .`
 
