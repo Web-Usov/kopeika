@@ -1284,3 +1284,119 @@ export function DemoNote({ text, actionLabel, onAction }: { text: string; action
     </div>
   );
 }
+
+export type DebtLine = { text: string; copyLabel: string; onCopy: () => void; copied?: boolean };
+
+/**
+ * Карточка долга: аватар, имя, подпись («должен(на) вам» / «вы должны») и сумма; реквизиты строками
+ * с кнопкой «Скопировать» (`lines`) или подсказка, если их нет (`hint`); ряд кнопок (`children`) и причина,
+ * если действие недоступно (`reason`).
+ */
+export function DebtCard({
+  member,
+  caption,
+  amount,
+  lines,
+  hint,
+  reason,
+  children,
+}: {
+  member: AvatarMember;
+  caption: string;
+  amount: ReactNode;
+  lines?: DebtLine[];
+  hint?: string;
+  reason?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <Card className="debt">
+      <div className="debt-head">
+        <Avatar member={member} size="l" />
+        <div className="debt-who">
+          <div className="debt-name">{member.name}</div>
+          <div className="debt-cap">{caption}</div>
+        </div>
+        <div className="debt-sum">{amount}</div>
+      </div>
+      {lines && lines.length > 0 && (
+        <div className="debt-lines">
+          {lines.map((l) => (
+            <div key={l.text} className="debt-line">
+              <span className="debt-text">{l.text}</span>
+              <IconButton icon={l.copied ? 'check' : 'copy'} label={l.copyLabel} onClick={l.onCopy} />
+            </div>
+          ))}
+        </div>
+      )}
+      {hint && <div className="debt-hint">{hint}</div>}
+      {children && <div className="btn-pair">{children}</div>}
+      {reason && <div className="debt-reason">{reason}</div>}
+    </Card>
+  );
+}
+
+/** Полоса баланса с чертой посередине: вправо зелёная (вам должны), влево красная (вы должны). `ratio` — доля от 0 до 1. */
+export function BalanceTrack({ value, ratio }: { value: number; ratio: number }) {
+  const width = `${Math.min(1, Math.max(0, ratio)) * 50}%`;
+  return (
+    <span className="track" aria-hidden="true">
+      {value !== 0 && <i className={value > 0 ? 'r' : 'l'} style={{ width }} />}
+    </span>
+  );
+}
+
+/** Строка баланса в одну линию: аватар `s`, имя, полоса от центральной черты и сумма справа. */
+export function BalanceRow({
+  member,
+  name,
+  value,
+  ratio,
+  amount,
+}: {
+  member: AvatarMember;
+  name: ReactNode;
+  value: number;
+  ratio: number;
+  amount: ReactNode;
+}) {
+  return (
+    <div className="row brow">
+      <Avatar member={member} size="s" />
+      <span className="brow-name">{name}</span>
+      <BalanceTrack value={value} ratio={ratio} />
+      <span className={cx('brow-amount', value > 0 && 'pos', value < 0 && 'neg')}>{amount}</span>
+    </div>
+  );
+}
+
+/** Строка статистики: малая плитка категории, название и сумма на одной линии, под ними полоса цвета категории (`ratio` от 0 до 1). */
+export function CategoryStat({
+  category,
+  title,
+  amount,
+  ratio,
+}: {
+  category: CategoryId | string;
+  title: ReactNode;
+  amount: ReactNode;
+  ratio: number;
+}) {
+  return (
+    <div className="row cstat">
+      <CategoryTile category={category} size="s" />
+      <div className="cstat-main">
+        <div className="cstat-line">
+          <span className="cstat-title">{title}</span>
+          <span className="cstat-amount">{amount}</span>
+        </div>
+        <span className="stat-bar">
+          <i
+            className={`stat-fill tone-${categoryTone(category)}`}
+            style={{ width: `${Math.min(1, Math.max(0, ratio)) * 100}%` }}
+          />
+        </span>
+      </div>
+    </div>
+  );
+}

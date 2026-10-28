@@ -2735,3 +2735,213 @@ select.field {
 .row .rr b {
   font-weight: 600;
 }
+
+/* --- DebtCard: карточка долга (Балансы) --- */
+.debts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.card.debt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.debt-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.debt-who {
+  flex: 1;
+  min-width: 0;
+}
+
+.debt-name {
+  font-size: var(--fs-body);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.debt-cap {
+  font-size: var(--fs-callout);
+  color: var(--sub);
+}
+
+.debt-sum {
+  flex: none;
+  font-size: var(--fs-title-m);
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.debt-lines {
+  border-top: 0.5px solid var(--sep);
+}
+
+.debt-line {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: var(--h-btn);
+}
+
+.debt-line + .debt-line {
+  border-top: 0.5px solid var(--sep);
+}
+
+.debt-text {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-callout);
+  overflow-wrap: anywhere;
+}
+
+.debt-line .ibtn {
+  flex: none;
+  margin-right: calc(-1 * var(--sp-3));
+  color: var(--link);
+}
+
+.debt-hint,
+.debt-reason {
+  font-size: var(--fs-footnote);
+  color: var(--sub);
+}
+
+.debt-reason {
+  margin-top: calc(-1 * var(--sp-1));
+}
+
+/* --- BalanceTrack и CategoryStat --- */
+.track {
+  position: relative;
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--fill);
+}
+
+.track::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -4px;
+  bottom: -4px;
+  width: 1.5px;
+  margin-left: -0.75px;
+  background: var(--line2);
+}
+
+.track i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.track i.r {
+  left: 50%;
+  border-radius: 0 4px 4px 0;
+  background: var(--pos);
+}
+
+.track i.l {
+  right: 50%;
+  border-radius: 4px 0 0 4px;
+  background: var(--neg);
+}
+
+.stat-bar {
+  display: block;
+  height: 4px;
+  margin-top: var(--sp-2);
+  border-radius: 2px;
+  background: var(--fill);
+  overflow: hidden;
+}
+
+.stat-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+}
+
+.stat-fill.tone-food,
+.stat-fill.tone-groc,
+.stat-fill.tone-home,
+.stat-fill.tone-taxi,
+.stat-fill.tone-fun,
+.stat-fill.tone-shop,
+.stat-fill.tone-other {
+  background: currentColor;
+}
+
+.section-body > .segmented {
+  margin-bottom: var(--sp-2);
+}
+
+.brow {
+  gap: var(--sp-3);
+}
+
+.brow-name {
+  flex: 0 0 24%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brow .track {
+  flex: 1;
+  min-width: 0;
+}
+
+.brow-amount {
+  flex: 0 0 30%;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+  color: var(--hint);
+}
+
+.brow-amount .money {
+  font-weight: 600;
+}
+
+.cstat {
+  gap: var(--sp-3);
+}
+
+.cstat-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.cstat-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.cstat-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cstat-amount {
+  flex: none;
+}
+
+.cstat .stat-bar {
+  margin-top: var(--sp-2);
+}

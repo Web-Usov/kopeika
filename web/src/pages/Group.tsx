@@ -1,6 +1,6 @@
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { type ActivityEntry, activityText } from '../../../shared/activity.ts';
-import { type CategoryId, type CategoryTotal, categoryEmoji, categoryKey } from '../../../shared/categories.ts';
+import { type CategoryId, type CategoryTotal, categoryKey } from '../../../shared/categories.ts';
 import { formatMoney } from '../../../shared/money.ts';
 import { parseQuickExpense } from '../../../shared/quickExpense.ts';
 import {
@@ -29,15 +29,19 @@ import {
   copyText,
   haptic,
   MainButton,
-  openLink,
   shareLink,
   shareMessage,
 } from '../tg.tsx';
 import {
   Avatar,
   BalanceBlock,
+  BalanceRow,
   Button,
+  Card,
+  CategoryStat,
   DayHeader,
+  DebtCard,
+  type DebtLine,
   DemoNote,
   EmptyState,
   ErrorView,
@@ -482,69 +486,72 @@ function HistoryTab({ g }: { g: GroupDetail }) {
 
 function BalancesTab({ g }: { g: GroupDetail }) {
   const member = (id: number) => g.members.find((m) => m.id === id)!;
-  const label = (id: number) => (id === g.meId ? t('common.you') : member(id).name);
   const maxAbs = Math.max(1, ...g.members.map((m) => Math.abs(m.balance)));
+  const owedToMe = g.settlements.filter((s) => s.to === g.meId);
+  const iPay = g.settlements.filter((s) => s.from === g.meId);
+  const others = g.settlements.filter((s) => s.to !== g.meId && s.from !== g.meId);
+  const sum = (list: { amount: number }[]) => list.reduce((acc, s) => acc + s.amount, 0);
+  const markTransfer = (s: { from: number; to: number; amount: number }) =>
+    navigate(`/g/${g.id}/transfer/new?from=${s.from}&to=${s.to}&amount=${s.amount}`);
 
   return (
     <>
-      <Section title={t('group.balancesTitle')} footer={t('group.balancesFooter')}>
+      {owedToMe.length > 0 && (
+        <Section bare title={t('group.owedToYouTitle')} aside={<Money value={sum(owedToMe)} currency={g.currency} />}>
+          <div className="debts">
+            {owedToMe.map((s) => (
+              <OwedCard key={s.from} g={g} debtor={member(s.from)} amount={s.amount} onMark={() => markTransfer(s)} />
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {iPay.length > 0 && (
+        <Section bare title={t('group.youPayTitle')} aside={<Money value={sum(iPay)} currency={g.currency} />}>
+          <div className="debts">
+            {iPay.map((s) => (
+              <PayCard key={s.to} g={g} to={member(s.to)} amount={s.amount} onMark={() => markTransfer(s)} />
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {others.length > 0 && (
+        <Section title={t('group.othersTitle')}>
+          {others.map((s) => (
+            <Row
+              key={`${s.from}-${s.to}`}
+              title={`${member(s.from).name} → ${member(s.to).name}`}
+              right={<Money value={s.amount} currency={g.currency} />}
+              chevron
+              onClick={() => markTransfer(s)}
+            />
+          ))}
+        </Section>
+      )}
+
+      {g.settlements.length === 0 && (
+        <Card>
+          <EmptyState icon="check" tone="pos" title={t('group.allSettled')} />
+        </Card>
+      )}
+
+      <Button variant="ghost" wide icon="plus" onClick={() => navigate(`/g/${g.id}/transfer/new`)}>
+        {t('group.manualTransfer')}
+      </Button>
+
+      <Section title={t('group.balancesTitle')} footer={t('group.balancesFooter')} inset={60}>
         {g.members.map((m) => (
-          <Row
+          <BalanceRow
             key={m.id}
-            left={<Avatar member={m} />}
-            title={m.id === g.meId ? t('common.youParen', { name: m.name }) : m.name}
-            subtitle={
-              <span className="bar">
-                <span
-                  className={m.balance >= 0 ? 'pos' : 'neg'}
-                  style={{ width: `${(Math.abs(m.balance) / maxAbs) * 100}%` }}
-                />
-              </span>
-            }
-            right={
-              m.balance === 0 ? (
-                <span className="hint">0</span>
-              ) : (
-                <Money value={m.balance} currency={g.currency} signed />
-              )
-            }
+            member={m}
+            name={m.id === g.meId ? t('common.you') : m.name}
+            value={m.balance}
+            ratio={Math.abs(m.balance) / maxAbs}
+            amount={m.balance === 0 ? '0' : <Money value={m.balance} currency={g.currency} signed />}
           />
         ))}
       </Section>
-
-      <Section title={t('group.howToSettle')}>
-        {g.settlements.length === 0 ? (
-          <div className="row hint">{t('group.allSettled')}</div>
-        ) : (
-          g.settlements.map((s) => (
-            <Fragment key={`${s.from}-${s.to}`}>
-              <Row
-                title={
-                  <>
-                    {label(s.from)} → {label(s.to)}
-                  </>
-                }
-                subtitle={<Money value={s.amount} currency={g.currency} />}
-                right={
-                  <button
-                    type="button"
-                    className="small-btn"
-                    onClick={() => navigate(`/g/${g.id}/transfer/new?from=${s.from}&to=${s.to}&amount=${s.amount}`)}
-                  >
-                    {t('group.returned')}
-                  </button>
-                }
-              />
-              {s.from === g.meId && <PaymentDetails to={member(s.to)} />}
-              {s.to === g.meId && <RemindRow g={g} debtor={member(s.from)} />}
-            </Fragment>
-          ))
-        )}
-      </Section>
-
-      <button type="button" className="text-btn" onClick={() => navigate(`/g/${g.id}/transfer/new`)}>
-        {t('group.manualTransfer')}
-      </button>
 
       <Stats g={g} />
     </>
@@ -554,97 +561,93 @@ function BalancesTab({ g }: { g: GroupDetail }) {
 function Stats({ g }: { g: GroupDetail }) {
   // Category totals are computed by the server over all expenses, not from the loaded page.
   const [totals, setTotals] = useState<{ group: CategoryTotal[]; mine: CategoryTotal[] }>();
+  const [scope, setScope] = useState<'group' | 'mine'>('group');
   const stamp = `${g.expensesTotal}:${g.totalSpent}`;
   useEffect(() => {
     api.stats(g.id).then(setTotals, () => {});
   }, [g.id, stamp]);
   if (!totals) return null;
-  const { group, mine } = totals;
+  const list = totals[scope];
+  const max = list[0]?.amount ?? 1;
   return (
-    <>
-      <Section title={`${t('group.statsTitle')} · ${t('group.statsGroup')}`}>
-        <CategoryBars totals={group} currency={g.currency} empty={t('group.statsEmpty')} />
-      </Section>
-      <Section title={`${t('group.statsTitle')} · ${t('group.statsMine')}`} footer={t('group.statsFooter')}>
-        <CategoryBars totals={mine} currency={g.currency} empty={t('group.statsMineEmpty')} />
-      </Section>
-    </>
-  );
-}
-
-function CategoryBars({
-  totals,
-  currency,
-  empty,
-}: {
-  totals: { category: CategoryId; amount: number }[];
-  currency: string;
-  empty: string;
-}) {
-  if (totals.length === 0) return <div className="row hint">{empty}</div>;
-  const max = totals[0].amount;
-  return (
-    <>
-      {totals.map((c) => (
-        <Row
-          key={c.category}
-          left={<span className="expense-icon">{categoryEmoji(c.category)}</span>}
-          title={t(categoryKey(c.category))}
-          subtitle={
-            <span className="bar">
-              <span className="accent" style={{ width: `${(c.amount / max) * 100}%` }} />
-            </span>
-          }
-          right={<Money value={c.amount} currency={currency} />}
-        />
-      ))}
-    </>
+    <Section title={t('group.statsTitle')} footer={scope === 'mine' ? t('group.statsFooter') : undefined} inset={60}>
+      <Segmented
+        value={scope}
+        options={[
+          { value: 'group', label: t('group.statsGroup') },
+          { value: 'mine', label: t('group.statsMine') },
+        ]}
+        onChange={setScope}
+      />
+      {list.length === 0 ? (
+        <div className="row hint">{scope === 'group' ? t('group.statsEmpty') : t('group.statsMineEmpty')}</div>
+      ) : (
+        list.map((c) => (
+          <CategoryStat
+            key={c.category}
+            category={c.category}
+            title={t(categoryKey(c.category))}
+            amount={<Money value={c.amount} currency={g.currency} />}
+            ratio={c.amount / max}
+          />
+        ))
+      )}
+    </Section>
   );
 }
 
 const spaced = (digits: string, size: number) => digits.replace(new RegExp(`(.{${size}})(?=.)`, 'g'), '$1 ');
 
-/** What the debtor needs to pay the creditor: details with one-tap copy buttons. */
-function PaymentDetails({ to }: { to: Member }) {
+/** Debt I owe: the creditor's details with one-tap copy buttons and "mark as paid". */
+function PayCard({ g, to, amount, onMark }: { g: GroupDetail; to: Member; amount: number; onMark: () => void }) {
   const info: PaymentInfo = to.paymentInfo;
-  const [copied, setCopied] = useState<'phone' | 'card'>();
-  if (!hasPaymentInfo(info)) return <div className="row hint small">{t('payment.none', { name: to.name })}</div>;
-
-  const copy = async (what: 'phone' | 'card') => {
-    if (!(await copyText(info[what]!))) return;
-    setCopied(what);
+  const [copied, setCopied] = useState<string>();
+  const copy = async (key: string, value: string) => {
+    if (!(await copyText(value))) return;
+    setCopied(key);
     setTimeout(() => setCopied(undefined), 2000);
   };
-
+  const line = (key: string, text: string, value: string, label: string): DebtLine => ({
+    text,
+    copyLabel: copied === key ? t('payment.copied') : label,
+    copied: copied === key,
+    onCopy: () => copy(key, value),
+  });
+  const lines: DebtLine[] = [];
+  if (info.phone || info.bank) {
+    const text = [info.phone, info.bank].filter(Boolean).join(' · ');
+    lines.push(line('phone', text, info.phone ?? text, info.phone ? t('payment.copyPhone') : t('payment.copy')));
+  }
+  if (info.card) lines.push(line('card', spaced(info.card, 4), info.card, t('payment.copyCard')));
+  if (info.link) lines.push(line('link', info.link, info.link, t('payment.copyLink')));
+  if (info.note) lines.push(line('note', info.note, info.note, t('payment.copy')));
   return (
-    <div className="row payment">
-      {info.phone && <span className="payment-line">{[info.phone, info.bank].filter(Boolean).join(' · ')}</span>}
-      {!info.phone && info.bank && <span className="payment-line">{info.bank}</span>}
-      {info.card && <span className="payment-line">{spaced(info.card, 4)}</span>}
-      {info.note && <span className="payment-line">{info.note}</span>}
-      <div className="buttons-wrap">
-        {info.phone && (
-          <button type="button" className="small-btn" onClick={() => copy('phone')}>
-            {copied === 'phone' ? t('payment.copied') : t('payment.copyPhone')}
-          </button>
-        )}
-        {info.card && (
-          <button type="button" className="small-btn" onClick={() => copy('card')}>
-            {copied === 'card' ? t('payment.copied') : t('payment.copyCard')}
-          </button>
-        )}
-        {info.link && (
-          <button type="button" className="small-btn" onClick={() => openLink(info.link!)}>
-            {t('payment.openLink')}
-          </button>
-        )}
-      </div>
-    </div>
+    <DebtCard
+      member={to}
+      caption={t('group.youOweCaption')}
+      amount={<Money value={amount} currency={g.currency} />}
+      lines={hasPaymentInfo(info) ? lines : undefined}
+      hint={hasPaymentInfo(info) ? undefined : t('payment.none', { name: to.name })}
+    >
+      <Button variant="tint" onClick={onMark}>
+        {t('group.markTransfer')}
+      </Button>
+    </DebtCard>
   );
 }
 
-/** "Remind" under a debt owed to me: the bot nudges the debtor; once a day per person. */
-function RemindRow({ g, debtor }: { g: GroupDetail; debtor: Member }) {
+/** Debt owed to me: "mark as paid" and "remind" (the bot nudges the debtor; once a day per person). */
+function OwedCard({
+  g,
+  debtor,
+  amount,
+  onMark,
+}: {
+  g: GroupDetail;
+  debtor: Member;
+  amount: number;
+  onMark: () => void;
+}) {
   const [state, setState] = useState<'idle' | 'busy' | 'done'>('idle');
   const remind = async () => {
     setState('busy');
@@ -659,21 +662,19 @@ function RemindRow({ g, debtor }: { g: GroupDetail; debtor: Member }) {
       await alertDialog((e as Error).message);
     }
   };
-  if (!debtor.canNotify) {
-    return (
-      <div className="row buttons-wrap-row">
-        <button type="button" className="small-btn" disabled>
-          {t('group.remind')}
-        </button>
-        <span className="hint small">{t('group.remindNoNotify', { name: debtor.name })}</span>
-      </div>
-    );
-  }
   return (
-    <div className="row buttons-wrap-row">
-      <button type="button" className="small-btn" disabled={state !== 'idle'} onClick={remind}>
+    <DebtCard
+      member={debtor}
+      caption={t('group.owesYou')}
+      amount={<Money value={amount} currency={g.currency} />}
+      reason={debtor.canNotify ? undefined : t('group.remindNoNotify', { name: debtor.name })}
+    >
+      <Button variant="tint" onClick={onMark}>
+        {t('group.markTransfer')}
+      </Button>
+      <Button variant="fill" disabled={!debtor.canNotify || state !== 'idle'} onClick={remind}>
         {state === 'done' ? t('group.reminded') : t('group.remind')}
-      </button>
-    </div>
+      </Button>
+    </DebtCard>
   );
 }
