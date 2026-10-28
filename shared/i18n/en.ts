@@ -169,8 +169,8 @@ export const en: Dict = {
     biggest: 'Biggest expense',
     biggestBy: 'paid by {name}',
     members: 'Who paid what',
-    paid: 'paid {amount}',
-    consumed: 'share {amount}',
+    part: 'share {amount}',
+    titlesNote: 'Titles go to the biggest amount in their category.',
     share: 'Share summary',
     copied: 'Summary copied — paste it into a chat',
     empty: 'No summary yet',
@@ -193,6 +193,8 @@ export const en: Dict = {
   achievements: {
     title: 'Achievements',
     counter: '{done}/{total}',
+    got: 'unlocked',
+    counterOf: '{done} of {total}',
     progress: '{current} of {target}',
     newTitle: 'New achievement!',
     items: {

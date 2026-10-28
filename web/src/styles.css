@@ -426,12 +426,6 @@ button:disabled {
   text-align: left;
 }
 
-.stack-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-}
-
 .expense-icon {
   width: 36px;
   height: 36px;
@@ -958,10 +952,6 @@ select.field {
   color: var(--sub);
 }
 
-.bar span.accent {
-  background: var(--btn);
-}
-
 /* --- Payment details --- */
 .payment-line {
   display: block;
@@ -1073,78 +1063,6 @@ select.field {
   .celebration {
     animation: none;
   }
-}
-
-/* --- Summary --- */
-.summary-card {
-  background: var(--sec);
-  border-radius: var(--r-m);
-  padding: 16px;
-  margin-bottom: 12px;
-  text-align: center;
-}
-
-.summary-hero {
-  background: var(--btn);
-  color: var(--btn-text);
-}
-
-.summary-big {
-  font-size: 36px;
-  font-weight: 700;
-  line-height: 1.2;
-  margin: 4px 0;
-  overflow-wrap: anywhere;
-}
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.summary-grid .summary-card {
-  margin-bottom: 0;
-}
-
-.summary-grid + .summary-card {
-  margin-top: 12px;
-}
-
-.summary-emoji {
-  font-size: 32px;
-  line-height: 1.2;
-}
-
-.summary-label {
-  color: var(--hint);
-  font-size: 13px;
-}
-
-.summary-value {
-  font-size: 20px;
-  font-weight: 700;
-  margin: 2px 0;
-  overflow-wrap: anywhere;
-}
-
-.title-chip {
-  display: block;
-  width: fit-content;
-  max-width: 100%;
-  white-space: normal;
-  margin-bottom: 4px;
-  padding: 1px 8px;
-  border-radius: 10px;
-  background: var(--fill);
-  color: var(--link);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.summary-hero .summary-label {
-  color: inherit;
-  opacity: 0.85;
 }
 
 /* --- Шаги (Steps): карточка с номерами и линией --- */
@@ -1283,49 +1201,6 @@ select.field {
 .badge.gray {
   background: var(--fill);
   color: var(--sub-strong);
-}
-
-/* --- Achievements --- */
-.achievement {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-}
-
-.achievement + .achievement {
-  border-top: 1px solid var(--sep);
-}
-
-.achievement-emoji {
-  font-size: 28px;
-  line-height: 1;
-}
-
-.achievement-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.achievement-title {
-  font-weight: 600;
-}
-
-.achievement-progress {
-  white-space: nowrap;
-}
-
-.achievement.locked .achievement-emoji {
-  filter: grayscale(1);
-  opacity: 0.45;
-}
-
-.achievement.locked .achievement-title {
-  color: var(--hint);
-}
-
-.achievement.unlocked .achievement-title {
-  color: var(--link);
 }
 
 /* --- Receipt scan --- */
@@ -2560,4 +2435,303 @@ select.field {
 
 .intro-who .stack {
   margin-top: 0;
+}
+
+/* --- Итоги: шапка, полоса категорий (StackBar), факты (Fact), достижения (Medal) --- */
+.sum-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  text-align: center;
+}
+
+.sum-head .ttl {
+  padding: 0;
+  overflow-wrap: anywhere;
+}
+
+.sum-head .lead {
+  margin: 0;
+}
+
+.sum-total {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.sum-total-label {
+  color: var(--hint);
+  font-size: var(--fs-footnote);
+}
+
+.sum-total-amount {
+  font-size: var(--fs-display);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.sum-total-amount.long {
+  font-size: var(--fs-title-l);
+}
+
+.stackbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.stackbar-track {
+  display: flex;
+  gap: 2px;
+  height: var(--sp-3);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+}
+
+.stackbar-track span {
+  flex-basis: 0;
+  min-width: var(--sp-1);
+}
+
+.stackbar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--sub-strong);
+  font-size: var(--fs-footnote);
+}
+
+.stackbar-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.stackbar-legend .dot {
+  width: var(--sp-2);
+  height: var(--sp-2);
+  border-radius: 2px;
+  flex: none;
+}
+
+.seg-food {
+  background: var(--c-food);
+}
+
+.seg-groc {
+  background: var(--c-groc);
+}
+
+.seg-home {
+  background: var(--c-home);
+}
+
+.seg-taxi {
+  background: var(--c-taxi);
+}
+
+.seg-fun {
+  background: var(--c-fun);
+}
+
+.seg-shop {
+  background: var(--c-shop);
+}
+
+.seg-other {
+  background: var(--c-other);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-3);
+}
+
+.fact {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-1);
+  min-width: 0;
+  padding: var(--sp-3);
+  border-radius: var(--r-l);
+  background: var(--sec);
+}
+
+.fact.compact {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+}
+
+.fact .tile {
+  flex: none;
+}
+
+.fact-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fact-line {
+  color: var(--sub-strong);
+  font-size: var(--fs-callout);
+  overflow-wrap: anywhere;
+}
+
+.fact-line b {
+  color: var(--text);
+  font-size: var(--fs-body);
+  font-weight: 600;
+}
+
+.fact .tile {
+  margin-bottom: var(--sp-2);
+}
+
+.fact-label {
+  color: var(--hint);
+  white-space: nowrap;
+  font-size: var(--fs-footnote);
+}
+
+.fact-value {
+  max-width: 100%;
+  font-size: var(--fs-headline);
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.fact-caption {
+  max-width: 100%;
+  color: var(--sub-strong);
+  font-size: var(--fs-callout);
+  overflow-wrap: anywhere;
+}
+
+.paid-bar {
+  display: block;
+  height: var(--sp-1);
+  margin-top: var(--sp-2);
+  border-radius: var(--r-pill);
+  background: var(--fill);
+  overflow: hidden;
+}
+
+.paid-bar span {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--btn);
+}
+
+.medals {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-2);
+}
+
+.medal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: var(--sp-3) var(--sp-2);
+  border-radius: var(--r-l);
+  text-align: center;
+}
+
+.medal {
+  background: var(--sec);
+  hyphens: auto;
+}
+
+.medal-icon {
+  width: var(--tile);
+  height: var(--tile);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.medal.on .medal-icon {
+  background: var(--brand-tint);
+  color: var(--brand-text);
+  box-shadow: inset 0 0 0 2px var(--brand);
+}
+
+.medal.off .medal-icon {
+  background: var(--fill2);
+  color: var(--hint);
+  font-size: var(--fs-headline);
+  font-weight: 600;
+}
+
+.medal-state {
+  color: var(--brand-text);
+  font-size: var(--fs-caption);
+  font-weight: 500;
+}
+
+.section-title .sum-count {
+  color: var(--brand-text);
+  font-weight: 600;
+}
+
+.medal-title {
+  max-width: 100%;
+  hyphens: auto;
+  font-size: var(--fs-footnote);
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.medal-title {
+  color: var(--text);
+}
+
+.medal-bar {
+  align-self: stretch;
+  height: var(--sp-1);
+  border-radius: var(--r-pill);
+  background: var(--fill2);
+  overflow: hidden;
+}
+
+.medal-bar span {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--brand);
+}
+
+.medal-progress {
+  color: var(--hint);
+  font-size: var(--fs-caption);
+  font-weight: 500;
+}
+
+.row-title .badge {
+  margin-left: var(--sp-2);
+  vertical-align: middle;
+}
+
+.row .rr b {
+  font-weight: 600;
 }

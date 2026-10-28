@@ -170,8 +170,8 @@ export const ru = {
     biggest: 'Самая крупная трата',
     biggestBy: 'платил(а) {name}',
     members: 'Кто сколько',
-    paid: 'заплатил(а) {amount}',
-    consumed: 'на долю {amount}',
+    part: 'доля {amount}',
+    titlesNote: 'Титулы — за самую большую сумму в своей категории.',
     share: 'Поделиться итогами',
     copied: 'Итоги скопированы — вставьте их в чат',
     empty: 'Итогов пока нет',
@@ -194,6 +194,8 @@ export const ru = {
   achievements: {
     title: 'Достижения',
     counter: '{done}/{total}',
+    got: 'получено',
+    counterOf: '{done} из {total}',
     progress: '{current} из {target}',
     newTitle: 'Новое достижение!',
     items: {

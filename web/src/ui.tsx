@@ -1,5 +1,5 @@
 import { type ButtonHTMLAttributes, type CSSProperties, type InputHTMLAttributes, type ReactNode, useId } from 'react';
-import { type CategoryId, categoryIcon, categoryTone } from '../../shared/categories.ts';
+import { type CategoryId, type CategoryTone, categoryIcon, categoryTone } from '../../shared/categories.ts';
 import { formatMoney } from '../../shared/money.ts';
 import type { Member } from './api.ts';
 import { dateLocale, lang, t } from './i18n.ts';
@@ -956,6 +956,112 @@ export function Intro({
       {lead && <p className="intro-lead">{lead}</p>}
       {children}
     </header>
+  );
+}
+
+/**
+ * Сводная полоса категорий (итоги) и легенда под ней. Ширина сегмента — доля `value`; цвет — по `tone` категории
+ * (`categoryTone`). Смысл не держится на цвете: каждый сегмент подписан в легенде.
+ */
+export function StackBar({ items }: { items: { tone: CategoryTone; value: number; label: ReactNode }[] }) {
+  return (
+    <div className="stackbar">
+      <div className="stackbar-track" aria-hidden="true">
+        {items.map((i) => (
+          <span key={i.tone} className={`seg-${i.tone}`} style={{ flexGrow: i.value }} />
+        ))}
+      </div>
+      <ul className="stackbar-legend">
+        {items.map((i) => (
+          <li key={i.tone}>
+            <span className={`dot seg-${i.tone}`} aria-hidden="true" />
+            {i.label}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * Плитка факта (итоги): малая плитка, подпись, значение `headline` и пояснение (сумма).
+ * `compact` — строка на всю ширину: плитка слева, справа подпись и строка `value` (сумма и название).
+ */
+export function Fact({
+  icon,
+  tone,
+  label,
+  value,
+  caption,
+  compact = false,
+}: {
+  icon: IconName;
+  tone: TileTone;
+  label: ReactNode;
+  value: ReactNode;
+  caption?: ReactNode;
+  compact?: boolean;
+}) {
+  if (compact)
+    return (
+      <div className="fact compact">
+        <Tile icon={icon} tone={tone} />
+        <div className="fact-text">
+          <div className="fact-label">{label}</div>
+          <div className="fact-line">{value}</div>
+        </div>
+      </div>
+    );
+  return (
+    <div className="fact">
+      <Tile icon={icon} tone={tone} size="s" />
+      <div className="fact-label">{label}</div>
+      <div className="fact-value">{value}</div>
+      {caption && <div className="fact-caption">{caption}</div>}
+    </div>
+  );
+}
+
+/**
+ * Достижение: получено — кружок с медной обводкой и подпись «получено»; не получено — серый кружок
+ * (для счётных — число `count`), а с `progress` ещё и медная полоса и «5 из 10».
+ * `hint` — описание условия (всплывающая подсказка).
+ */
+export function Medal({
+  icon,
+  title,
+  hint,
+  unlocked,
+  progress,
+  count,
+}: {
+  icon: IconName;
+  title: ReactNode;
+  hint?: string;
+  unlocked: boolean;
+  progress?: { current: number; target: number };
+  /** Число вместо иконки в сером кружке («10», «100»). */
+  count?: number;
+}) {
+  const ratio = progress ? Math.min(1, progress.current / Math.max(1, progress.target)) : 0;
+  return (
+    <div className={cx('medal', unlocked ? 'on' : 'off')} title={hint}>
+      <span className="medal-icon" aria-hidden="true">
+        {!unlocked && count !== undefined ? count : <Icon name={icon} size={22} />}
+      </span>
+      <span className="medal-title">{title}</span>
+      {unlocked && <span className="medal-state">{t('achievements.got')}</span>}
+      {!unlocked && progress && (
+        <>
+          <span className="medal-bar" aria-hidden="true">
+            <span style={{ width: `${ratio * 100}%` }} />
+          </span>
+          <span className="medal-progress">
+            {t('achievements.progress', { current: progress.current, target: progress.target })}
+          </span>
+        </>
+      )}
+    </div>
   );
 }
 
