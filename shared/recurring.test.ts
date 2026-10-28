@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { dueDates, firstOccurrence, isoWeekday, nextOccurrence } from './recurring.ts';
+import { dueDates, firstOccurrence, isoWeekday, isRealDate, nextOccurrence } from './recurring.ts';
 
 test('monthly: next month, same day', () => {
   assert.equal(nextOccurrence('monthly', 15, '2025-01-15'), '2025-02-15');
@@ -73,4 +73,22 @@ test('dueDates: weekly catch-up and custom limit', () => {
   assert.deepEqual(r.due, ['2025-01-20', '2025-01-27']);
   assert.equal(r.skipped, 2);
   assert.equal(r.next, '2025-02-03');
+});
+
+test('isRealDate: only existing calendar dates in YYYY-MM-DD', () => {
+  for (const ok of ['2024-02-29', '2026-12-31', '2000-01-01', '9999-01-01']) assert.equal(isRealDate(ok), true, ok);
+  for (const bad of [
+    '2026-02-29',
+    '2026-02-31',
+    '2026-04-31',
+    '2026-13-01',
+    '2026-00-10',
+    '2026-01-00',
+    '2026-1-1',
+    '',
+    'abc',
+  ])
+    assert.equal(isRealDate(bad), false, bad);
+  assert.equal(isRealDate('0050-02-29'), false);
+  assert.equal(isRealDate('0050-03-01'), true);
 });

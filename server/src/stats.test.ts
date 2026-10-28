@@ -69,7 +69,7 @@ test('API actions count: group, expense, transfer, join (once)', async () => {
   assert.equal(created.status, 201);
   const g = created.body;
   const shares = g.members.map((m: Json) => ({ memberId: m.id, value: 1 }));
-  const base = { title: 'Хлеб', amount: 1000, payerId: g.meId, splitMode: 'equal', shares, spentOn: '2030-01-01' };
+  const base = { title: 'Хлеб', amount: 1000, payerId: g.meId, splitMode: 'equal', shares, spentOn: '2025-01-01' };
   assert.equal((await call(owner, 'POST', `/groups/${g.id}/expenses`, { ...base, kind: 'expense' })).status, 201);
   // a rejected expense (bad payer) is not counted
   const bad = await call(owner, 'POST', `/groups/${g.id}/expenses`, { ...base, kind: 'expense', payerId: 999999 });
@@ -82,7 +82,7 @@ test('API actions count: group, expense, transfer, join (once)', async () => {
     payerId: maria,
     splitMode: 'equal',
     shares: [{ memberId: g.meId, value: 1 }],
-    spentOn: '2030-01-01',
+    spentOn: '2025-01-01',
   });
   assert.equal(tr.status, 201);
   const code = db.one<{ invite_code: string }>('SELECT invite_code FROM groups WHERE id = ?', g.id)?.invite_code;

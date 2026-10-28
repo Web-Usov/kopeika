@@ -13,6 +13,15 @@ const parse = (iso: string) => {
 };
 const daysInMonth = (year: number, month0: number) => new Date(Date.UTC(year, month0 + 1, 0)).getUTCDate();
 
+/** A real calendar date in the form YYYY-MM-DD: "2024-02-29" yes, "2026-02-29" or "2026-13-01" no. */
+export function isRealDate(iso: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+  const [y, m, d] = iso.split('-').map(Number);
+  // Date.UTC maps years 0-99 to 1900-1999, so compare the parts instead of formatting back.
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return date.getUTCMonth() === m - 1 && date.getUTCDate() === d && m >= 1 && m <= 12;
+}
+
 export function addDays(iso: string, n: number): string {
   const d = parse(iso);
   d.setUTCDate(d.getUTCDate() + n);

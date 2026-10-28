@@ -9,12 +9,17 @@ import {
   normalizeRate,
   type SplitInput,
 } from '../../shared/money.ts';
+import { addDays, isRealDate } from '../../shared/recurring.ts';
 import { expenseSnapshot, logActivity } from './activity.ts';
 import { all, one, run } from './db.ts';
 import { fail } from './errors.ts';
 import { assertRoomForExpense } from './quota.ts';
+import { localDate } from './recurring.ts';
 import type { ExpenseRow, GroupRow } from './repo.ts';
 import { countEvent } from './stats.ts';
+
+/** Earliest accepted expense date. */
+const MIN_SPENT_ON = '2000-01-01';
 
 export const expenseBody = z.object({
   kind: z.enum(['expense', 'transfer']).default('expense'),
@@ -27,7 +32,11 @@ export const expenseBody = z.object({
   rate: z.string().max(32).optional(),
   payerId: z.number().int().positive(),
   splitMode: z.enum(['equal', 'shares', 'exact']),
-  spentOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  // A real date, up to tomorrow on the server calendar (slack for clients ahead of the server's time zone).
+  spentOn: z
+    .string()
+    .refine(isRealDate)
+    .refine((d) => d >= MIN_SPENT_ON && d <= addDays(localDate(), 1)),
   category: z.enum(CATEGORY_IDS).optional(),
   shares: z
     .array(z.object({ memberId: z.number().int().positive(), value: z.number().int().min(0) }))
