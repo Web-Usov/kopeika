@@ -1,4 +1,5 @@
 import { type ButtonHTMLAttributes, type CSSProperties, type InputHTMLAttributes, type ReactNode, useId } from 'react';
+import type { AchievementId } from '../../shared/achievements.ts';
 import { type CategoryId, type CategoryTone, categoryIcon, categoryTone } from '../../shared/categories.ts';
 import type { Key } from '../../shared/i18n/index.ts';
 import { formatMoney } from '../../shared/money.ts';
@@ -1475,5 +1476,90 @@ export function Tips({ items }: { items: ReactNode[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/** Иконки достижений: `Medal` в «Итогах» и эмблема в `CelebrationModal`. */
+export const ACHIEVEMENT_ICON: Record<AchievementId, IconName> = {
+  first: 'sprout',
+  crew: 'users',
+  ten: 'receipt',
+  hundred: 'flame',
+  travelers: 'globe',
+  allCategories: 'palette',
+  clean: 'check',
+  week: 'calendar',
+  month: 'clock',
+};
+
+/**
+ * Модалка праздника (`.modal` на `.scrim`): эмблема 88, заголовок `title-m`, текст, `Button primary wide`
+ * и необязательная `Button ghost wide`. Конфетти (`backdrop`) рисуется между затемнением и карточкой.
+ */
+export function CelebrationModal({
+  emblem,
+  title,
+  text,
+  actionLabel,
+  onAction,
+  ghostLabel,
+  onGhost,
+  backdrop,
+  onDismiss,
+}: {
+  emblem: ReactNode;
+  title: ReactNode;
+  text: ReactNode;
+  actionLabel: string;
+  onAction: () => void;
+  ghostLabel?: string;
+  onGhost?: () => void;
+  backdrop?: ReactNode;
+  onDismiss?: () => void;
+}) {
+  return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: закрывается и кнопкой внутри
+    <div className="scrim" role="dialog" aria-modal="true" onClick={onDismiss}>
+      {backdrop}
+      <div className="modal">
+        {emblem}
+        <h2 className="modal-title">{title}</h2>
+        <p className="modal-text">{text}</p>
+        <div className="modal-actions">
+          <Button wide onClick={onAction}>
+            {actionLabel}
+          </Button>
+          {ghostLabel && onGhost && (
+            <Button variant="ghost" wide onClick={onGhost}>
+              {ghostLabel}
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Плашка «Завершить поездку» (`.finish-banner`): `Card` с обводкой `--brand`, плитка-галочка, заголовок,
+ * текст и две кнопки поровну — `primary` и `fill`.
+ */
+export function FinishBanner({ onFinish, onLater }: { onFinish: () => void; onLater: () => void }) {
+  return (
+    <Card className="finish-banner">
+      <div className="finish-head">
+        <Tile icon="check" tone="pos" />
+        <div className="finish-body">
+          <div className="finish-title">{t('group.allSettledTitle')}</div>
+          <div className="hint">{t('group.allSettledText')}</div>
+        </div>
+      </div>
+      <div className="finish-actions">
+        <Button onClick={onFinish}>{t('group.finish')}</Button>
+        <Button variant="fill" onClick={onLater}>
+          {t('group.finishLater')}
+        </Button>
+      </div>
+    </Card>
   );
 }

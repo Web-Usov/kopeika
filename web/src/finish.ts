@@ -5,6 +5,9 @@ import { alertDialog, haptic } from './tg.tsx';
 /** Everyone is even and something was spent: the moment to offer to finish the trip. */
 export const isAllSettled = (g: GroupDetail) => g.totalSpent > 0 && g.members.every((m) => m.balance === 0);
 
+/** The offer is on: a live, settled, real group where «Not now» hasn't been said for the latest entry. */
+export const canFinish = (g: GroupDetail) => !g.isDemo && !g.archived && isAllSettled(g) && !finishOfferDismissed(g);
+
 /** The newest ledger entry; «Not now» is remembered against it, so the next expense brings the offer back. */
 const latestEntryId = (g: GroupDetail) => g.expenses.reduce((max, e) => Math.max(max, e.id), 0);
 
