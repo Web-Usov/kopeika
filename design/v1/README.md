@@ -6,6 +6,7 @@
 - **[`v1.css`](v1.css)** — те же токены и компоненты в CSS. Этим кодом нарисованы макеты.
 - **[`screens/`](screens)** — рендеры 24 экранов (390 px, ×2): эталон компоновки.
 - **Холст** с «Как сейчас» и v1 рядом: [claude.ai/artifact/HHWPpvqerihPHh5bCBPYqo](https://claude.ai/artifact/HHWPpvqerihPHh5bCBPYqo) (доступ у владельца).
+- **Doop** — рабочие HTML-макеты всех 24 экранов рядом с эталонами: [doop.design/c/bCI9GJFCBF](https://doop.design/c/bCI9GJFCBF). Здесь дорабатываем дизайн до кода; порядок работы — навык [`.claude/skills/doop-design`](../../.claude/skills/doop-design/SKILL.md).
 
 **Маскот в v1 не входит.** Где и как показывать Копейку, решаем в #21. На её местах — нейтральные эмблемы.
 
