@@ -3,31 +3,34 @@
 import { type Lang, t } from './i18n/index.ts';
 import { formatMoney } from './money.ts';
 
-export type ActivityAction =
-  | 'group.create'
-  | 'group.rename'
-  | 'member.add'
-  | 'member.rename'
-  | 'member.delete'
-  | 'member.join'
-  | 'member.claim'
-  | 'member.payment_info'
-  | 'member.leave'
-  | 'member.remove'
-  | 'group.invite_rotate'
-  | 'group.archive'
-  | 'group.unarchive'
-  | 'expense.create'
-  | 'expense.update'
-  | 'expense.delete'
-  | 'debt.remind'
-  | 'group.auto_remind'
-  | 'group.chat_link'
-  | 'group.chat_unlink'
-  | 'group.chat_feed'
-  | 'recurring.create'
-  | 'recurring.update'
-  | 'recurring.delete';
+export const ACTIVITY_ACTIONS = [
+  'group.create',
+  'group.rename',
+  'member.add',
+  'member.rename',
+  'member.delete',
+  'member.join',
+  'member.claim',
+  'member.payment_info',
+  'member.leave',
+  'member.remove',
+  'group.invite_rotate',
+  'group.archive',
+  'group.unarchive',
+  'expense.create',
+  'expense.update',
+  'expense.delete',
+  'debt.remind',
+  'group.auto_remind',
+  'group.chat_link',
+  'group.chat_unlink',
+  'group.chat_feed',
+  'recurring.create',
+  'recurring.update',
+  'recurring.delete',
+] as const;
+
+export type ActivityAction = (typeof ACTIVITY_ACTIONS)[number];
 
 export interface PersonRef {
   id: number;
@@ -69,9 +72,35 @@ export interface ActivityEntry {
 
 /** The text of one history line. Amounts are formatted in the group's currency. */
 export function activityText(lang: Lang, entry: ActivityEntry, currency: string): string {
+  return render(lang, entry, (n) => formatMoney(n, currency, lang));
+}
+
+/** A piece of a history line; `bold` marks an amount. */
+export interface ActivityPart {
+  text: string;
+  bold: boolean;
+}
+
+// Private-use characters fence an amount in the rendered line, so the same templates give plain text and parts.
+const MONEY_OPEN = '\uE000';
+const MONEY_CLOSE = '\uE001';
+
+/** The same line as `activityText`, split into parts so the UI can set amounts in bold without HTML. */
+export function activityParts(lang: Lang, entry: ActivityEntry, currency: string): ActivityPart[] {
+  const marked = render(lang, entry, (n) => MONEY_OPEN + formatMoney(n, currency, lang) + MONEY_CLOSE);
+  const parts: ActivityPart[] = [];
+  for (const [i, chunk] of marked.split(MONEY_OPEN).entries()) {
+    // Every chunk after the first starts with an amount that ends at MONEY_CLOSE.
+    const [amount, rest] = i === 0 ? ['', chunk] : (chunk.split(MONEY_CLOSE) as [string, string]);
+    if (amount) parts.push({ text: amount, bold: true });
+    if (rest) parts.push({ text: rest, bold: false });
+  }
+  return parts;
+}
+
+function render(lang: Lang, entry: ActivityEntry, money: (n: number) => string): string {
   const actor = entry.actor.name;
   const p = entry.payload;
-  const money = (n: number) => formatMoney(n, currency, lang);
   switch (entry.action) {
     case 'group.create':
       return t(lang, 'activity.groupCreate', { actor, name: p.name ?? '' });

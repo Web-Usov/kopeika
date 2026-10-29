@@ -971,9 +971,14 @@ select.field {
   margin-top: 8px;
 }
 
-.row.activity .row-title {
-  white-space: normal;
-  overflow: visible;
+/* История: аватар стоит по верху строки, на уровне первой строки текста. */
+.row.activity {
+  align-items: flex-start;
+}
+
+/* История: суммы в тексте записи полужирным. */
+.row.activity .row-title b {
+  font-weight: 600;
 }
 
 .row.buttons-wrap-row {
@@ -1691,8 +1696,8 @@ select.field {
 
 .av-badge {
   position: absolute;
-  right: calc(var(--sp-1) * -1);
-  bottom: calc(var(--sp-1) * -1);
+  right: calc(var(--sp-1) * -1.5);
+  bottom: calc(var(--sp-1) * -1.5);
   width: 18px;
   height: 18px;
   border-radius: var(--sp-1);

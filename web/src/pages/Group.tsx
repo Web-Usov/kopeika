@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
-import { type ActivityEntry, activityText } from '../../../shared/activity.ts';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import { type ActivityEntry, activityParts } from '../../../shared/activity.ts';
+import { activityBadge } from '../../../shared/activityBadge.ts';
 import { type CategoryId, type CategoryTotal, categoryKey } from '../../../shared/categories.ts';
 import { formatMoney } from '../../../shared/money.ts';
 import { parseQuickExpense } from '../../../shared/quickExpense.ts';
@@ -412,17 +413,13 @@ function InviteHint({ g }: { g: GroupDetail }) {
   );
 }
 
-function whenText(iso: string): string {
+function timeText(iso: string): string {
+  return new Intl.DateTimeFormat(dateLocale, { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+}
+
+function localDay(iso: string): string {
   const d = new Date(iso);
-  const now = new Date();
-  const time = new Intl.DateTimeFormat(dateLocale, { hour: '2-digit', minute: '2-digit' }).format(d);
-  if (d.toDateString() === now.toDateString()) return time;
-  const date = new Intl.DateTimeFormat(dateLocale, {
-    day: 'numeric',
-    month: 'short',
-    ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
-  }).format(d);
-  return `${date}, ${time}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function HistoryTab({ g }: { g: GroupDetail }) {
@@ -460,27 +457,43 @@ function HistoryTab({ g }: { g: GroupDetail }) {
       </div>
     );
   }
+  const byDay = new Map<string, ActivityEntry[]>();
+  for (const e of items) {
+    const day = localDay(e.createdAt);
+    byDay.set(day, [...(byDay.get(day) ?? []), e]);
+  }
   return (
-    <Section>
-      {items.map((e) => (
-        <Row
-          key={e.id}
-          className="activity"
-          left={
-            <Avatar
-              member={g.members.find((m) => m.id === e.actor.memberId) ?? { id: 0, name: e.actor.name, photoUrl: null }}
+    <>
+      {[...byDay].map(([day, list]) => (
+        <DayHeader key={day} day={formatDay(day)} inset={64}>
+          {list.map((e) => (
+            <Row
+              key={e.id}
+              wrap
+              className="activity"
+              left={
+                <Avatar
+                  member={
+                    g.members.find((m) => m.id === e.actor.memberId) ?? { id: 0, name: e.actor.name, photoUrl: null }
+                  }
+                  badge={activityBadge(e)}
+                />
+              }
+              title={activityParts(lang, e, g.currency).map((part, i) =>
+                // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one line never reorder
+                part.bold ? <b key={i}>{part.text}</b> : <Fragment key={i}>{part.text}</Fragment>,
+              )}
+              subtitle={timeText(e.createdAt)}
             />
-          }
-          title={activityText(lang, e, g.currency)}
-          subtitle={whenText(e.createdAt)}
-        />
+          ))}
+        </DayHeader>
       ))}
       {next !== null && (
-        <button type="button" className="text-btn" disabled={busy} onClick={() => load(next)}>
-          {t('activity.loadMore')}
-        </button>
+        <Button variant="ghost" wide disabled={busy} onClick={() => load(next)}>
+          {busy ? t('common.loading') : t('activity.loadMore')}
+        </Button>
       )}
-    </Section>
+    </>
   );
 }
 

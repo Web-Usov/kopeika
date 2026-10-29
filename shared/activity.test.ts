@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { type ActivityEntry, activityText, type ExpenseSnapshot } from './activity.ts';
+import { type ActivityEntry, activityParts, activityText, type ExpenseSnapshot } from './activity.ts';
 
 const nbsp = (s: string) => s.replace(/\s/g, ' ');
 const masha = { memberId: 2, name: 'Маша' };
@@ -118,4 +118,16 @@ test('recurring entries: pause and resume differ from a plain change', () => {
   );
   assert.equal(text('ru', entry('recurring.delete', { name })), 'Маша удалил(а) регулярную трату «Аренда»');
   assert.equal(text('en', entry('recurring.delete', { name })), 'Маша deleted the recurring expense “Аренда”');
+});
+
+test('activityParts: amounts are bold and the parts join back to activityText', () => {
+  const e = entry('expense.update', { before: snap(), after: snap({ amount: 350000 }) });
+  const parts = activityParts('ru', e, 'RUB');
+  assert.equal(nbsp(parts.map((p) => p.text).join('')), text('ru', e));
+  assert.deepEqual(
+    parts.filter((p) => p.bold).map((p) => nbsp(p.text)),
+    ['3 000 ₽', '3 500 ₽'],
+  );
+  const plain = entry('member.join', {});
+  assert.deepEqual(activityParts('en', plain, 'RUB'), [{ text: activityText('en', plain, 'RUB'), bold: false }]);
 });
