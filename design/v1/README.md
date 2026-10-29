@@ -33,7 +33,7 @@
 
 | Токен | Источник | Для чего |
 |---|---|---|
-| `--bg` | `--tg-theme-secondary-bg-color` (#efeff4 / #000) | фон экрана |
+| `--bg` | `--tg-theme-secondary-bg-color` (#efeff4 / #000) | фон экрана; если тема клиента даёт фон почти как у секций — фон затемняется (tg.tsx) |
 | `--sec` | `--tg-theme-section-bg-color` (#fff / #1c1c1e) | секции, карточки, поля |
 | `--text` | `--tg-theme-text-color` | основной текст |
 | `--hint` | `--tg-theme-hint-color` (#8e8e93 / #98989e) | подписи, плейсхолдеры, неактивное |

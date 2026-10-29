@@ -1,6 +1,7 @@
 // Thin typed wrapper around the official telegram-web-app.js (loaded in index.html).
 // Outside Telegram (plain browser during development) everything degrades to HTML fallbacks.
 import { type ReactNode, useEffect, useRef } from 'react';
+import { correctedScreenBg, type ThemeColors } from '../../shared/themeContrast.ts';
 import { t } from './i18n.ts';
 
 interface BottomButton {
@@ -20,6 +21,8 @@ interface WebApp {
   };
   version: string;
   colorScheme: 'light' | 'dark';
+  themeParams?: ThemeColors;
+  setBackgroundColor?(color: string): void;
   isVersionAtLeast(v: string): boolean;
   onEvent?(event: string, cb: () => void): void;
   ready(): void;
@@ -62,6 +65,22 @@ function currentScheme(): 'light' | 'dark' {
 /** Ставит data-scheme на <html>: от него включается тёмная пара токенов (tokens.css). */
 export function applyScheme(scheme: 'light' | 'dark' = currentScheme()) {
   document.documentElement.dataset.scheme = scheme;
+  applyScreenBg(inTelegram ? tg!.themeParams : undefined, scheme);
+}
+
+let bgOverridden = false;
+
+/**
+ * Telegram Desktop/Web нередко присылают фон экрана почти как у карточек — границы блоков не видны.
+ * Тогда `--bg` затемняется (themeContrast.ts), иначе override снимается. Вне Telegram — запасные значения tokens.css.
+ */
+export function applyScreenBg(theme: ThemeColors | undefined, scheme: 'light' | 'dark') {
+  const root = document.documentElement.style;
+  const bg = correctedScreenBg(theme, scheme);
+  if (bg) root.setProperty('--bg', bg);
+  else root.removeProperty('--bg');
+  if (inTelegram && atLeast('6.1') && (bg || bgOverridden)) tg!.setBackgroundColor?.(bg ?? 'secondary_bg_color');
+  bgOverridden = Boolean(bg);
 }
 
 // Тема нужна до первой отрисовки, поэтому выставляем её при загрузке модуля и следим за сменой.
