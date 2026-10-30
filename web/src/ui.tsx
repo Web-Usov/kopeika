@@ -1,8 +1,16 @@
-import { type ButtonHTMLAttributes, type CSSProperties, type InputHTMLAttributes, type ReactNode, useId } from 'react';
+import {
+  type ButtonHTMLAttributes,
+  type CSSProperties,
+  type InputHTMLAttributes,
+  type ReactNode,
+  useId,
+  useState,
+} from 'react';
+import { flushSync } from 'react-dom';
 import type { AchievementId } from '../../shared/achievements.ts';
 import { type CategoryId, type CategoryTone, categoryIcon, categoryTone } from '../../shared/categories.ts';
 import type { Key } from '../../shared/i18n/index.ts';
-import { formatMoney } from '../../shared/money.ts';
+import { formatAmount, formatMoney, parseAmount } from '../../shared/money.ts';
 import type { Member } from './api.ts';
 import { dateLocale, lang, t } from './i18n.ts';
 import { Icon, type IconName } from './icons.tsx';
@@ -775,6 +783,9 @@ export function AmountCard({
   children?: ReactNode;
 }) {
   const id = useId();
+  const [focused, setFocused] = useState(false);
+  const minor = parseAmount(value);
+  const shown = !focused && minor !== null && value.trim() !== '' ? formatAmount(minor, lang) : value;
   return (
     <div className="amt">
       <div className="amt-main">
@@ -786,10 +797,16 @@ export function AmountCard({
             id={id}
             className={cx('amt-input', error && 'input-err')}
             inputMode="decimal"
-            size={Math.max(1, value.length)}
+            size={Math.max(1, shown.length)}
             placeholder={placeholder}
-            value={value}
+            value={shown}
             aria-invalid={error ? true : undefined}
+            onFocus={(e) => {
+              const input = e.target;
+              flushSync(() => setFocused(true)); // подменить «3 200» на число до установки каретки
+              input.select();
+            }}
+            onBlur={() => setFocused(false)}
             onChange={(e) => onChange(e.target.value)}
           />
           {currency &&
@@ -1441,7 +1458,7 @@ export function PhotoTile({
   return (
     <label className="photo">
       <span className="pi" aria-hidden="true">
-        <Icon name={icon} size={26} stroke={2} />
+        <Icon name={icon} size={24} stroke={2} />
       </span>
       {label}
       <input
