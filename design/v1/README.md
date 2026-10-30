@@ -4,7 +4,7 @@
 
 - **Этот файл** — правила: токены, шкалы, иконки, компоненты, паттерны, состояния, тексты.
 - **[`v1.css`](v1.css)** — те же токены и компоненты в CSS. Этим кодом нарисованы макеты.
-- **[`screens/`](screens)** — рендеры 24 экранов (390 px, ×2): эталон компоновки.
+- **[`screens/`](screens)** — рендеры 24 экранов (390 px, ×2): эталон компоновки. Обновлены 30 октября 2026 по макетам Doop, синхронизированным с кодом.
 - **Холст** с «Как сейчас» и v1 рядом: [claude.ai/artifact/HHWPpvqerihPHh5bCBPYqo](https://claude.ai/artifact/HHWPpvqerihPHh5bCBPYqo) (доступ у владельца).
 - **Doop** — рабочие HTML-макеты всех 24 экранов рядом с эталонами: [doop.design/c/bCI9GJFCBF](https://doop.design/c/bCI9GJFCBF). Здесь дорабатываем дизайн до кода; порядок работы — навык [`.claude/skills/doop-design`](../../.claude/skills/doop-design/SKILL.md).
 
