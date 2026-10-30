@@ -278,6 +278,11 @@ button:disabled {
   margin-bottom: 20px;
 }
 
+/* После кнопки на всю ширину (экран группы) секция отступает так же, как от соседней секции. */
+.btn.wide + .section {
+  margin-top: 20px;
+}
+
 .section-title {
   color: var(--sub);
   font-size: var(--fs-footnote);
@@ -976,8 +981,8 @@ select.field {
   align-items: flex-start;
 }
 
-/* История: суммы в тексте записи полужирным. */
-.row.activity .row-title b {
+/* Полужирное в заголовке строки: суммы в записи истории, название группы в списке. */
+.row-title b {
   font-weight: 600;
 }
 
@@ -1233,8 +1238,8 @@ select.field {
   align-items: center;
   justify-content: center;
   gap: var(--sp-3);
-  min-height: 132px;
-  padding: var(--sp-3);
+  min-height: 140px;
+  padding: var(--sp-5) var(--sp-4);
   border-radius: var(--r-l);
   background: var(--sec);
   color: var(--link);
@@ -1248,16 +1253,16 @@ select.field {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 52px;
-  border-radius: var(--r-l);
+  width: 60px;
+  height: 60px;
+  border-radius: var(--r-m);
   background: var(--tint);
 }
 
 .tips {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--sp-3);
   margin: 0;
   padding: 2px var(--sp-1);
   list-style: none;
@@ -2538,10 +2543,10 @@ select.field {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--sp-2);
+  gap: var(--sp-3);
   margin-top: var(--sp-2);
   color: var(--hint);
-  font-size: var(--fs-callout);
+  font-size: var(--fs-body);
 }
 
 .intro-who .stack {
@@ -3001,7 +3006,8 @@ select.field {
 }
 
 .brow-name {
-  flex: 0 0 24%;
+  flex: none;
+  width: 48px;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3014,7 +3020,8 @@ select.field {
 }
 
 .brow-amount {
-  flex: 0 0 30%;
+  flex: none;
+  min-width: 112px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;

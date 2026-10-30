@@ -52,7 +52,7 @@ export function Home() {
       key={g.id}
       left={<Tile text={groupInitial(g.name)} tone={`a${(g.id % 7) + 1}` as TileTone} />}
       onClick={() => navigate(`/g/${g.id}`)}
-      title={g.name}
+      title={<b>{g.name}</b>}
       subtitle={
         <>
           {g.isDemo && <Badge tone="brand">{t('home.demoBadge')}</Badge>}{' '}

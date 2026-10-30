@@ -180,6 +180,15 @@ export function formatMoney(minor: number, currency: string, lang: Lang): string
   }
 }
 
+/** Сумма без знака валюты, с разбивкой по разрядам: «3 200», «5 531,67» (плашка валюты рядом). */
+export function formatAmount(minor: number, lang: Lang): string {
+  const hasFrac = minor % 100 !== 0;
+  return new Intl.NumberFormat(locale(lang), {
+    minimumFractionDigits: hasFrac ? 2 : 0,
+    maximumFractionDigits: 2,
+  }).format(minor / 100);
+}
+
 export const CURRENCIES = ['RUB', 'USD', 'EUR', 'GEL', 'TRY', 'KZT', 'AMD', 'BYN', 'UAH', 'THB', 'AED', 'CNY', 'GBP'];
 
 /** Number of minor-unit digits of a currency (2 for everything we support today; JPY-like ones would be 0). */

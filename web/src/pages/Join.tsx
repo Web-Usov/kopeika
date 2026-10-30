@@ -80,7 +80,7 @@ export function Join({ code, to }: { code: string; to?: 'summary' }) {
       {back}
       <Intro emblem={<Emblem icon="userplus" />} title={group.name} lead={t('join.invited')}>
         <div className="intro-who">
-          <AvatarStack members={members.slice(0, 4).map((m) => ({ ...m, photoUrl: null }))} size="s" />
+          <AvatarStack members={members.slice(0, 4).map((m) => ({ ...m, photoUrl: null }))} />
           <span>{whoText}</span>
         </div>
       </Intro>
