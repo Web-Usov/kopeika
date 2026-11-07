@@ -1,0 +1,69 @@
+{
+  // opencode-taskflow project config. Global defaults: ~/.config/opencode/taskflow.jsonc. Service artifacts: .taskflow/.
+  "language": { "human": "ru", "agent": "en" },
+  "git": { "remote": "origin", "baseBranch": "main", "branchPrefix": "task/", "worktreeDir": "../{repo}-wt" },
+  "task": { "areas": ["api", "web", "mobile", "infra", "docs"], "sizes": ["S", "M"] },
+  // Files copied from the main checkout into every new worktree (git-ignored env files), and commands run there.
+  "setup": { "copy": [], "commands": ["npm ci"] },
+  "verify": { "full": "npm run check", "quick": "npm run lint", "e2e": "npm run e2e" },
+  // Required CI checks (names of GitHub status checks).
+  "ci": { "checks": ["test", "e2e", "image"] },
+  // Only the planner edits these; PRs touching them wait for the human.
+  "protected": [
+    "docs/specs/**",
+    "docs/decisions/**",
+    ".taskflow/epics/**",
+    ".taskflow/standards/**",
+    ".taskflow/plans/**",
+    ".taskflow/workflow.md",
+    ".taskflow/config.jsonc"
+  ],
+  "qaPaths": ["e2e/**"],
+  // Reference index only: status is a routing hint, not authenticated human sign-off.
+  "standards": {
+    "index": ".taskflow/standards/index.json",
+    "roots": [".taskflow", "docs", "AGENTS.md"],
+    "maxContextChars": 24000
+  },
+  "review": { "maxRounds": 3, "autoMerge": true, "mergeMethod": "squash" },
+  "parallel": 2,
+  // Project overrides replace Astra with Sol; other role defaults remain inherited.
+  "agents": {
+    "lead": {
+      "models": ["claude-code/claude-opus-5-5#high", "anthropic/claude-opus-5-5#high", "openai/gpt-6.1-sol#high"]
+    },
+    "planner": {
+      "models": [
+        "claude-code/claude-opus-5-5#high",
+        "anthropic/claude-fable-5-1#high",
+        "anthropic/claude-opus-5-5#high",
+        "openai/gpt-6.1-sol#high"
+      ]
+    },
+    "reviewer": {
+      "models": ["openai/gpt-6.1-sol#high", "claude-code/claude-opus-5-5#high", "anthropic/claude-opus-5-5#high"]
+    }
+  },
+  "categories": {
+    "deep": {
+      "models": ["claude-code/claude-opus-5-5#high", "anthropic/claude-opus-5-5#high", "openai/gpt-6.1-sol#high"]
+    }
+  },
+  // Route implementer tasks to categories by size/area (categories are defined globally or here).
+  "routing": [{ "when": { "size": "S" }, "category": "quick" }],
+  // Explicit service paths keep inherited settings from routing this project back to the legacy layout.
+  "paths": {
+    "config": ".taskflow/config.jsonc",
+    "tasks": ".taskflow/tasks",
+    "epics": ".taskflow/epics",
+    "board": ".taskflow/tasks/README.md",
+    "template": ".taskflow/templates/task.md",
+    "epicTemplate": ".taskflow/templates/epic.md",
+    "workflow": ".taskflow/workflow.md",
+    "plans": ".taskflow/plans",
+    "standardsGuide": ".taskflow/standards/README.md",
+    "prTemplate": ".taskflow/templates/pull-request.md",
+    "humanReviewTemplate": ".taskflow/templates/human-review.md",
+    "milestones": ".taskflow/milestones"
+  }
+}
